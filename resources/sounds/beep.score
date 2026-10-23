@@ -1,0 +1,5 @@
+# The alert: one clear tone, short, with a soft edge.
+wave triangle
+attack 4
+release 60
+note 880 140 0.5

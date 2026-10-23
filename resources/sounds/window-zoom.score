@@ -1,0 +1,7 @@
+# A window zoomed: two quick ticks at one pitch.
+wave sine
+attack 3
+release 20
+note 990 30 0.3
+rest 20
+note 990 30 0.3

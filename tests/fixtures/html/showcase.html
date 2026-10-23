@@ -1,0 +1,23 @@
+<!doctype html><html><head><style>
+body { font-family: Sans; font-size: 14px; line-height: 1.5; }
+.panel { width: 80%; max-width: 500px; margin: 8px auto; padding: 12px; border: 2px solid #345678; background: #eef4fa; color: #203040; }
+.summary { font-family: Serif; font-weight: bold; text-align: center; }
+.draft { display: none; }
+th { padding: 6px; border: 1px solid #456789; background: #345678; color: white; }
+td { padding: 6px; border: 1px solid #789abc; }
+.warm { background: #ffe8d0; color: #302010; }
+.code { white-space: pre-wrap; font-family: Mono; font-size: 15px; line-height: 1.4; }
+figure { padding: 10px; border: 1px solid #456789; text-align: center; }
+figcaption { font-family: Serif; color: #345678; }
+</style></head><body>
+<h1>Document showcase</h1><p>Offline text, boxes, pictures and tables.</p>
+<div class="panel"><p class="summary">Measured document typography</p><p>Nested <u>underlined</u> and <s>revised</s> words share their selection geometry.</p><p><a href="#detail">Open the details</a>.</p></div>
+<div class="draft"><h2>HIDDEN_DRAFT</h2><a href="hidden.html">Hidden link</a><img src="hidden.png"></div>
+<table><caption>Renderer capabilities</caption><tr><th>Area</th><th>Behavior</th></tr>
+<tr class="warm"><td rowspan="2" style="width:30%">Text</td><td>Font selection, wrapping and spacing</td></tr>
+<tr><td>Selection, find and copied text</td></tr><tr><td colspan="2">Cells share a bounded column layout.</td></tr></table>
+<figure><img width="140" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAICAYAAAD5nd/tAAAAFklEQVR4nGM4wSXyn5qYYdTAUQNJxwCGyS8wuJRVjAAAAABJRU5ErkJggg==" alt="Embedded colour sample"><figcaption>Embedded resource</figcaption></figure>
+<figure><img src="missing.png" alt="Unavailable resource"><figcaption>Alternate text remains available.</figcaption></figure>
+<h4 id="detail">Details</h4><pre class="code">renderer.sample()
+  preserved  whitespace
+bounded local resources</pre><footer>TAIL_SHOWCASE</footer></body></html>

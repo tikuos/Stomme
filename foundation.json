@@ -1,0 +1,31 @@
+{
+  "id": "desktop-foundation",
+  "name": "Stomme",
+  "version": "0.01",
+  "kits": [
+    "editor",
+    "application",
+    "translation",
+    "interface",
+    "storage",
+    "device",
+    "media",
+    "support"
+  ],
+  "document_provider": "none",
+  "optional_packages": {
+    "tiku-basic": {
+      "path": "packages/document-basic",
+      "kits": [
+        "document_formats",
+        "document"
+      ],
+      "requires": [
+        "translation",
+        "interface",
+        "storage",
+        "support"
+      ]
+    }
+  }
+}

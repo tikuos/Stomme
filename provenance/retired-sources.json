@@ -1,0 +1,14 @@
+[
+  {
+    "path": "kits/tools/check_kits.py",
+    "origin_product": "tikudesktop",
+    "origin_path": "kits/tools/check_kits.py",
+    "origin_revision": "958141e312fd52ef44b13f378c34ffe0f392a39b",
+    "sha256": "8e0526d8134c80c0d35fe373380128327e0985948e9c22991abf878f96b4fbef",
+    "reason": "Selected extraction origin",
+    "extracted_sha256": "70eb13a6ce12fdbc1e5a672523862b432a44556cefa4b0859c44173952c29268",
+    "origin_state": "working-snapshot",
+    "baseline_manifest_sha256": "99e802641f099d209ffb55499b42a240dedd73a78e200ec7971fc519db49df04",
+    "retirement_reason": "Replaced by tools/check_dependencies.py"
+  }
+]

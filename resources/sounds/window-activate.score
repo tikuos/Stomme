@@ -1,0 +1,5 @@
+# A window brought to the front: the faintest tick.
+wave sine
+attack 2
+release 15
+note 1320 18 0.18

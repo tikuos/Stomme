@@ -1,0 +1,378 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The words the interface is made of, in English.
+
+  This file is the one place the English is written: it is baked into the
+  binary by kits/support/tools/genstrings.py, and read at runtime so a change here
+  shows without a rebuild.  A translation is a copy of this file named for
+  its language (fr.xml, el.xml, ru.xml) with the values changed and
+  the keys left alone.
+
+  Keep it sorted by area, and never change a key: the key is the name the
+  code knows a line by.  The … is a real ellipsis, not three dots.
+-->
+<strings lang="en">
+  <string name="reader.open">Open…</string>
+  <string name="reader.reload">Reload</string>
+  <string name="reader.close">Close</string>
+  <string name="reader.find">Find…</string>
+  <string name="reader.bookmark">Toggle bookmark</string>
+  <string name="reader.search_folder">Search folder</string>
+  <string name="reader.stop_search">Stop Search</string>
+  <string name="reader.search_results">Search Results</string>
+  <string name="reader.text_larger">Larger Text</string>
+  <string name="reader.text_smaller">Smaller Text</string>
+  <string name="reader.text_default">Default Text Size</string>
+  <string name="reader.reading_width">Comfortable Reading Width</string>
+  <string name="reader.location">Location:</string>
+  <string name="reader.location_focus">Location…</string>
+  <string name="reader.go">Go</string>
+  <string name="reader.find_button">Find</string>
+  <string name="reader.tip_back">Back (Alt+Left)</string>
+  <string name="reader.tip_forward">Forward (Alt+Right)</string>
+  <string name="reader.tip_reload">Reload (Ctrl+R)</string>
+  <string name="reader.tip_open">Open document (Ctrl+O)</string>
+  <string name="reader.tip_find">Find in document (Ctrl+F)</string>
+  <string name="reader.tip_go">Open location (Enter)</string>
+  <string name="reader.tip_find_close">Close Find (Escape)</string>
+  <string name="reader.location_hint">Open a local Markdown or HTML document</string>
+
+  <!-- Buttons that appear in more than one window. -->
+  <string name="button.defaults">Defaults</string>
+  <string name="button.revert">Revert</string>
+
+  <!-- Labels shared across windows and menus. -->
+  <string name="label.icon_size">Icon size</string>
+  <string name="label.recent_documents">Recent documents</string>
+  <string name="label.recent_folders">Recent folders</string>
+  <string name="label.recent_applications">Recent applications</string>
+
+  <!-- Window titles. -->
+  <string name="title.deskbar_prefs">Deskbar preferences</string>
+  <string name="title.desktop_prefs">Desktop preferences</string>
+  <string name="title.fonts">Fonts</string>
+  <string name="title.sounds">Sounds</string>
+
+  <!-- The Deskbar's menu. -->
+  <string name="menu.about">About this system</string>
+  <string name="menu.find">Find…</string>
+  <string name="menu.settings">Settings</string>
+  <string name="menu.help">Help…</string>
+  <string name="menu.force_quit">Force Quit…</string>
+  <string name="menu.applications">Applications</string>
+  <string name="menu.programming">Programming</string>
+  <string name="menu.documents">Documents</string>
+  <string name="menu.graphics">Graphics &amp; Design</string>
+  <string name="menu.utilities">Utilities</string>
+  <string name="menu.development">Development</string>
+  <string name="menu.device_tools">Device Tools</string>
+  <string name="menu.demos">Demos</string>
+  <string name="menu.deskbar_prefs">Deskbar preferences…</string>
+  <string name="menu.tracker_prefs">File Manager preferences…</string>
+  <string name="menu.desktop_prefs">Desktop preferences…</string>
+  <string name="menu.fonts">Fonts…</string>
+  <string name="menu.sounds">Sounds…</string>
+  <string name="menu.show_replicants">Show replicants</string>
+  <string name="menu.hide_replicants">Hide replicants</string>
+  <string name="menu.shut_down">Shut down…</string>
+  <string name="menu.show_all">Show all</string>
+  <string name="menu.hide_all">Hide all</string>
+  <string name="menu.close_all">Close all</string>
+  <string name="menu.clock.show">Show clock</string>
+  <string name="menu.clock.hide">Hide clock</string>
+  <string name="menu.seconds.show">Show seconds</string>
+  <string name="menu.seconds.hide">Hide seconds</string>
+  <string name="menu.day.show">Show day of week</string>
+  <string name="menu.day.hide">Hide day of week</string>
+  <string name="menu.zone.show">Show time zone</string>
+  <string name="menu.zone.hide">Hide time zone</string>
+
+  <!-- Deskbar preferences window. -->
+  <string name="prefs.deskbar.sort_apps">Sort applications by name</string>
+  <string name="prefs.deskbar.tracker_first">File Manager always first</string>
+  <string name="prefs.deskbar.show_expander">Show application expander</string>
+  <string name="prefs.deskbar.expand_new">Expand new applications</string>
+  <string name="prefs.deskbar.hide_app_names">Hide application names</string>
+  <string name="prefs.deskbar.font_size">Font size</string>
+  <string name="prefs.deskbar.always_on_top">Always on top</string>
+  <string name="prefs.deskbar.auto_raise">Auto-raise</string>
+  <string name="prefs.deskbar.auto_hide">Auto-hide</string>
+  <string name="prefs.deskbar.dock_location">Dock location</string>
+  <string name="prefs.deskbar.dock_n">Dock: %d</string>
+  <string name="prefs.deskbar.edit_in_tracker">Edit in File Manager…</string>
+
+  <!-- Desktop preferences window. -->
+  <string name="prefs.desktop.picture">Picture</string>
+  <string name="prefs.desktop.no_picture">No picture</string>
+  <string name="prefs.desktop.drop_hint">Drop a picture in the Desktop to offer it here</string>
+  <string name="prefs.desktop.how_laid">How it is laid</string>
+  <string name="prefs.desktop.mode.corner">At its own corner</string>
+  <string name="prefs.desktop.mode.centred">Centred</string>
+  <string name="prefs.desktop.mode.scaled">Scaled to fit</string>
+  <string name="prefs.desktop.mode.tiled">Tiled</string>
+  <string name="prefs.desktop.reduce_motion">Reduce motion</string>
+
+  <!-- Help window. -->
+  <string name="title.help">Help</string>
+  <string name="button.back">Back</string>
+  <string name="button.forward">Forward</string>
+  <string name="help.home">Contents</string>
+  <string name="help.prev">&lt;</string>
+  <string name="help.next">&gt;</string>
+  <string name="help.search_all">Search all help</string>
+  <string name="help.copy">Copy</string>
+  <string name="help.copy_code">Copy code</string>
+  <string name="help.outline">Outline</string>
+  <string name="help.add_bookmark">+</string>
+  <string name="help.bookmarks">Bookmarks</string>
+  <string name="help.copy_link">Copy link</string>
+  <string name="help.find_hint">Find in page (Ctrl+F)…</string>
+  <string name="help.cut">This page was cut at its</string>
+  <string name="help.no_such_page">There is no such page in the help folder.</string>
+  <string name="help.no_such_place">This page has no such place in it.</string>
+  <string name="help.not_followed">Web addresses are not opened from here.</string>
+  <string name="help.too_long">This page is longer than the reader holds; the rest is not shown.</string>
+  <string name="help.not_a_place">That is not a place on this machine.</string>
+  <string name="help.no_folder">No help folder was found beside this desktop.</string>
+
+  <!-- Fonts window. -->
+  <string name="prefs.fonts.family">Family</string>
+  <string name="prefs.fonts.subtitle">Choose how text looks throughout the desktop.</string>
+  <string name="prefs.fonts.preview">Preview</string>
+  <string name="prefs.fonts.help">Changes apply immediately. Revert restores the settings you opened with.</string>
+  <string name="prefs.fonts.done">Done</string>
+  <string name="prefs.fonts.size">Size</string>
+  <string name="prefs.fonts.sample_title">File Manager</string>
+  <string name="prefs.fonts.sample_body">Handgloves 0123456789</string>
+
+  <!-- Sounds window: the moments, in the kit's order. -->
+  <string name="prefs.sounds.event">Sound</string>
+  <string name="prefs.sounds.volume">Volume</string>
+  <string name="button.test">Test</string>
+  <string name="sound.builtin">Built-in</string>
+  <string name="sound.choose">...</string>
+  <string name="sound.startup">Startup chime</string>
+  <string name="sound.beep">Beep</string>
+  <string name="sound.window-open">Window opened</string>
+  <string name="sound.window-close">Window closed</string>
+  <string name="sound.window-minimize">Window minimized</string>
+  <string name="sound.window-zoom">Window zoomed</string>
+  <string name="sound.window-activate">Window activated</string>
+  <string name="sound.shutdown">Shutdown</string>
+
+  <!-- File and view commands (from tiku_trk_sc_label). -->
+  <string name="button.cancel">Cancel</string>
+  <string name="cmd.about">About this system…</string>
+  <string name="cmd.add_ons">Add-ons…</string>
+  <string name="cmd.arrange_by">Arrange by</string>
+  <string name="cmd.cleanup">Clean up</string>
+  <string name="cmd.cleanup_shift">Clean up all</string>
+  <string name="cmd.close">Close</string>
+  <string name="cmd.close_all_workspace">Close all in workspace</string>
+  <string name="cmd.close_shift">Close all</string>
+  <string name="cmd.col_date">Modified</string>
+  <string name="cmd.col_original">Original path</string>
+  <string name="cmd.col_path">Location</string>
+  <string name="cmd.col_perm">Permissions</string>
+  <string name="cmd.copy">Copy</string>
+  <string name="cmd.copy_here">Copy here</string>
+  <string name="cmd.copy_layout">Copy layout</string>
+  <string name="cmd.copy_shift">Copy more</string>
+  <string name="cmd.copy_to">Copy to</string>
+  <string name="cmd.create_link">Create link</string>
+  <string name="cmd.create_link_shift">Create relative link</string>
+  <string name="cmd.create_query">Create a Query</string>
+  <string name="cmd.create_query_tpl">Create a Query template</string>
+  <string name="cmd.cut">Cut</string>
+  <string name="cmd.cut_shift">Cut more</string>
+  <string name="cmd.delete">Delete</string>
+  <string name="cmd.duplicate">Duplicate</string>
+  <string name="cmd.edit_name">Edit name</string>
+  <string name="cmd.edit_query">Edit query</string>
+  <string name="cmd.edit_templates">Edit templates…</string>
+  <string name="cmd.empty_trash">Empty Trash</string>
+  <string name="cmd.find">Find…</string>
+  <string name="cmd.get_info">Get info</string>
+  <string name="cmd.icon_size_128">128 x 128</string>
+  <string name="cmd.icon_size_32">32 x 32</string>
+  <string name="cmd.icon_size_40">40 x 40</string>
+  <string name="cmd.icon_size_48">48 x 48</string>
+  <string name="cmd.icon_size_64">64 x 64</string>
+  <string name="cmd.icon_size_96">96 x 96</string>
+  <string name="cmd.icon_view">Icon view</string>
+  <string name="cmd.identify">Identify</string>
+  <string name="cmd.invert_selection">Invert selection</string>
+  <string name="cmd.link_here">Create link here</string>
+  <string name="cmd.link_here_shift">Create relative link here</string>
+  <string name="cmd.list_view">List view</string>
+  <string name="cmd.mini_icon_view">Mini icon view</string>
+  <string name="cmd.mount">Mount</string>
+  <string name="cmd.mount_all">Mount all</string>
+  <string name="cmd.mount_settings">Settings…</string>
+  <string name="cmd.move_here">Move here</string>
+  <string name="cmd.move_to">Move to</string>
+  <string name="cmd.move_to_trash">Move to Trash</string>
+  <string name="cmd.move_to_trash_shift">Delete</string>
+  <string name="cmd.new_folder">New folder</string>
+  <string name="cmd.open">Open</string>
+  <string name="cmd.open_parent">Open parent</string>
+  <string name="cmd.open_with">Open with…</string>
+  <string name="cmd.open_with_window">Open with…</string>
+  <string name="cmd.paste">Paste</string>
+  <string name="cmd.paste_layout">Paste layout</string>
+  <string name="cmd.paste_shift">Paste links</string>
+  <string name="cmd.preferences">Preferences…</string>
+  <string name="cmd.resize_to_fit">Resize to fit</string>
+  <string name="cmd.restore">Restore</string>
+  <string name="cmd.reverse_order">Reverse order</string>
+  <string name="cmd.select_all">Select all</string>
+  <string name="cmd.select_matching">Select…</string>
+  <string name="cmd.screenshot">Take Screenshot</string>
+  <string name="cmd.shutdown">Shut down…</string>
+  <string name="cmd.unmount">Unmount</string>
+  <string name="label.capability">Capability</string>
+  <string name="label.kind">Kind</string>
+  <string name="label.name">Name</string>
+  <string name="label.size">Size</string>
+  <string name="label.value">Value</string>
+
+  <!-- Columns -->
+  <string name="label.location">Location</string>
+  <string name="label.modified">Modified</string>
+  <string name="label.cap">Cap</string>
+  <string name="col.title">Title</string>
+  <string name="col.url">URL</string>
+  <string name="col.nickname">Nickname</string>
+  <string name="col.email">E-mail</string>
+  <string name="col.phone">Phone</string>
+  <string name="col.subject">Subject</string>
+  <string name="col.from">From</string>
+  <string name="col.when">When</string>
+  <string name="col.status">Status</string>
+
+  <!-- Alerts -->
+  <string name="alert.btn.empty_trash">Cancel|Empty Trash</string>
+  <string name="alert.btn.get_info">Cancel|Get info</string>
+  <string name="alert.btn.trash_delete">Cancel|Move to Trash|Delete</string>
+  <string name="alert.btn.ok">Cancel|OK</string>
+  <string name="alert.btn.open">Cancel|Open</string>
+  <string name="alert.btn.replace">Cancel|Replace</string>
+  <string name="alert.btn.shut_down">Cancel|Shut down</string>
+  <string name="alert.btn.conflict">Cancel|Skip|Skip all|Replace all</string>
+  <string name="alert.msg.exists_here">An item named "%.80s" already exists here.</string>
+  <string name="alert.msg.exists_replace">An item named "%.64s" already exists.  Replace it?</string>
+  <string name="alert.msg.delete_items">Are you sure you want to delete %d item%s?  This operation cannot be reverted.</string>
+  <string name="alert.msg.empty_trash">Are you sure you want to empty the Trash?  This operation cannot be reverted.</string>
+  <string name="alert.msg.shut_down">Shut down the desktop?</string>
+  <string name="alert.msg.broken_open">There is no file to open: the link's target cannot be found.</string>
+  <string name="alert.msg.perms_not_yours">This item's permissions are not yours to set.</string>
+
+  <!-- File kinds -->
+  <string name="kind.folder">Folder</string>
+  <string name="kind.symlink">Symbolic link</string>
+  <string name="kind.volume">Volume</string>
+  <string name="kind.disks">Disks</string>
+  <string name="kind.query">Query</string>
+  <string name="kind.trash">Trash</string>
+  <string name="kind.application">Application</string>
+  <string name="kind.text_file">Text file</string>
+  <string name="kind.schematic">KiCad schematic</string>
+  <string name="kind.drill">Drill drawing</string>
+  <string name="kind.gerber">Gerber artwork</string>
+  <string name="kind.gerberjob">Gerber job</string>
+  <string name="kind.eagleschematic">Schematic (.sch)</string>
+  <string name="kind.image">Image</string>
+  <string name="kind.audio">Audio</string>
+  <string name="kind.video">Video</string>
+  <string name="kind.file">File</string>
+  <string name="kind.broken_link">Broken link</string>
+  <string name="kind.namespace_folder">Namespace folder</string>
+  <string name="kind.device_node">Device node</string>
+  <string name="kind.printer">Printer</string>
+  <string name="kind.desktop">Desktop</string>
+  <string name="kind.unknown">Unknown</string>
+
+  <!-- Browser menus -->
+  <string name="menu.file">File</string>
+  <string name="menu.new">New</string>
+  <string name="menu.templates">Templates</string>
+  <string name="menu.window">Window</string>
+  <string name="menu.attributes">Attributes</string>
+  <string name="menu.add_ons">Add-ons</string>
+  <string name="menu.no_add_ons">No add-ons</string>
+  <string name="menu.open_with">Open with</string>
+  <string name="menu.add_new_submenu">Add new submenu…</string>
+
+  <!-- Find window -->
+  <string name="find.path">Path</string>
+  <string name="find.unit">Unit</string>
+  <string name="find.writable">Writable</string>
+  <string name="find.find">Find</string>
+  <string name="find.name_contains">Name contains</string>
+  <string name="find.formula">Formula</string>
+  <string name="find.of_type">Of type</string>
+  <string name="find.search_in">Search in</string>
+  <string name="find.include_trash">Include Trash</string>
+  <string name="find.save">Save</string>
+  <string name="find.search">Search</string>
+  <string name="find.everywhere">Everywhere</string>
+  <string name="find.all_files">All files and folders</string>
+  <string name="find.save_as_template">Save as template</string>
+  <string name="find.edit_loaded_template">Edit loaded template</string>
+  <string name="find.select_folders">Select folders…</string>
+
+  <!-- Info window -->
+  <string name="info.capacity">Capacity</string>
+  <string name="info.opens_with">Opens with</string>
+  <string name="info.link_to">Link to</string>
+  <string name="info.dimensions">Dimensions</string>
+  <string name="info.filesystem">Filesystem</string>
+  <string name="info.created">Created</string>
+  <string name="info.information">Information</string>
+  <string name="info.permissions">Permissions</string>
+  <string name="info.msg.perms_cannot_change">This item's permissions cannot be changed.</string>
+  <string name="info.msg.nothing_to_point">Nothing to point it at.</string>
+  <string name="info.msg.not_a_link">That is not a link.</string>
+  <string name="info.msg.repoint_failed">The link could not be re-pointed.</string>
+
+  <!-- Tracker preferences window -->
+  <string name="title.tracker_prefs">File Manager preferences</string>
+  <string name="prefs.page.desktop">Desktop</string>
+  <string name="prefs.page.windows">Windows</string>
+  <string name="prefs.page.volumes">Volume icons</string>
+  <string name="prefs.page.mount">Disk mount</string>
+
+  <!-- Operators and months -->
+  <string name="op.contains">contains</string>
+  <string name="op.is">is</string>
+  <string name="op.is_not">is not</string>
+  <string name="op.starts_with">starts with</string>
+  <string name="op.ends_with">ends with</string>
+  <string name="op.greater_than">greater than</string>
+  <string name="op.less_than">less than</string>
+  <string name="op.after">after</string>
+  <string name="op.before">before</string>
+  <string name="month.1">January</string>
+  <string name="month.2">February</string>
+  <string name="month.3">March</string>
+  <string name="month.4">April</string>
+  <string name="month.5">May</string>
+  <string name="month.6">June</string>
+  <string name="month.7">July</string>
+  <string name="month.8">August</string>
+  <string name="month.9">September</string>
+  <string name="month.10">October</string>
+  <string name="month.11">November</string>
+  <string name="month.12">December</string>
+
+  <!-- Status bar -->
+  <string name="status.selected">%d/%d selected</string>
+  <string name="status.items">%d item%s</string>
+  <string name="status.items_so_far">%d item%s so far</string>
+  <string name="status.items_n">%d item%s%s</string>
+  <string name="status.filtered"> (filtered)</string>
+  <string name="status.empty_folder">empty folder</string>
+  <string name="status.nothing_matches">nothing matches</string>
+  <string name="status.clipboard">%d item%s on the clipboard</string>
+
+</strings>

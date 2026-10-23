@@ -1,0 +1,57 @@
+{
+  "applications": [
+    "calculator",
+    "developer-calculator",
+    "reader",
+    "image",
+    "pdf",
+    "archive",
+    "diff",
+    "grab",
+    "hex",
+    "terminal",
+    "circuit",
+    "marker"
+  ],
+  "editor_common": [
+    "apps/editor/tiku_editor_preferences.c",
+    "apps/editor/tiku_editor_search_feedback.c",
+    "apps/editor/tiku_editor_context.c",
+    "apps/editor/tiku_editor_main.c",
+    "apps/editor/tiku_editor_file.c"
+  ],
+  "tests": [
+    "tests/apps/test_calc.c",
+    "tests/apps/test_calculator.c",
+    "tests/apps/test_help_window.c",
+    "tests/apps/test_help_reader.c",
+    "tests/apps/test_document_reader.c",
+    "tests/apps/test_reader_large.c",
+    "tests/apps/test_reader_reliability.c",
+    "tests/apps/test_reader_allocations.c",
+    "tests/apps/test_reader_search_faults.c",
+    "tests/apps/test_image_viewer.c",
+    "tests/apps/test_pdf_viewer.c",
+    "tests/apps/test_archive_viewer.c",
+    "tests/apps/test_diff_viewer.c",
+    "tests/apps/test_grab_app.c",
+    "tests/apps/test_hex.c",
+    "tests/apps/test_terminal.c",
+    "tests/apps/test_circuit_viewer.c",
+    "tests/apps/test_marker.c",
+    "tests/apps/test_editor_resize.c",
+    "tests/apps/test_editor_baseline.c",
+    "tests/fixtures/reader_wait.h",
+    "tests/fixtures/archive.inc",
+    "tests/fixtures/pdf_crypt.inc",
+    "tests/fixtures/cms.inc",
+    "tests/fixtures/pubsec.inc",
+    "tests/fixtures/pdfsig.inc",
+    "tests/fixtures/image_fixtures.inc"
+  ],
+  "requires": {
+    "marker": [
+      "reader"
+    ]
+  }
+}

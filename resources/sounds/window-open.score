@@ -1,0 +1,6 @@
+# A window opening: two ticks, the second higher.
+wave sine
+attack 3
+release 25
+note 660 35 0.3
+note 880 45 0.3

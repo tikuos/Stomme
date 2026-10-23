@@ -1,0 +1,6 @@
+# A window closing: the same two ticks, falling.
+wave sine
+attack 3
+release 25
+note 880 35 0.3
+note 660 45 0.3

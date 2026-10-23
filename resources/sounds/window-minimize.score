@@ -1,0 +1,5 @@
+# A window put away: one low tick.
+wave sine
+attack 3
+release 40
+note 440 60 0.3

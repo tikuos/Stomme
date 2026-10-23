@@ -1,0 +1,7 @@
+# The way out: the chime run backwards.
+wave sine
+attack 8
+release 160
+note 1047 90 0.45
+note 784 90 0.45
+note 523 380 0.5

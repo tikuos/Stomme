@@ -1,0 +1,7 @@
+# The startup chime: a rising fifth and the octave, held.
+wave sine
+attack 8
+release 120
+note 523 90 0.45
+note 784 90 0.45
+note 1047 320 0.55

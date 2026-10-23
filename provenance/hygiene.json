@@ -1,0 +1,42 @@
+[
+  {
+    "path": "hygiene/commit-style.md",
+    "origin_repository": "https://github.com/tikuos/tikuOS.git",
+    "origin_revision": "c396f097a6eee31c07ee4b0f67805db455d97d34",
+    "origin_state": "working-tree",
+    "origin_path": "hygiene/commit-style.md",
+    "origin_sha256": "8817f2415b845a91e30bfa82c377451d67ad3329a21c88886671078309db6c94",
+    "extracted_sha256": "9d4c09c1a17986d89e30aefd74ae363a96fbc146c872ac51bcd018c9bd5cd961",
+    "adaptation": "Stomme checkout installation, configured author checks and three-bullet diagnostics"
+  },
+  {
+    "path": "hygiene/check_commit_msg.py",
+    "origin_repository": "https://github.com/tikuos/tikuOS.git",
+    "origin_revision": "c396f097a6eee31c07ee4b0f67805db455d97d34",
+    "origin_state": "working-tree",
+    "origin_path": "hygiene/check_commit_msg.py",
+    "origin_sha256": "29fbae618dbdc4d9234417b0f74a140946b984544f19a83675cbcfbc5dcfeabd",
+    "extracted_sha256": "d7c2d3abb7b3a5ad4153ff3f190902f18b839ce72d8839132c326ce0fc1314f5",
+    "adaptation": "Stomme checkout installation, configured author checks and three-bullet diagnostics"
+  },
+  {
+    "path": "hygiene/install_hooks.sh",
+    "origin_repository": "https://github.com/tikuos/tikuOS.git",
+    "origin_revision": "c396f097a6eee31c07ee4b0f67805db455d97d34",
+    "origin_state": "working-tree",
+    "origin_path": "hygiene/install_hooks.sh",
+    "origin_sha256": "7bb88f786e304a5c0c7da5a04759b524afc9f67bba5d11926af459f8fc0cd9d0",
+    "extracted_sha256": "a81372a8f678ae8865bc2688b32ec8b9c415992663edadafa91dcb4732d8d758",
+    "adaptation": "Stomme checkout installation, configured author checks and three-bullet diagnostics"
+  },
+  {
+    "path": "hygiene/githooks/commit-msg",
+    "origin_repository": "https://github.com/tikuos/tikuOS.git",
+    "origin_revision": "c396f097a6eee31c07ee4b0f67805db455d97d34",
+    "origin_state": "working-tree",
+    "origin_path": "hygiene/githooks/commit-msg",
+    "origin_sha256": "eb24f9067950db2db1d90f1bc8cf0b45777655f7ac2f47890359ae24c7c1fe5c",
+    "extracted_sha256": "f7c837a977c902c74f3337cf1a88d7a17bc5d44c6b8d34a0fcdd597fb217368d",
+    "adaptation": "Stomme checkout installation, configured author checks and three-bullet diagnostics"
+  }
+]

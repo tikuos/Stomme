@@ -1,0 +1,9 @@
+Kintsugi OS
+
+This distribution derives from the TikuDesktop applications and kit sources
+maintained at https://github.com/tikuos/tracker.
+
+The imported source includes the native document and presentation kits and the
+TikuWord application. Original copyright, authorship and SPDX headers remain in
+the source. Third-party components retain their own license and notice files;
+packaging copies the applicable notices into the distribution resources.

@@ -1,0 +1,13 @@
+#!/bin/sh
+# Authors: Ambuj Varshney <ambuj@tiku-os.org>
+# SPDX-License-Identifier: Apache-2.0
+# Check the message and author using this checkout's commit rules.
+set -eu
+
+hook_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+checker="$hook_dir/../check_commit_msg.py"
+[ -x "$checker" ] || {
+    echo "Stomme commit checker is missing or not executable" >&2
+    exit 1
+}
+exec "$checker" "$1"

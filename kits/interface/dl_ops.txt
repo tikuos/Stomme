@@ -1,0 +1,37 @@
+# The display list's ops: the one table both ends are generated from.
+#
+# number  NAME           fields, in wire order                       says
+#
+# Field types: rect (four i16: x y w h), i16, u16, u32, rgb (u32),
+# face (u8), u8, str (a NUL-terminated tail), strs (NUL-terminated
+# strings, one at least, a tail), blob16 (a u16 length then that many
+# bytes, a tail), bytes (the rest of the payload).
+# A tail must come last; an op has at most one.  Numbers are the wire
+# and are never reused; gaps are deliberate.
+1   FILL           rect r, rgb colour                           paint
+2   FRAME          rect r, rgb colour                           paint
+3   BEVEL          rect r, rgb light, rgb shadow                paint
+4   HLINE          i16 x, i16 y, i16 w, rgb colour              paint
+5   VLINE          i16 x, i16 y, i16 h, rgb colour              paint
+6   TEXT           i16 x, i16 y, rgb colour, face face, str text   text
+7   TEXT_CENTERED  rect r, rgb colour, face face, str text      text
+8   CLIP_SET       rect r                                       paint
+9   CLIP_RESET                                                  paint
+16  PANEL          rect r                                       paint
+17  RAISED         rect r                                       paint
+18  SUNKEN         rect r, rgb face                             paint
+19  BUTTON         rect r, u32 state, str label                 button
+20  CHECKBOX       rect r, u32 state, str label                 checkbox
+21  RADIO          rect r, u32 state, str label                 radio
+22  LIST_ROW       rect r, u32 state, str text                  list_row
+23  ICON_ART       u32 id, blob16 hvif                          paint
+24  ICON           u32 id, i16 x, i16 y, i16 size, u8 mix, u8 pad, rgb wash   icon
+25  GAUGE          rect r, u16 per_mille                        gauge
+26  TIP            rect r, u32 state, str text                  tip
+27  TEXTFIELD      rect r, u32 state, str text                  textfield
+28  SCROLLBAR      rect r, u16 pos, u16 frac, u16 horiz         scrollbar
+29  SLIDER         rect r, i16 lo, i16 hi, i16 value            slider
+30  ALERT_ICON     i16 cx, i16 cy, u16 kind                     alert_icon
+31  TABS           rect r, u16 count, i16 current, strs labels    tabs
+32  MENUFIELD      rect r, u32 state, str label                 menufield
+33  PICTURE        i16 x, i16 y, u16 w, u16 h, bytes px         picture

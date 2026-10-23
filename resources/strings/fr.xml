@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Les mots de l'interface, en français.
+
+  Une traduction est une copie de en.xml : les mêmes clés, les valeurs
+  changées.  Une clé sans traduction retombe sur l'anglais, donc un
+  fichier partiel est parfaitement valable.
+-->
+<strings lang="fr">
+  <string name="reader.open">Ouvrir…</string>
+  <string name="reader.reload">Recharger</string>
+  <string name="reader.close">Fermer</string>
+  <string name="reader.find">Rechercher…</string>
+  <string name="reader.bookmark">Basculer le signet</string>
+  <string name="reader.search_folder">Chercher dossier</string>
+  <string name="reader.location">Adresse :</string>
+  <string name="reader.location_focus">Adresse…</string>
+  <string name="reader.go">Aller</string>
+  <string name="reader.find_button">Chercher</string>
+  <string name="reader.tip_back">Précédent (Alt+Gauche)</string>
+  <string name="reader.tip_forward">Suivant (Alt+Droite)</string>
+  <string name="reader.tip_reload">Recharger (Ctrl+R)</string>
+  <string name="reader.tip_open">Ouvrir un document (Ctrl+O)</string>
+  <string name="reader.tip_find">Rechercher dans le document (Ctrl+F)</string>
+  <string name="reader.tip_go">Ouvrir l'adresse (Entrée)</string>
+  <string name="reader.tip_find_close">Fermer la recherche (Échap)</string>
+  <string name="reader.location_hint">Ouvrir un document Markdown ou HTML local</string>
+
+  <string name="button.defaults">Par défaut</string>
+  <string name="button.revert">Rétablir</string>
+
+  <string name="label.icon_size">Taille des icônes</string>
+  <string name="label.recent_documents">Documents récents</string>
+  <string name="label.recent_folders">Dossiers récents</string>
+  <string name="label.recent_applications">Applications récentes</string>
+
+  <string name="title.deskbar_prefs">Préférences du Deskbar</string>
+  <string name="title.desktop_prefs">Préférences de Desktop</string>
+  <string name="title.fonts">Polices</string>
+
+  <string name="menu.about">À propos de ce système</string>
+  <string name="menu.find">Rechercher…</string>
+  <string name="menu.settings">Réglages</string>
+  <string name="menu.help">Aide…</string>
+  <string name="menu.force_quit">Forcer à quitter…</string>
+  <string name="menu.applications">Applications</string>
+  <string name="menu.programming">Programmation</string>
+  <string name="menu.documents">Documents</string>
+  <string name="menu.graphics">Graphisme et conception</string>
+  <string name="menu.utilities">Utilitaires</string>
+  <string name="menu.development">Développement</string>
+  <string name="menu.device_tools">Outils pour appareils</string>
+  <string name="menu.demos">Démonstrations</string>
+  <string name="menu.deskbar_prefs">Préférences du Deskbar…</string>
+  <string name="menu.tracker_prefs">Préférences de File Manager…</string>
+  <string name="menu.desktop_prefs">Préférences de Desktop…</string>
+  <string name="menu.fonts">Polices…</string>
+  <string name="menu.show_replicants">Afficher les replicants</string>
+  <string name="menu.hide_replicants">Masquer les replicants</string>
+  <string name="menu.shut_down">Arrêter…</string>
+  <string name="menu.show_all">Tout afficher</string>
+  <string name="menu.hide_all">Tout masquer</string>
+  <string name="menu.close_all">Tout fermer</string>
+  <string name="menu.clock.show">Afficher l'horloge</string>
+  <string name="menu.clock.hide">Masquer l'horloge</string>
+  <string name="menu.seconds.show">Afficher les secondes</string>
+  <string name="menu.seconds.hide">Masquer les secondes</string>
+  <string name="menu.day.show">Afficher le jour</string>
+  <string name="menu.day.hide">Masquer le jour</string>
+  <string name="menu.zone.show">Afficher le fuseau horaire</string>
+  <string name="menu.zone.hide">Masquer le fuseau horaire</string>
+
+  <string name="prefs.deskbar.sort_apps">Trier les applications par nom</string>
+  <string name="prefs.deskbar.tracker_first">File Manager toujours en premier</string>
+  <string name="prefs.deskbar.show_expander">Afficher le déplieur</string>
+  <string name="prefs.deskbar.expand_new">Déplier les nouvelles applications</string>
+  <string name="prefs.deskbar.hide_app_names">Masquer les noms d'applications</string>
+  <string name="prefs.deskbar.font_size">Taille du texte</string>
+  <string name="prefs.deskbar.always_on_top">Toujours au premier plan</string>
+  <string name="prefs.deskbar.auto_raise">Remontée automatique</string>
+  <string name="prefs.deskbar.auto_hide">Masquage automatique</string>
+  <string name="prefs.deskbar.dock_location">Emplacement du dock</string>
+  <string name="prefs.deskbar.dock_n">Dock : %d</string>
+  <string name="prefs.deskbar.edit_in_tracker">Modifier dans File Manager…</string>
+
+  <string name="prefs.desktop.picture">Image</string>
+  <string name="prefs.desktop.no_picture">Aucune image</string>
+  <string name="prefs.desktop.drop_hint">Déposez une image dans le bureau pour la proposer ici</string>
+  <string name="prefs.desktop.how_laid">Disposition</string>
+  <string name="prefs.desktop.mode.corner">Dans son coin</string>
+  <string name="prefs.desktop.mode.centred">Centrée</string>
+  <string name="prefs.desktop.mode.scaled">Ajustée</string>
+  <string name="prefs.desktop.mode.tiled">Mosaïque</string>
+
+  <string name="title.help">Aide</string>
+  <string name="button.back">Retour</string>
+  <string name="button.forward">Suivant</string>
+  <string name="help.home">Sommaire</string>
+  <string name="help.prev">&lt;</string>
+  <string name="help.next">&gt;</string>
+  <string name="help.search_all">Toute l’aide</string>
+  <string name="help.copy">Copier</string>
+  <string name="help.copy_code">Code</string>
+  <string name="help.outline">Plan</string>
+  <string name="help.add_bookmark">+</string>
+  <string name="help.bookmarks">Signets</string>
+  <string name="help.copy_link">Lien</string>
+  <string name="help.find_hint">Rechercher (Ctrl+F)…</string>
+  <string name="help.cut">Cette page a été coupée à</string>
+  <string name="help.no_such_page">Cette page n’existe pas dans le dossier d’aide.</string>
+  <string name="help.no_such_place">Cette page ne contient pas cet endroit.</string>
+  <string name="help.not_followed">Les adresses web ne s’ouvrent pas d’ici.</string>
+  <string name="help.too_long">Cette page dépasse la taille lisible ; la suite n’est pas affichée.</string>
+  <string name="help.not_a_place">Ce n’est pas un emplacement de cette machine.</string>
+  <string name="help.no_folder">Aucun dossier d’aide n’a été trouvé.</string>
+
+  <string name="prefs.fonts.family">Famille</string>
+  <string name="prefs.fonts.subtitle">Choisissez l’apparence du texte sur le bureau.</string>
+  <string name="prefs.fonts.preview">Aperçu</string>
+  <string name="prefs.fonts.help">Les changements sont immédiats. Rétablir restaure les réglages à l’ouverture.</string>
+  <string name="prefs.fonts.done">Terminé</string>
+  <string name="prefs.fonts.size">Taille</string>
+  <string name="prefs.fonts.sample_title">File Manager</string>
+  <string name="prefs.fonts.sample_body">Élégant café 0123456789</string>
+
+  <!-- Commandes -->
+  <string name="button.cancel">Annuler</string>
+  <string name="cmd.about">À propos de ce système…</string>
+  <string name="cmd.add_ons">Extensions…</string>
+  <string name="cmd.arrange_by">Ranger par</string>
+  <string name="cmd.cleanup">Nettoyer</string>
+  <string name="cmd.cleanup_shift">Tout nettoyer</string>
+  <string name="cmd.close">Fermer</string>
+  <string name="cmd.close_all_workspace">Tout fermer dans l'espace</string>
+  <string name="cmd.close_shift">Tout fermer</string>
+  <string name="cmd.col_date">Modifié</string>
+  <string name="cmd.col_original">Chemin d'origine</string>
+  <string name="cmd.col_path">Emplacement</string>
+  <string name="cmd.col_perm">Permissions</string>
+  <string name="cmd.copy">Copier</string>
+  <string name="cmd.copy_here">Copier ici</string>
+  <string name="cmd.copy_layout">Copier la disposition</string>
+  <string name="cmd.copy_shift">Copier plus</string>
+  <string name="cmd.copy_to">Copier vers</string>
+  <string name="cmd.create_link">Créer un lien</string>
+  <string name="cmd.create_link_shift">Créer un lien relatif</string>
+  <string name="cmd.create_query">Créer une requête</string>
+  <string name="cmd.create_query_tpl">Créer un modèle de requête</string>
+  <string name="cmd.cut">Couper</string>
+  <string name="cmd.cut_shift">Couper plus</string>
+  <string name="cmd.delete">Supprimer</string>
+  <string name="cmd.duplicate">Dupliquer</string>
+  <string name="cmd.edit_name">Modifier le nom</string>
+  <string name="cmd.edit_query">Modifier la requête</string>
+  <string name="cmd.edit_templates">Modifier les modèles…</string>
+  <string name="cmd.empty_trash">Vider la corbeille</string>
+  <string name="cmd.find">Rechercher…</string>
+  <string name="cmd.get_info">Informations</string>
+  <string name="cmd.icon_view">Vue en icônes</string>
+  <string name="cmd.identify">Identifier</string>
+  <string name="cmd.invert_selection">Inverser la sélection</string>
+  <string name="cmd.link_here">Créer un lien ici</string>
+  <string name="cmd.link_here_shift">Créer un lien relatif ici</string>
+  <string name="cmd.list_view">Vue en liste</string>
+  <string name="cmd.mini_icon_view">Vue en mini-icônes</string>
+  <string name="cmd.mount">Monter</string>
+  <string name="cmd.mount_all">Tout monter</string>
+  <string name="cmd.mount_settings">Réglages…</string>
+  <string name="cmd.move_here">Déplacer ici</string>
+  <string name="cmd.move_to">Déplacer vers</string>
+  <string name="cmd.move_to_trash">Mettre à la corbeille</string>
+  <string name="cmd.move_to_trash_shift">Supprimer</string>
+  <string name="cmd.new_folder">Nouveau dossier</string>
+  <string name="cmd.open">Ouvrir</string>
+  <string name="cmd.open_parent">Ouvrir le parent</string>
+  <string name="cmd.open_with">Ouvrir avec…</string>
+  <string name="cmd.open_with_window">Ouvrir avec…</string>
+  <string name="cmd.paste">Coller</string>
+  <string name="cmd.paste_layout">Coller la disposition</string>
+  <string name="cmd.paste_shift">Coller des liens</string>
+  <string name="cmd.preferences">Préférences…</string>
+  <string name="cmd.resize_to_fit">Ajuster la taille</string>
+  <string name="cmd.restore">Restaurer</string>
+  <string name="cmd.reverse_order">Ordre inverse</string>
+  <string name="cmd.select_all">Tout sélectionner</string>
+  <string name="cmd.select_matching">Sélectionner…</string>
+  <string name="cmd.screenshot">Capture d'écran</string>
+  <string name="cmd.shutdown">Arrêter…</string>
+  <string name="cmd.unmount">Démonter</string>
+  <string name="label.capability">Capacité</string>
+  <string name="label.kind">Type</string>
+  <string name="label.name">Nom</string>
+  <string name="label.size">Taille</string>
+  <string name="label.value">Valeur</string>
+
+  <!-- Colonnes -->
+  <string name="label.location">Emplacement</string>
+  <string name="label.modified">Modifié</string>
+  <string name="label.cap">Cap.</string>
+  <string name="col.title">Titre</string>
+  <string name="col.url">URL</string>
+  <string name="col.nickname">Surnom</string>
+  <string name="col.email">Courriel</string>
+  <string name="col.phone">Téléphone</string>
+  <string name="col.subject">Objet</string>
+  <string name="col.from">De</string>
+  <string name="col.when">Date</string>
+  <string name="col.status">État</string>
+
+  <!-- Alertes -->
+  <string name="alert.btn.empty_trash">Annuler|Vider la corbeille</string>
+  <string name="alert.btn.get_info">Annuler|Informations</string>
+  <string name="alert.btn.trash_delete">Annuler|Mettre à la corbeille|Supprimer</string>
+  <string name="alert.btn.ok">Annuler|OK</string>
+  <string name="alert.btn.open">Annuler|Ouvrir</string>
+  <string name="alert.btn.replace">Annuler|Remplacer</string>
+  <string name="alert.btn.shut_down">Annuler|Arrêter</string>
+  <string name="alert.btn.conflict">Annuler|Ignorer|Tout ignorer|Tout remplacer</string>
+  <string name="alert.msg.exists_here">Un élément nommé « %.80s » existe déjà ici.</string>
+  <string name="alert.msg.exists_replace">Un élément nommé « %.64s » existe déjà.  Le remplacer ?</string>
+  <string name="alert.msg.delete_items">Voulez-vous vraiment supprimer %d élément%s ?  Cette opération est irréversible.</string>
+  <string name="alert.msg.empty_trash">Voulez-vous vraiment vider la corbeille ?  Cette opération est irréversible.</string>
+  <string name="alert.msg.shut_down">Arrêter le bureau ?</string>
+  <string name="alert.msg.broken_open">Aucun fichier à ouvrir : la cible du lien est introuvable.</string>
+  <string name="alert.msg.perms_not_yours">Les permissions de cet élément ne sont pas les vôtres à définir.</string>
+
+  <!-- Types de fichier -->
+  <string name="kind.folder">Dossier</string>
+  <string name="kind.symlink">Lien symbolique</string>
+  <string name="kind.volume">Volume</string>
+  <string name="kind.disks">Disques</string>
+  <string name="kind.query">Requête</string>
+  <string name="kind.trash">Corbeille</string>
+  <string name="kind.application">Application</string>
+  <string name="kind.text_file">Fichier texte</string>
+  <string name="kind.schematic">Schéma KiCad</string>
+  <string name="kind.drill">Plan de perçage</string>
+  <string name="kind.gerber">Typon Gerber</string>
+  <string name="kind.gerberjob">Tâche Gerber</string>
+  <string name="kind.eagleschematic">Schéma (.sch)</string>
+  <string name="kind.image">Image</string>
+  <string name="kind.audio">Audio</string>
+  <string name="kind.video">Vidéo</string>
+  <string name="kind.file">Fichier</string>
+  <string name="kind.broken_link">Lien brisé</string>
+  <string name="kind.namespace_folder">Dossier d'espace de noms</string>
+  <string name="kind.device_node">Nœud de périphérique</string>
+  <string name="kind.printer">Imprimante</string>
+  <string name="kind.desktop">Bureau</string>
+  <string name="kind.unknown">Inconnu</string>
+
+  <!-- Menus -->
+  <string name="menu.file">Fichier</string>
+  <string name="menu.new">Nouveau</string>
+  <string name="menu.templates">Modèles</string>
+  <string name="menu.window">Fenêtre</string>
+  <string name="menu.attributes">Attributs</string>
+  <string name="menu.add_ons">Extensions</string>
+  <string name="menu.no_add_ons">Aucune extension</string>
+  <string name="menu.open_with">Ouvrir avec</string>
+  <string name="menu.add_new_submenu">Ajouter un sous-menu…</string>
+
+  <!-- Fenêtre Rechercher -->
+  <string name="find.path">Chemin</string>
+  <string name="find.unit">Unité</string>
+  <string name="find.writable">Modifiable</string>
+  <string name="find.find">Rechercher</string>
+  <string name="find.name_contains">Le nom contient</string>
+  <string name="find.formula">Formule</string>
+  <string name="find.of_type">Du type</string>
+  <string name="find.search_in">Rechercher dans</string>
+  <string name="find.include_trash">Inclure la corbeille</string>
+  <string name="find.save">Enregistrer</string>
+  <string name="find.search">Rechercher</string>
+  <string name="find.everywhere">Partout</string>
+  <string name="find.all_files">Tous les fichiers et dossiers</string>
+  <string name="find.save_as_template">Enregistrer comme modèle</string>
+  <string name="find.edit_loaded_template">Modifier le modèle chargé</string>
+  <string name="find.select_folders">Choisir des dossiers…</string>
+
+  <!-- Fenêtre Informations -->
+  <string name="info.capacity">Capacité</string>
+  <string name="info.opens_with">Ouvre avec</string>
+  <string name="info.link_to">Lien vers</string>
+  <string name="info.dimensions">Dimensions</string>
+  <string name="info.filesystem">Système de fichiers</string>
+  <string name="info.created">Créé</string>
+  <string name="info.information">Informations</string>
+  <string name="info.permissions">Permissions</string>
+  <string name="info.msg.perms_cannot_change">Les permissions de cet élément ne peuvent pas être changées.</string>
+  <string name="info.msg.nothing_to_point">Rien vers quoi le pointer.</string>
+  <string name="info.msg.not_a_link">Ce n'est pas un lien.</string>
+  <string name="info.msg.repoint_failed">Le lien n'a pas pu être re-pointé.</string>
+
+  <!-- Préférences File Manager -->
+  <string name="title.tracker_prefs">Préférences de File Manager</string>
+  <string name="prefs.page.desktop">Bureau</string>
+  <string name="prefs.page.windows">Fenêtres</string>
+  <string name="prefs.page.volumes">Icônes de volume</string>
+  <string name="prefs.page.mount">Montage des disques</string>
+
+  <!-- Opérateurs et mois -->
+  <string name="op.contains">contient</string>
+  <string name="op.is">est</string>
+  <string name="op.is_not">n'est pas</string>
+  <string name="op.starts_with">commence par</string>
+  <string name="op.ends_with">finit par</string>
+  <string name="op.greater_than">supérieur à</string>
+  <string name="op.less_than">inférieur à</string>
+  <string name="op.after">après</string>
+  <string name="op.before">avant</string>
+  <string name="month.1">janvier</string>
+  <string name="month.2">février</string>
+  <string name="month.3">mars</string>
+  <string name="month.4">avril</string>
+  <string name="month.5">mai</string>
+  <string name="month.6">juin</string>
+  <string name="month.7">juillet</string>
+  <string name="month.8">août</string>
+  <string name="month.9">septembre</string>
+  <string name="month.10">octobre</string>
+  <string name="month.11">novembre</string>
+  <string name="month.12">décembre</string>
+
+  <!-- Barre d'état -->
+  <string name="status.selected">%d/%d sélectionnés</string>
+  <string name="status.items">%d élément%s</string>
+  <string name="status.items_so_far">%d élément%s jusqu’ici</string>
+  <string name="status.items_n">%d élément%s%s</string>
+  <string name="status.filtered"> (filtrés)</string>
+  <string name="status.empty_folder">dossier vide</string>
+  <string name="status.nothing_matches">aucune correspondance</string>
+  <string name="status.clipboard">%d élément%s dans le presse-papiers</string>
+
+</strings>

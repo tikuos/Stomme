@@ -1,0 +1,111 @@
+/*
+ * TikuOS kits -- the foundation TikuDesktop and TikuTracker
+ * both stand on.
+ *
+ * Authors: Ambuj Varshney <ambuj@tiku-os.org>
+ *
+ * tiku_cff_strings.inl - the 391 strings every CFF font shares (Appendix
+ * A of the CFF specification), which its charset names glyphs by, and
+ * the standard encoding's code to string (Appendix B).  Included by
+ * tiku_cff.c and tiku_type1.c, which each keep a copy.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#define CFF_STD_STRINGS 391
+
+static const char *const cff_std_string[CFF_STD_STRINGS] = {
+    ".notdef", "space", "exclam", "quotedbl", "numbersign", "dollar",
+    "percent", "ampersand", "quoteright", "parenleft", "parenright",
+    "asterisk", "plus", "comma", "hyphen", "period", "slash", "zero", "one",
+    "two", "three", "four", "five", "six", "seven", "eight", "nine", "colon",
+    "semicolon", "less", "equal", "greater", "question", "at", "A", "B", "C",
+    "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R",
+    "S", "T", "U", "V", "W", "X", "Y", "Z", "bracketleft", "backslash",
+    "bracketright", "asciicircum", "underscore", "quoteleft", "a", "b", "c",
+    "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r",
+    "s", "t", "u", "v", "w", "x", "y", "z", "braceleft", "bar", "braceright",
+    "asciitilde", "exclamdown", "cent", "sterling", "fraction", "yen",
+    "florin", "section", "currency", "quotesingle", "quotedblleft",
+    "guillemotleft", "guilsinglleft", "guilsinglright", "fi", "fl", "endash",
+    "dagger", "daggerdbl", "periodcentered", "paragraph", "bullet",
+    "quotesinglbase", "quotedblbase", "quotedblright", "guillemotright",
+    "ellipsis", "perthousand", "questiondown", "grave", "acute", "circumflex",
+    "tilde", "macron", "breve", "dotaccent", "dieresis", "ring", "cedilla",
+    "hungarumlaut", "ogonek", "caron", "emdash", "AE", "ordfeminine",
+    "Lslash", "Oslash", "OE", "ordmasculine", "ae", "dotlessi", "lslash",
+    "oslash", "oe", "germandbls", "onesuperior", "logicalnot", "mu",
+    "trademark", "Eth", "onehalf", "plusminus", "Thorn", "onequarter",
+    "divide", "brokenbar", "degree", "thorn", "threequarters", "twosuperior",
+    "registered", "minus", "eth", "multiply", "threesuperior", "copyright",
+    "Aacute", "Acircumflex", "Adieresis", "Agrave", "Aring", "Atilde",
+    "Ccedilla", "Eacute", "Ecircumflex", "Edieresis", "Egrave", "Iacute",
+    "Icircumflex", "Idieresis", "Igrave", "Ntilde", "Oacute", "Ocircumflex",
+    "Odieresis", "Ograve", "Otilde", "Scaron", "Uacute", "Ucircumflex",
+    "Udieresis", "Ugrave", "Yacute", "Ydieresis", "Zcaron", "aacute",
+    "acircumflex", "adieresis", "agrave", "aring", "atilde", "ccedilla",
+    "eacute", "ecircumflex", "edieresis", "egrave", "iacute", "icircumflex",
+    "idieresis", "igrave", "ntilde", "oacute", "ocircumflex", "odieresis",
+    "ograve", "otilde", "scaron", "uacute", "ucircumflex", "udieresis",
+    "ugrave", "yacute", "ydieresis", "zcaron", "exclamsmall",
+    "Hungarumlautsmall", "dollaroldstyle", "dollarsuperior", "ampersandsmall",
+    "Acutesmall", "parenleftsuperior", "parenrightsuperior", "twodotenleader",
+    "onedotenleader", "zerooldstyle", "oneoldstyle", "twooldstyle",
+    "threeoldstyle", "fouroldstyle", "fiveoldstyle", "sixoldstyle",
+    "sevenoldstyle", "eightoldstyle", "nineoldstyle", "commasuperior",
+    "threequartersemdash", "periodsuperior", "questionsmall", "asuperior",
+    "bsuperior", "centsuperior", "dsuperior", "esuperior", "isuperior",
+    "lsuperior", "msuperior", "nsuperior", "osuperior", "rsuperior",
+    "ssuperior", "tsuperior", "ff", "ffi", "ffl", "parenleftinferior",
+    "parenrightinferior", "Circumflexsmall", "hyphensuperior", "Gravesmall",
+    "Asmall", "Bsmall", "Csmall", "Dsmall", "Esmall", "Fsmall", "Gsmall",
+    "Hsmall", "Ismall", "Jsmall", "Ksmall", "Lsmall", "Msmall", "Nsmall",
+    "Osmall", "Psmall", "Qsmall", "Rsmall", "Ssmall", "Tsmall", "Usmall",
+    "Vsmall", "Wsmall", "Xsmall", "Ysmall", "Zsmall", "colonmonetary",
+    "onefitted", "rupiah", "Tildesmall", "exclamdownsmall", "centoldstyle",
+    "Lslashsmall", "Scaronsmall", "Zcaronsmall", "Dieresissmall",
+    "Brevesmall", "Caronsmall", "Dotaccentsmall", "Macronsmall", "figuredash",
+    "hypheninferior", "Ogoneksmall", "Ringsmall", "Cedillasmall",
+    "questiondownsmall", "oneeighth", "threeeighths", "fiveeighths",
+    "seveneighths", "onethird", "twothirds", "zerosuperior", "foursuperior",
+    "fivesuperior", "sixsuperior", "sevensuperior", "eightsuperior",
+    "ninesuperior", "zeroinferior", "oneinferior", "twoinferior",
+    "threeinferior", "fourinferior", "fiveinferior", "sixinferior",
+    "seveninferior", "eightinferior", "nineinferior", "centinferior",
+    "dollarinferior", "periodinferior", "commainferior", "Agravesmall",
+    "Aacutesmall", "Acircumflexsmall", "Atildesmall", "Adieresissmall",
+    "Aringsmall", "AEsmall", "Ccedillasmall", "Egravesmall", "Eacutesmall",
+    "Ecircumflexsmall", "Edieresissmall", "Igravesmall", "Iacutesmall",
+    "Icircumflexsmall", "Idieresissmall", "Ethsmall", "Ntildesmall",
+    "Ogravesmall", "Oacutesmall", "Ocircumflexsmall", "Otildesmall",
+    "Odieresissmall", "OEsmall", "Oslashsmall", "Ugravesmall", "Uacutesmall",
+    "Ucircumflexsmall", "Udieresissmall", "Yacutesmall", "Thornsmall",
+    "Ydieresissmall", "001.000", "001.001", "001.002", "001.003", "Black",
+    "Bold", "Book", "Light", "Medium", "Regular", "Roman", "Semibold",
+};
+
+/* StandardEncoding: each code's standard string, 0 for none. */
+static const unsigned char cff_std_encoding[256] = {
+      0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+      0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+      0,   0,   0,   0,   0,   0,   0,   0,   1,   2,   3,   4,
+      5,   6,   7,   8,   9,  10,  11,  12,  13,  14,  15,  16,
+     17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,
+     29,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  40,
+     41,  42,  43,  44,  45,  46,  47,  48,  49,  50,  51,  52,
+     53,  54,  55,  56,  57,  58,  59,  60,  61,  62,  63,  64,
+     65,  66,  67,  68,  69,  70,  71,  72,  73,  74,  75,  76,
+     77,  78,  79,  80,  81,  82,  83,  84,  85,  86,  87,  88,
+     89,  90,  91,  92,  93,  94,  95,   0,   0,   0,   0,   0,
+      0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+      0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+      0,   0,   0,   0,   0,  96,  97,  98,  99, 100, 101, 102,
+    103, 104, 105, 106, 107, 108, 109, 110,   0, 111, 112, 113,
+    114,   0, 115, 116, 117, 118, 119, 120, 121, 122,   0, 123,
+      0, 124, 125, 126, 127, 128, 129, 130, 131,   0, 132, 133,
+      0, 134, 135, 136, 137,   0,   0,   0,   0,   0,   0,   0,
+      0,   0,   0,   0,   0,   0,   0,   0,   0, 138,   0, 139,
+      0,   0,   0,   0, 140, 141, 142, 143,   0,   0,   0,   0,
+      0, 144,   0,   0,   0, 145,   0,   0, 146, 147, 148, 149,
+      0,   0,   0,   0,
+};
