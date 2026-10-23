@@ -433,6 +433,16 @@ boot_namespace(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
             return 1;
         }
     }
+    {
+        const char *directory=getenv("STOMME_RESOURCE_DIRECTORY");
+        if(directory && *directory){
+            const char *mount=getenv("STOMME_RESOURCE_MOUNT");
+            const char *fixture=getenv("STOMME_RESOURCE_TEST_PROVIDER");
+            app->resource_session=tiku_trk_resource_session_open(app->backend,directory,
+                mount && *mount?mount:"/.stomme",TIKU_SHELL_PRODUCT_NAME,fixture && !strcmp(fixture,"1"));
+            if(!app->resource_session){fprintf(stderr,"resource service: startup refused\n");return 1;}
+        }
+    }
     /* From here a folder under /devices is listed by a worker. */
     desktop_wire_install(app);
 #if TIKU_SHELL_BOARD_SERVICES
@@ -1404,9 +1414,13 @@ desktop_teardown(desktop_t *app, desktop_loop_t *lp)
 #if TIKU_SHELL_BOARD_SERVICES
 
     /* A timed-out service worker owns its backend until process exit. */
-    if (vfs_drained) tiku_backend_close(app->backend);
+    if (vfs_drained) {
+        tiku_trk_resource_session_close(app->resource_session);
+        tiku_backend_close(app->backend);
+    }
 #else
 
+    tiku_trk_resource_session_close(app->resource_session);
     tiku_backend_close(app->backend);
 #endif
 

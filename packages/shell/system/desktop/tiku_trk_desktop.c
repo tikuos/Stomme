@@ -16,6 +16,7 @@
 #include "tiku_report.h"
 #include "tiku_trk_desktop_private.h"
 #include "tiku_watch.h"
+#include "tiku_trk_session_controller.h"
 
 /**
  * @brief Apply the settings to the running desktop: thumbnails, the global
@@ -194,6 +195,8 @@ tracker_run(int argc, char **argv)
     }
     code = desktop_boot(&app, &opt, &lp);
     if (code >= 0) {
+        if(app.fs != NULL)tiku_trk_session_drain_filesystem(app.fs);
+        tiku_trk_resource_session_close(app.resource_session);
         return code;
     }
 
@@ -204,6 +207,7 @@ tracker_run(int argc, char **argv)
     while (app.running) {
         tiku_watch_beat();
         desktop_turn_begin(&app, &opt, &lp);
+        if(tiku_trk_resource_session_pump(app.resource_session))app.running=0;
         int64_t event_started = tiku_trk_now();
         int event_count = 0;
         for (;;) {

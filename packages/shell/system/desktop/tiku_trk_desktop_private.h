@@ -27,6 +27,7 @@
 #include "tiku_field.h"
 #include "tiku_form.h"
 #include "tiku_fs.h"
+#include "tiku_trk_resource_session.h"
 #include "tiku_host.h"
 #include "tiku_iconpaint.h"
 #include "tiku_icons.h"
@@ -213,6 +214,7 @@ typedef struct desktop {
     tiku_workspace_t     *desk;         /**< the windows and their stacking */
     tiku_trk_deskbar_t  *deskbar;       /**< the bar, drawn last */
     tiku_backend_t  *backend;           /**< the namespace: files and mounts */
+    tiku_trk_resource_session_t *resource_session;
     tiku_fs_t       *fs;                /**< file operations over it */
     folder_t             folders[TIKU_WINDOW_MAX]; /**< the folder windows */
     tiku_trk_services_t  services;      /**< what the views ask the desktop */

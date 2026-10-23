@@ -1,0 +1,699 @@
+{
+  "protocol": {
+    "major": 1,
+    "minor": 0
+  },
+  "status": "specification-examples",
+  "flows": [
+    {
+      "name": "describe-setting",
+      "request": {
+        "op": "describe",
+        "request_id": "00000000000000000000000000000001",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "path": "/settings/ui/theme"
+      },
+      "response": {
+        "request_id": "00000000000000000000000000000001",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "result": {
+          "path": "/settings/ui/theme",
+          "provider": "settings",
+          "incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "revision": "7",
+          "schema_version": 1,
+          "kind": "setting",
+          "value_schema": {
+            "type": "enum",
+            "choices": [
+              "light",
+              "dark",
+              "monochrome"
+            ]
+          },
+          "access": {
+            "operations": [
+              "read",
+              "set"
+            ],
+            "scopes": [
+              "settings.write"
+            ]
+          },
+          "availability": {
+            "state": "available"
+          },
+          "persistence": {
+            "scope": "user",
+            "owner": "TrackerSettings"
+          },
+          "apply": {
+            "mode": "live",
+            "transaction_group": null
+          },
+          "sensitive": false,
+          "limits": {
+            "text_bytes": 4096
+          }
+        }
+      }
+    },
+    {
+      "name": "read-setting",
+      "request": {
+        "op": "read",
+        "request_id": "00000000000000000000000000000002",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "path": "/settings/ui/theme"
+      },
+      "response": {
+        "request_id": "00000000000000000000000000000002",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "result": {
+          "provider": "settings",
+          "incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "revision": "7",
+          "desired": {
+            "type": "enum",
+            "value": "light"
+          },
+          "persisted": {
+            "type": "enum",
+            "value": "light"
+          },
+          "applied": {
+            "type": "enum",
+            "value": "light"
+          },
+          "apply_state": "applied"
+        }
+      }
+    },
+    {
+      "name": "conditional-write",
+      "request": {
+        "op": "set",
+        "request_id": "00000000000000000000000000000003",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "path": "/settings/ui/theme",
+        "expected": {
+          "provider": "settings",
+          "incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "revision": "7"
+        },
+        "value": {
+          "type": "enum",
+          "value": "dark"
+        },
+        "durability": "user",
+        "deadline_ms": 1000
+      },
+      "response": {
+        "request_id": "00000000000000000000000000000003",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "result": {
+          "provider": "settings",
+          "incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "revision": "8",
+          "desired": {
+            "type": "enum",
+            "value": "dark"
+          },
+          "persisted": {
+            "type": "enum",
+            "value": "dark"
+          },
+          "applied": {
+            "type": "enum",
+            "value": "dark"
+          },
+          "apply_state": "applied"
+        }
+      }
+    },
+    {
+      "name": "stale-write",
+      "request": {
+        "op": "set",
+        "request_id": "00000000000000000000000000000004",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "path": "/settings/ui/theme",
+        "expected": {
+          "provider": "settings",
+          "incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "revision": "7"
+        },
+        "value": {
+          "type": "enum",
+          "value": "monochrome"
+        },
+        "durability": "user",
+        "deadline_ms": 1000
+      },
+      "response": {
+        "request_id": "00000000000000000000000000000004",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "error": {
+          "code": "stale_revision",
+          "message": "Read the current revision.",
+          "effect": "none",
+          "current": {
+            "provider": "settings",
+            "incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "revision": "8",
+            "desired": {
+              "type": "enum",
+              "value": "dark"
+            },
+            "persisted": {
+              "type": "enum",
+              "value": "dark"
+            },
+            "applied": {
+              "type": "enum",
+              "value": "dark"
+            },
+            "apply_state": "applied"
+          }
+        }
+      }
+    },
+    {
+      "name": "read-only-state",
+      "request": {
+        "op": "set",
+        "request_id": "00000000000000000000000000000005",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "path": "/about/abi",
+        "expected": {
+          "provider": "about",
+          "incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "revision": "7"
+        },
+        "value": {
+          "type": "integer",
+          "value": 6
+        },
+        "durability": "session",
+        "deadline_ms": 1000
+      },
+      "response": {
+        "request_id": "00000000000000000000000000000005",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "error": {
+          "code": "read_only",
+          "message": "ABI is composition metadata.",
+          "effect": "none"
+        }
+      }
+    },
+    {
+      "name": "missing-content-scope",
+      "request": {
+        "op": "invoke",
+        "request_id": "00000000000000000000000000000006",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "path": "/clipboard/actions/read-content",
+        "expected": {
+          "provider": "clipboard",
+          "incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "revision": "7"
+        },
+        "arguments": {
+          "type": "object",
+          "value": {}
+        },
+        "deadline_ms": 1000
+      },
+      "response": {
+        "request_id": "00000000000000000000000000000006",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "error": {
+          "code": "permission_denied",
+          "message": "Content access is not granted.",
+          "effect": "none"
+        }
+      }
+    },
+    {
+      "name": "atomic-fixture-group",
+      "request": {
+        "op": "transaction",
+        "request_id": "00000000000000000000000000000007",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "provider": "example.atomic",
+        "expected": {
+          "provider": "example.atomic",
+          "incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "revision": "7"
+        },
+        "replacements": [
+          {
+            "path": "/settings/example/first",
+            "value": {
+              "type": "boolean",
+              "value": true
+            }
+          },
+          {
+            "path": "/settings/example/second",
+            "value": {
+              "type": "boolean",
+              "value": false
+            }
+          }
+        ],
+        "deadline_ms": 1000
+      },
+      "response": {
+        "request_id": "00000000000000000000000000000007",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "result": {
+          "provider": "example.atomic",
+          "incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "revision": "8",
+          "values": {
+            "first": true,
+            "second": false
+          },
+          "apply_state": "applied"
+        }
+      }
+    },
+    {
+      "name": "dirty-window-confirmation",
+      "request": {
+        "op": "invoke",
+        "request_id": "00000000000000000000000000000008",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "path": "/windows/cccccccccccccccccccccccccccccccc/actions/request-close",
+        "expected": {
+          "provider": "windows",
+          "incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "revision": "7"
+        },
+        "arguments": {
+          "type": "object",
+          "value": {}
+        },
+        "deadline_ms": 1000
+      },
+      "response": {
+        "request_id": "00000000000000000000000000000008",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "result": {
+          "job": "dddddddddddddddddddddddddddddddd",
+          "state": "awaiting_confirmation",
+          "provider": "jobs",
+          "incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "revision": "8",
+          "expires_in_ms": 300000
+        }
+      }
+    },
+    {
+      "name": "cancel-before-commit",
+      "request": {
+        "op": "cancel",
+        "request_id": "00000000000000000000000000000009",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "job": "dddddddddddddddddddddddddddddddd",
+        "expected": {
+          "provider": "jobs",
+          "incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "revision": "8"
+        },
+        "deadline_ms": 1000
+      },
+      "response": {
+        "request_id": "00000000000000000000000000000009",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "result": {
+          "cancellation": "accepted"
+        }
+      }
+    },
+    {
+      "name": "snapshot-and-watch",
+      "request": {
+        "op": "subscribe",
+        "request_id": "0000000000000000000000000000000a",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "provider": "settings",
+        "path": "/settings/ui"
+      },
+      "response": {
+        "request_id": "0000000000000000000000000000000a",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "result": {
+          "subscription": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "snapshot": {
+            "provider": "settings",
+            "incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "revision": "8",
+            "desired": {
+              "type": "enum",
+              "value": "dark"
+            },
+            "persisted": {
+              "type": "enum",
+              "value": "dark"
+            },
+            "applied": {
+              "type": "enum",
+              "value": "dark"
+            },
+            "apply_state": "applied"
+          },
+          "next_sequence": "1"
+        }
+      }
+    },
+    {
+      "name": "watch-overflow",
+      "event": {
+        "subscription": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "provider": "settings",
+        "incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "revision": "9",
+        "sequence": "257",
+        "kind": "overflow",
+        "paths": [
+          "/settings/ui"
+        ]
+      },
+      "client_action": "discard-cache-and-resubscribe"
+    },
+    {
+      "name": "owner-loss-after-dispatch",
+      "request": {
+        "op": "invoke",
+        "request_id": "0000000000000000000000000000000b",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "path": "/windows/cccccccccccccccccccccccccccccccc/actions/request-close",
+        "expected": {
+          "provider": "windows",
+          "incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "revision": "9"
+        },
+        "arguments": {
+          "type": "object",
+          "value": {}
+        },
+        "deadline_ms": 1000
+      },
+      "response": {
+        "request_id": "0000000000000000000000000000000b",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "error": {
+          "code": "unknown_outcome",
+          "message": "The owner disconnected after dispatch.",
+          "effect": "unknown"
+        }
+      }
+    },
+    {
+      "name": "save-failure-after-live-apply",
+      "request": {
+        "op": "set",
+        "request_id": "0000000000000000000000000000000c",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "path": "/settings/ui/theme",
+        "expected": {
+          "provider": "settings",
+          "incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "revision": "8"
+        },
+        "value": {
+          "type": "enum",
+          "value": "light"
+        },
+        "durability": "user",
+        "deadline_ms": 1000
+      },
+      "response": {
+        "request_id": "0000000000000000000000000000000c",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "error": {
+          "code": "persistence_failed",
+          "message": "The settings file could not be replaced.",
+          "effect": "partial",
+          "current": {
+            "provider": "settings",
+            "incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "revision": "9",
+            "desired": {
+              "type": "enum",
+              "value": "light"
+            },
+            "persisted": {
+              "type": "enum",
+              "value": "dark"
+            },
+            "applied": {
+              "type": "enum",
+              "value": "light"
+            },
+            "apply_state": "persistence_failed"
+          }
+        }
+      }
+    },
+    {
+      "name": "list-directory",
+      "request": {
+        "op": "list",
+        "request_id": "00000000000000000000000000000015",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "path": "/settings",
+        "page_size": 128
+      },
+      "response": {
+        "request_id": "00000000000000000000000000000015",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "result": {
+          "provider": "settings",
+          "incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "revision": "8",
+          "entries": [
+            {
+              "path": "/settings/ui",
+              "kind": "directory"
+            }
+          ],
+          "next_cursor": null
+        }
+      }
+    },
+    {
+      "name": "describe-directory",
+      "request": {
+        "op": "describe",
+        "request_id": "00000000000000000000000000000016",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "path": "/settings/ui"
+      },
+      "response": {
+        "request_id": "00000000000000000000000000000016",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "result": {
+          "path": "/settings/ui",
+          "kind": "directory",
+          "provider": "settings",
+          "incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "revision": "8",
+          "schema_version": 1,
+          "value_schema": {
+            "type": "entries"
+          },
+          "access": {
+            "operations": [
+              "list",
+              "describe"
+            ],
+            "scopes": [
+              "metadata.read"
+            ]
+          },
+          "availability": {
+            "state": "available"
+          },
+          "persistence": {
+            "scope": "none",
+            "owner": "session"
+          },
+          "apply": {
+            "mode": "live",
+            "transaction_group": null
+          },
+          "sensitive": false,
+          "limits": {
+            "frame_bytes": 65536
+          }
+        }
+      }
+    },
+    {
+      "name": "describe-collection",
+      "request": {
+        "op": "describe",
+        "request_id": "00000000000000000000000000000017",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "path": "/apps/catalog"
+      },
+      "response": {
+        "request_id": "00000000000000000000000000000017",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "result": {
+          "path": "/apps/catalog",
+          "kind": "collection",
+          "provider": "settings",
+          "incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "revision": "8",
+          "schema_version": 1,
+          "value_schema": {
+            "type": "entries"
+          },
+          "access": {
+            "operations": [
+              "list",
+              "describe"
+            ],
+            "scopes": [
+              "metadata.read"
+            ]
+          },
+          "availability": {
+            "state": "available"
+          },
+          "persistence": {
+            "scope": "none",
+            "owner": "session"
+          },
+          "apply": {
+            "mode": "live",
+            "transaction_group": null
+          },
+          "sensitive": false,
+          "limits": {
+            "frame_bytes": 65536
+          }
+        }
+      }
+    },
+    {
+      "name": "describe-stream",
+      "request": {
+        "op": "describe",
+        "request_id": "00000000000000000000000000000018",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "path": "/clipboard/content"
+      },
+      "response": {
+        "request_id": "00000000000000000000000000000018",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "result": {
+          "path": "/clipboard/content",
+          "kind": "stream",
+          "provider": "clipboard",
+          "incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "revision": "8",
+          "schema_version": 1,
+          "value_schema": {
+            "type": "bounded-content"
+          },
+          "access": {
+            "operations": [
+              "stream-open",
+              "stream-read",
+              "stream-close"
+            ],
+            "scopes": [
+              "clipboard.content"
+            ]
+          },
+          "availability": {
+            "state": "available"
+          },
+          "persistence": {
+            "scope": "none",
+            "owner": "session"
+          },
+          "apply": {
+            "mode": "live",
+            "transaction_group": null
+          },
+          "sensitive": true,
+          "limits": {
+            "frame_bytes": 65536
+          }
+        }
+      }
+    },
+    {
+      "name": "open-read-stream",
+      "request": {
+        "op": "stream-open",
+        "request_id": "00000000000000000000000000000019",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "path": "/clipboard/content",
+        "expected": {
+          "provider": "clipboard",
+          "incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "revision": "8"
+        },
+        "maximum_bytes": "1024"
+      },
+      "response": {
+        "request_id": "00000000000000000000000000000019",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "result": {
+          "lease": "ffffffffffffffffffffffffffffffff",
+          "provider": "clipboard",
+          "incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "revision": "8",
+          "size": "3",
+          "idle_expiry_ms": 30000
+        }
+      }
+    },
+    {
+      "name": "read-stream",
+      "request": {
+        "op": "stream-read",
+        "request_id": "0000000000000000000000000000001a",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "lease": "ffffffffffffffffffffffffffffffff",
+        "offset": "0",
+        "byte_count": 3
+      },
+      "response": {
+        "request_id": "0000000000000000000000000000001a",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "result": {
+          "lease": "ffffffffffffffffffffffffffffffff",
+          "offset": "0",
+          "data": "YWJj",
+          "eof": true
+        }
+      }
+    },
+    {
+      "name": "close-stream",
+      "request": {
+        "op": "stream-close",
+        "request_id": "0000000000000000000000000000001b",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "lease": "ffffffffffffffffffffffffffffffff"
+      },
+      "response": {
+        "request_id": "0000000000000000000000000000001b",
+        "session": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "result": {
+          "released": true
+        }
+      }
+    }
+  ]
+}

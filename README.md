@@ -189,3 +189,15 @@ inputs in this checkout and update the product pins after checking the results.
 
 The [maintenance contract](docs/contracts/maintenance.md) defines shared-change
 review, downstream qualification, release records and dependency rollback.
+
+The [desktop resource contract](docs/contracts/desktop-vfs.md) specifies a typed
+VFS for desktop settings, state and actions. Its
+[local protocol](docs/contracts/desktop-vfs-protocol.md) defines caller context,
+conditional requests and change delivery. The
+[registry, broker and job APIs](docs/contracts/desktop-vfs-runtime.md) provide
+resource primitives; neither product mounts a desktop resource service.
+
+The desktop resource contracts are in `docs/contracts/desktop-vfs-runtime.md`.
+`examples/resource_client.c` is a standalone SDK client for the explicitly
+enabled desktop test provider. Shared shell startup selects a private endpoint
+through `STOMME_RESOURCE_DIRECTORY`; its read namespace mounts at `/.stomme`.
