@@ -182,8 +182,8 @@ tiku_trk_repaint_take_slide(tiku_trk_repaint_t *r, int *y)
     return delta;
 }
 
-int
-tiku_trk_repaint_take(tiku_trk_repaint_t *r, tiku_trk_repaint_rect_t *out, int max)
+int tiku_trk_repaint_take(tiku_trk_repaint_t *r, tiku_trk_repaint_rect_t *out,
+                          int max)
 {
     int n, i;
     if (r == NULL || out == NULL || max <= 0) return 0;

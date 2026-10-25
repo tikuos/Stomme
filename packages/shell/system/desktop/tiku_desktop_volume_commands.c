@@ -11,6 +11,42 @@
 
 #include "tiku_trk_desktop_private.h"
 
+int desktop_request_unmount(void *context, const tiku_volume_t *expected,
+                            char *why, size_t capacity)
+{
+    desktop_t *app = context;
+    tiku_volumes_t current;
+    char mount[TIKU_PATH_MAX], name[128];
+    if(!app||!expected||!why||!capacity)return 0;
+    why[0]=0;
+    if (app->unmount_job) {
+        snprintf(why, capacity, "An unmount is already pending.");
+        return 0;
+    }
+    int count = tiku_volumes_cached(&current, NULL);
+    const tiku_volume_t *volume = NULL;
+    for (int i = 0; i < count && i < TIKU_VOLUME_MAX; i++)
+        if (!strcmp(current.v[i].mount, expected->mount))
+            volume = &current.v[i];
+    if (!volume || volume->dev != expected->dev ||
+        strcmp(volume->source, expected->source) ||
+        strcmp(volume->fstype, expected->fstype)) {
+        snprintf(why, capacity,
+                 "The native volume identity changed or is unavailable.");
+        return 0;
+    }
+    if (tiku_volume_unmount_prepare(
+            &current, expected->mount, save_before_unmount, app, mount,
+            sizeof mount, name, sizeof name, why, capacity))
+        return 0;
+    if (!desktop_wire_unmount(app, mount, name)) {
+        snprintf(why, capacity,
+                 "The native unmount request could not be queued.");
+        return 0;
+    }
+    return 1;
+}
+
 /**
  * @brief Unmount the selected volume, or the volume whose root the window
  *        shows; a refusal is shown in an alert.
@@ -35,17 +71,9 @@ desktop_cmd_unmount(desktop_t *app, folder_t *fl, int command)
         uwhy[0] = '\0';
         if (tiku_volumes_scan(&uvols) > 0 &&
             tiku_volume_is_root(&uvols, upath)) {
-                        char umount_at[TIKU_PATH_MAX], uname[128];
-
-            /* The refusal and the saving are done here, on the loop; the
-             * umount itself, which flushes what is dirty, goes to a
-             * worker and reports back. */
-            if (tiku_volume_unmount_prepare(&uvols, upath,
-                                            save_before_unmount, app,
-                                            umount_at, sizeof umount_at,
-                                            uname, sizeof uname,
-                                            uwhy, sizeof uwhy) == 0) {
-                (void)desktop_wire_unmount(app, umount_at, uname);
+            const tiku_volume_t *volume=tiku_volume_of(&uvols,upath);
+            if(volume&&desktop_request_unmount(app,volume,uwhy,sizeof uwhy)) {
+                desktop_damage_all(app);
             } else if (uwhy[0] != '\0') {
                 tiku_sound_play(TIKU_SOUND_BEEP);
                 tiku_alert_open(alert_model(app), TIKU_ALERT_STOP,

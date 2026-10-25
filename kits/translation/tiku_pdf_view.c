@@ -502,3 +502,16 @@ const char *tiku_pdf_view_status(const tiku_pdf_view_t *v)
     if (!v) return "";
     return v->hint[0] ? v->hint : v->status;
 }
+
+int tiku_pdf_view_selection(const tiku_pdf_view_t *view,
+                            tiku_pdf_view_selection_t *out)
+{
+ if(!out)return 0;memset(out,0,sizeof *out);if(!view||!view->doc)return 0;
+ *out = (tiku_pdf_view_selection_t){.anchor_page = view->anchor.page,
+                                    .focus_page = view->focus.page,
+                                    .anchor = view->anchor.at,
+                                    .focus = view->focus.at,
+                                    .selected = view->selected,
+                                    .copy_allowed = view->may_copy};
+ return 1;
+}

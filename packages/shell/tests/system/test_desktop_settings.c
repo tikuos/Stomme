@@ -35,18 +35,34 @@ static tiku_resource_error_t change(tiku_resource_registry_t *registry,const cha
     tiku_resource_job_info_clear(&job);tiku_resource_job_info_clear(&out);return error;
 }
 
+/** @brief Count notifications from the native Desktop settings owner. */
+static void changed(void *context)
+{
+    (*(unsigned *)context)++;
+}
+
 /** @brief Exercise one native or cached state store through the same owner API. */
 static void exercise(tiku_store_t *store, const char *node, const char *path, int native)
 {
-    tiku_trk_deskprefs_t model; tiku_trk_prefs_t table;
+    tiku_trk_deskprefs_t model;
+    tiku_trk_prefs_t table;
+    unsigned notifications = 0;
     tiku_resource_registry_t *registry = tiku_resource_registry_new(NULL);
     tiku_trk_desktop_settings_t *desktop; tiku_trk_settings_t *settings;
     tiku_resource_snapshot_t snapshot; tiku_msg_t *input; char bytes[2048], backup[1100]; int64_t number;
     const char *view = "icon 32 12 10 20 30 40 2 3 1 0";
     CHECK(registry && !tiku_state_write(store,node,TIKU_ATTR_DESK_VIEW_STATE,view,strlen(view)) && !tiku_store_flush(store));
     tiku_trk_deskprefs_init(&model); tiku_trk_prefs_init(&table);
-    desktop=tiku_trk_desktop_settings_open(store,node,&model,NULL,NULL); CHECK(desktop);
+    desktop = tiku_trk_desktop_settings_open(store, node, &model, changed,
+                                             &notifications);
+    CHECK(desktop);
     settings=tiku_trk_settings_open_with_desktop(&table,path,registry,NULL,NULL,desktop,NULL,NULL); CHECK(settings); drain();
+    {
+        unsigned before = notifications;
+        tiku_trk_desktop_settings_poll(desktop, 501);
+        drain();
+        CHECK(notifications == before);
+    }
     input=tiku_resource_value_integer(TIKU_RESOURCE_INTEGER,48); CHECK(!change(registry,"/settings/desktop/icon_size",input,1)); tiku_msg_free(input);
     CHECK(model.value.icon_size==48);
     CHECK(tiku_state_read(store,node,TIKU_ATTR_DESK_VIEW_STATE,bytes,sizeof bytes-1)>0);
@@ -67,7 +83,9 @@ static void exercise(tiku_store_t *store, const char *node, const char *path, in
     model.value.icon_size=64; CHECK(!tiku_trk_desktop_settings_submit(desktop)); CHECK(model.value.icon_size==48); drain(); CHECK(model.value.icon_size==64);
     CHECK(!strcmp(tiku_trk_desktop_settings_status(desktop),""));
     CHECK(!tiku_state_write(store,node,TIKU_ATTR_DESK_VIEW_STATE,"mini 96 9 8 7 6 5 4 3 0 1",25) && !tiku_store_flush(store));
-    tiku_trk_desktop_settings_poll(desktop,1000); drain(); CHECK(model.value.icon_size==96);
+    tiku_trk_desktop_settings_poll(desktop, 1001);
+    drain();
+    CHECK(model.value.icon_size == 96);
     CHECK(!tiku_state_write(store,node,TIKU_ATTR_DESK_VIEW_STATE,"bad record",10) && !tiku_store_flush(store));
     tiku_trk_desktop_settings_poll(desktop,2000); drain(); CHECK(model.value.icon_size==96 && strstr(tiku_trk_desktop_settings_status(desktop),"Could not save"));
     CHECK(!tiku_state_write(store,node,TIKU_ATTR_DESK_VIEW_STATE,view,strlen(view)) && !tiku_store_flush(store));

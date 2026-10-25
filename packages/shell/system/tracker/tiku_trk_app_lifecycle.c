@@ -145,7 +145,8 @@ browser_boot(app_t *app, browser_options_t *o, browser_loop_t *lp)
         n = browser_selection_paths(app, paths, sel, 64);
         if (n > 0) {
             (void)tiku_fs_duplicate(app->fs, sel, n);
-            snprintf(app->status, sizeof app->status, "duplicating %d items", n);
+            snprintf(app->status, sizeof app->status, "duplicating %d items",
+                     n);
         }
     }
     if (getenv("TRK_DEMO_ICON") != NULL) {
@@ -159,8 +160,13 @@ browser_boot(app_t *app, browser_options_t *o, browser_loop_t *lp)
         {
             tiku_trk_pose_t *p0 = tiku_trk_poseview_at(app->view, 0);
             tiku_trk_pose_t *p1 = tiku_trk_poseview_at(app->view, 1);
-            if (p0 != NULL) { tiku_trk_poseview_move_pose(app->view, p0, 300, 180, 1); }
-            if (p1 != NULL) { tiku_trk_poseview_move_pose(app->view, p1, 300, 260, 1); p1->selected = 1; }
+            if (p0 != NULL) {
+                tiku_trk_poseview_move_pose(app->view, p0, 300, 180, 1);
+            }
+            if (p1 != NULL) {
+                tiku_trk_poseview_move_pose(app->view, p1, 300, 260, 1);
+                p1->selected = 1;
+            }
         }
         (void)tiku_trk_poseview_save_state(app->view);
     }
@@ -227,14 +233,25 @@ browser_parse_args(int argc, char **argv, browser_options_t *o)
     int i;
 
     for (i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "-d") == 0)                      { o->use_device = 1; }
-        else if (strcmp(argv[i], "-p") == 0 && i + 1 < argc) { o->port = argv[++i]; o->use_device = 1; }
-        else if (strcmp(argv[i], "-b") == 0 && i + 1 < argc) { o->baud = atoi(argv[++i]); }
-        else if (strcmp(argv[i], "-shot") == 0 && i + 1 < argc) { o->shot = argv[++i]; }
-        else if (strcmp(argv[i], "-script") == 0 && i + 1 < argc) { o->script_path = argv[++i]; }
-        else if (strcmp(argv[i], "-mute") == 0) { o->mute = 1; }
-        else if (strcmp(argv[i], "-seconds") == 0 && i + 1 < argc) { o->deadline_us = tiku_trk_now() + (int64_t)atoi(argv[++i]) * 1000000; }
-        else                                                 { o->start = argv[i]; }
+        if (strcmp(argv[i], "-d") == 0) {
+            o->use_device = 1;
+        } else if (strcmp(argv[i], "-p") == 0 && i + 1 < argc) {
+            o->port = argv[++i];
+            o->use_device = 1;
+        } else if (strcmp(argv[i], "-b") == 0 && i + 1 < argc) {
+            o->baud = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "-shot") == 0 && i + 1 < argc) {
+            o->shot = argv[++i];
+        } else if (strcmp(argv[i], "-script") == 0 && i + 1 < argc) {
+            o->script_path = argv[++i];
+        } else if (strcmp(argv[i], "-mute") == 0) {
+            o->mute = 1;
+        } else if (strcmp(argv[i], "-seconds") == 0 && i + 1 < argc) {
+            o->deadline_us =
+                tiku_trk_now() + (int64_t)atoi(argv[++i]) * 1000000;
+        } else {
+            o->start = argv[i];
+        }
     }
     return -1;
 }

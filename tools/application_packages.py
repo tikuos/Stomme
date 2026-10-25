@@ -44,7 +44,7 @@ def compose_applications(root, product, output, profile):
     shared = tree_files(package, 'apps') | tree_files(package, 'tests')
     for name, source in shared.items():
         parts = Path(name).parts
-        enabled = parts[0] == 'apps' and (parts[1] in requested or name in metadata.get('editor_common', []) and 'editor-common' in requested)
+        enabled = parts[0] == 'apps' and (parts[1] in requested or bool(requested) and name in metadata.get('common', []) or name in metadata.get('editor_common', []) and 'editor-common' in requested)
         if parts[0] == 'tests':
             enabled = bool(requested) and name in metadata.get('tests', [])
         if enabled:

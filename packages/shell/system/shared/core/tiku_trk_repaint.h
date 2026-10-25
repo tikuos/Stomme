@@ -44,25 +44,29 @@ void tiku_trk_repaint_add(tiku_trk_repaint_t *r, tiku_trk_repaint_rect_t rect);
  *
  * Above the view that is a scroll; inside it, a slide plus the one new row.
  */
-void tiku_trk_repaint_insert(tiku_trk_repaint_t *r, tiku_trk_repaint_rect_t visible,
-                             int row_h, int row_y);
+void tiku_trk_repaint_insert(tiku_trk_repaint_t *r,
+                             tiku_trk_repaint_rect_t visible, int row_h,
+                             int row_y);
 /**
  * @brief A row of @p row_h at @p row_y went away.
  *
  * Above the view that is a scroll; inside it, the rows below slide up and
  * the bottom row's worth of pixels is painted.
  */
-void tiku_trk_repaint_remove(tiku_trk_repaint_t *r, tiku_trk_repaint_rect_t visible,
-                             int row_h, int row_y);
+void tiku_trk_repaint_remove(tiku_trk_repaint_t *r,
+                             tiku_trk_repaint_rect_t visible, int row_h,
+                             int row_y);
 /**
  * @brief The band grew or shrank from @p old_rect to @p new_rect.
  *
  * Only the strips one has and the other has not are painted; a change of x
  * or width adds the overlapping height as well.
  */
-void tiku_trk_repaint_band(tiku_trk_repaint_t *r, tiku_trk_repaint_rect_t old_rect,
+void tiku_trk_repaint_band(tiku_trk_repaint_t *r,
+                           tiku_trk_repaint_rect_t old_rect,
                            tiku_trk_repaint_rect_t new_rect);
-/** @brief Take up to @p max rectangles out, oldest first.  @return how many. */
+/** @brief Take up to @p max rectangles out, oldest first.  @return how many.
+ */
 int tiku_trk_repaint_take(tiku_trk_repaint_t *r, tiku_trk_repaint_rect_t *out,
                           int max);
 

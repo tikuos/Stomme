@@ -54,6 +54,18 @@ int main(void)
     input=tiku_resource_value_integer(TIKU_RESOURCE_BOOLEAN,0);CHECK(!change(registry,"/settings/deskbar/show_clock",input,4));tiku_msg_free(input);CHECK(!bar.value.show_clock);
     bar.value.icon_size=48;CHECK(!tiku_trk_record_settings_submit(records,0));CHECK(bar.value.icon_size==16);drain();CHECK(bar.value.icon_size==48);
     fonts.value.size=16;CHECK(!tiku_trk_record_settings_submit(records,1));drain();CHECK(fonts.value.size==16 && bar.value.font_size==16 && tiku_font_size()==16);
+    fonts.value.size = 10;
+    CHECK(!tiku_trk_record_settings_submit(records, 1));
+    fonts.value.size = 12;
+    CHECK(!tiku_trk_record_settings_submit(records, 1));
+    fonts.value.size = 14;
+    CHECK(!tiku_trk_record_settings_submit(records, 1));
+    drain();
+    CHECK(fonts.value.size == 14 && bar.value.font_size == 14 &&
+          tiku_font_size() == 14);
+    fonts.value.size = 16;
+    CHECK(!tiku_trk_record_settings_submit(records, 1));
+    drain();
     input=tiku_resource_value_string(TIKU_RESOURCE_TEXT,"Missing test family");CHECK(!change(registry,"/settings/ui/font/dropped",input,5));tiku_msg_free(input);
     snapshot=read_value(registry,"/settings/ui/font/dropped");CHECK(!strcmp(snapshot.apply_state,"fallback") && !strcmp(tiku_msg_find_string(snapshot.desired,"value",0),"Missing test family") && !strcmp(tiku_msg_find_string(snapshot.applied,"value",0),""));tiku_resource_snapshot_clear(&snapshot);
     {

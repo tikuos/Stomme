@@ -24,6 +24,8 @@ typedef struct {
     int used, position;
     char path[512], error[192];
     struct stat identity;
+    uint64_t resource_document,
+        resource_revision; /**< lifetime and content publications */
 } hex_model_t;
 /** @brief Free the document's bytes and empty the model. */
 void hex_free(hex_model_t *m);

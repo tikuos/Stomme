@@ -19,7 +19,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-/** @brief The workspace backdrop: the Desktop folder's ground and its icons. */
+/** @brief The workspace backdrop: the Desktop folder's ground and its icons.
+ */
 static void
 draw(tiku_surface_t *surface, void *context)
 {
@@ -383,7 +384,10 @@ tiku_trk_desktop_view_init(tiku_trk_desktop_view_t *controller,
     controller->screen_w = screen_w;
     controller->screen_h = screen_h;
     /* Reserve the configured menu strip before restoring saved positions. */
-    controller->top_inset = tiku_trk_prefs_get(prefs,"GlobalMenuBar") && render->menus ? render->menus->bar.height : 0;
+    controller->top_inset =
+        tiku_trk_prefs_get(prefs, "GlobalMenuBar") && render->menus
+            ? render->menus->bar.height
+            : 0;
     tiku_trk_deskbar_set_top_inset(deskbar,controller->top_inset);
     home = getenv("HOME");
     (void)home;

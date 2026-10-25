@@ -14,10 +14,25 @@
  */
 
 #include "tiku_app.h"
+#include "tiku_app_resources.h"
 
 #include <dlfcn.h>
 #include <stdio.h>
 #include <string.h>
+
+/** @brief Optional extensions remain borrowed from their process-lived module. */
+static struct {
+    const tiku_app_descriptor_t *descriptor;
+    const tiku_app_resource_export_t *resources;
+} extensions[TIKU_APP_MAX];
+const tiku_app_resource_export_t *
+tiku_app_resource_bindings(const tiku_app_descriptor_t *descriptor)
+{
+    for (int i = 0; i < TIKU_APP_MAX; i++)
+        if (extensions[i].descriptor == descriptor)
+            return extensions[i].resources;
+    return NULL;
+}
 
 /*
  * The stamp that marks a TikuOS application's binary: this string, in a
@@ -81,7 +96,9 @@ sdk_matches(const char *path, char *err, size_t max)
     }
     (void)fclose(file);
     if (!found || !valid) {
-        snprintf(err, max, "incompatible application SDK; rebuild with this product's SDK");
+        snprintf(
+            err, max,
+            "incompatible application SDK; rebuild with this product's SDK");
         return 0;
     }
     return 1;
@@ -133,6 +150,30 @@ tiku_app_load(const char *path, char *err, size_t max)
         snprintf(err, max, "exports no application");
         (void)dlclose(object);
         return NULL;
+    }
+    const tiku_app_resource_export_t *resources =
+        dlsym(object, TIKU_APP_RESOURCE_EXPORT);
+    if (resources &&
+        (resources->version != TIKU_APP_RESOURCE_VERSION ||
+         resources->size != sizeof *resources || !resources->catalog ||
+         !resources->capture || !resources->change)) {
+        snprintf(err, max, "incompatible application resource extension");
+        dlclose(object);
+        return NULL;
+    }
+    if(resources) {
+        int index;
+        for (index = 0; index < TIKU_APP_MAX && extensions[index].descriptor &&
+                        extensions[index].descriptor != ex->app;
+             index++) {
+        }
+        if (index == TIKU_APP_MAX) {
+            snprintf(err, max, "application extension capacity");
+            dlclose(object);
+            return NULL;
+        }
+        extensions[index].descriptor = ex->app;
+        extensions[index].resources = resources;
     }
     /* The object stays open for the life of the process: the descriptor
      * and everything it points at live inside it. */

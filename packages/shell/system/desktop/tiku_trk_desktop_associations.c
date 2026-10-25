@@ -210,7 +210,9 @@ static void assoc_draw(tiku_window_t *w, tiku_surface_t *s,
                     assoc_flags(p, ASSOC_SAVE));
 }
 
-/** @brief Reconcile clean rows with saved values while preserving unsaved draft preconditions. */
+/** @brief Reconcile clean rows with saved values while preserving unsaved
+ * draft preconditions.
+ */
 static void assoc_sync(struct desktop_associations *p)
 {
     int i;
@@ -218,24 +220,30 @@ static void assoc_sync(struct desktop_associations *p)
     for (i = 0; i < p->model.count; i++) {
         tiku_trk_association_t *row = &p->model.row[i];
         if (!strcmp(row->saved, row->chosen)) {
-            tiku_trk_launch_preferred(p->app->store, row->type, row->saved, sizeof row->saved);
+            tiku_trk_launch_preferred(p->app->store, row->type, row->saved,
+                                      sizeof row->saved);
             strcpy(row->chosen, row->saved);
         }
     }
 }
 
-/** @brief Close the submitted draft after persistence, or retain it with its error. */
+/** @brief Close the submitted draft after persistence, or retain it with its
+ * error.
+ */
 static void assoc_saved(void *context, tiku_resource_error_t error)
 {
     struct desktop_associations *p = context;
     p->saving = 0;
     if (p->generation != p->submitted_generation) return;
     if (!error) desktop_associations_close(p->app);
-    else snprintf(p->status, sizeof p->status, error == TIKU_RESOURCE_STALE ?
-        "Associations changed. Reopen this window before saving." :
-        error == TIKU_RESOURCE_UNKNOWN_OUTCOME ?
-        "The save outcome is uncertain. Reopen to check the saved associations." :
-        "Could not save. Your previous associations are unchanged.");
+    else
+        snprintf(
+            p->status, sizeof p->status,
+            error == TIKU_RESOURCE_STALE
+                ? "Associations changed. Reopen this window before saving."
+            : error == TIKU_RESOURCE_UNKNOWN_OUTCOME
+                ? "The save outcome is uncertain. Reopen to check the saved associations."
+                : "Could not save. Your previous associations are unchanged.");
     desktop_damage_all(p->app);
 }
 
@@ -270,10 +278,14 @@ static int assoc_event(tiku_window_t *w, const tiku_event_t *ev, void *ctx)
     if (id == ASSOC_CANCEL) desktop_associations_close(p->app);
     if (id == ASSOC_SAVE && tiku_trk_associations_changed(&p->model)) {
         if (p->app->catalog_settings) {
-            if (!tiku_trk_catalog_settings_submit(p->app->catalog_settings, &p->model, assoc_saved, p)) {
+            if (!tiku_trk_catalog_settings_submit(p->app->catalog_settings,
+                                                  &p->model, assoc_saved, p)) {
                 p->saving = 1; p->submitted_generation = p->generation;
                 snprintf(p->status, sizeof p->status, "Saving associations...");
-            } else snprintf(p->status, sizeof p->status, "Could not start saving. Retry after other settings finish.");
+            } else
+                snprintf(
+                    p->status, sizeof p->status,
+                    "Could not start saving. Retry after other settings finish.");
         } else if (tiku_trk_associations_save(&p->model, p->app->store))
             desktop_associations_close(p->app);
         else snprintf(p->status, sizeof p->status,
@@ -296,7 +308,10 @@ void desktop_associations_close(desktop_t *app)
     tiku_window_t *w = desktop_associations_handle(app);
     if (app->prefs_track == w) app->prefs_track = NULL;
     if (w && w->open) tiku_workspace_close(app->desk, w);
-    if (app->associations) { app->associations->window = NULL; app->associations->generation++; }
+    if (app->associations) {
+        app->associations->window = NULL;
+        app->associations->generation++;
+    }
     desktop_damage_all(app);
 }
 

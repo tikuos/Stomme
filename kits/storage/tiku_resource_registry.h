@@ -110,4 +110,24 @@ int tiku_resource_watch_next(tiku_resource_registry_t *, tiku_resource_watch_t,
 /** @brief Release a watch and its queued events. */
 void tiku_resource_watch_close(tiku_resource_registry_t *, tiku_resource_watch_t);
 
+/** @brief Owner-thread counts of live registry resources and pending work. */
+typedef struct {
+    unsigned providers, provider_capacity, nodes, node_capacity;
+    unsigned watches, paused_watches, active_jobs, retained_jobs, services;
+    size_t retained_stream_bytes;
+} tiku_resource_registry_observation_t;
+/** @brief Copy counts without provider callbacks; zero for invalid thread/output. */
+int tiku_resource_registry_observe(const tiku_resource_registry_t *,tiku_resource_registry_observation_t *);
+
+/** @brief Counts and maximum sequence across selected live subscriptions. */
+typedef struct {
+    unsigned subscriptions, paused, queued;
+    uint64_t maximum_sequence;
+} tiku_resource_event_observation_t;
+/** @brief Observe live event queues, excluding one optional provider key.
+ * @note Sequences belong to subscriptions; the maximum can fall on retirement. */
+int tiku_resource_events_observe(const tiku_resource_registry_t *,
+                                 const char *exclude_provider,
+                                 tiku_resource_event_observation_t *);
+
 #endif

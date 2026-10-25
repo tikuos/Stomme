@@ -42,7 +42,7 @@ rect_get(const unsigned char *p)
                          (int32_t)get(p + 8, 4), (int32_t)get(p + 12, 4)};
 }
 int
-tiku_access_encode(const tiku_access_tree_t *tree, void **bytes, size_t *size)
+tiku_access_encode_limited(const tiku_access_tree_t *tree,size_t maximum,void **bytes,size_t *size)
 {
     if (!bytes || !size)
         return -1;
@@ -66,6 +66,7 @@ tiku_access_encode(const tiku_access_tree_t *tree, void **bytes, size_t *size)
             return -3;
         total += 20u * node->character_count;
     }
+    if(total>maximum)return -3;
     unsigned char *packet = calloc(1, total);
     if (!packet)
         return -2;
@@ -204,4 +205,9 @@ done:
         free((void *)nodes[i].character_bounds);
     free(nodes);
     return status;
+}
+
+int tiku_access_encode(const tiku_access_tree_t *tree,void **bytes,size_t *size)
+{
+    return tiku_access_encode_limited(tree,TIKU_ACCESS_BYTES_MAX,bytes,size);
 }

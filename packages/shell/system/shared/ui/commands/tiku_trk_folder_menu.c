@@ -214,7 +214,8 @@ tiku_trk_folder_menu_build_per_type(tiku_trk_folder_menu_t *controller,
         /* The submenu's item wears the type's icon; tiku_trk_types_find()
          * has already fallen back from the exact type to its supertype
          * (IV-056). */
-        snprintf(controller->menus->per_type_icon[controller->menus->per_type_count],
+        snprintf(controller->menus
+                     ->per_type_icon[controller->menus->per_type_count],
                  sizeof controller->menus->per_type_icon[0], "%s",
                  record->icon);
         tiku_menu_clear(menu);

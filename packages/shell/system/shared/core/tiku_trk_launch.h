@@ -186,9 +186,9 @@ const char *tiku_trk_launch_preferred(struct tiku_store *store,
 
 /** @brief Read the last saved preferred handler without filesystem I/O.
  *  @return 0 for a copied handler or no preference; -1 when unavailable. */
-int tiku_trk_launch_preferred_persisted(struct tiku_store *store, const char *type,
-    char *buffer, size_t max);
-
+int tiku_trk_launch_preferred_persisted(struct tiku_store *store,
+                                        const char *type, char *buffer,
+                                        size_t max);
 
 /** @brief The word a Relation column shows for @p rel (AW-042, MA-081). */
 const char *tiku_trk_launch_relation_label(tiku_trk_relation_t rel);

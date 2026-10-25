@@ -6,6 +6,7 @@
 #define TIKU_PDFVIEW_H_
 
 #include "tiku_window.h"
+#include "tiku_viewer_resources.h"
 
 /** @brief The viewer: its window, the document shown and its jobs. */
 typedef struct tiku_pdfview tiku_pdfview_t;
@@ -33,5 +34,8 @@ int tiku_pdfview_file(tiku_pdfview_t *c, const char *path);
 int tiku_pdfview_key(tiku_pdfview_t *c, const char *keyfile);
 /** @brief The shown document's path, "" when there is none. */
 const char *tiku_pdfview_path(tiku_pdfview_t *c);
+
+/** @brief Borrow current native document facts for the owning application provider. */
+vr_document_t tiku_pdfview_resource_document(tiku_pdfview_t *);
 
 #endif

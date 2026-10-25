@@ -159,4 +159,14 @@ size_t tiku_sound_frames(tiku_sound_event_t event);
  */
 const tiku_sound_backend_t *tiku_sound_host_backend(void);
 
+/** @brief Loop-thread snapshot of the configured backend and current clip. */
+typedef struct {
+    char backend[64];
+    int configured, opened, opening, last_open_known, last_open_ok;
+    int volume, event;
+    size_t written, frames;
+} tiku_sound_observation_t;
+/** @brief Copy engine state without opening or writing an audio device. */
+void tiku_sound_observe(tiku_sound_observation_t *out);
+
 #endif /* TIKU_SOUND_H_ */

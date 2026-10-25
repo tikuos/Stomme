@@ -294,4 +294,9 @@ int tiku_volume_unmount_prepare(const tiku_volumes_t *vs, const char *path,
 tiku_unmount_t tiku_volume_umount_now(const char *mount, const char *name,
                                       char *why, size_t max);
 
+/** @brief Copy the installed volume table without scanning or filesystem I/O.
+ *  @return Cached count, or -1 before a usable scan is installed.
+ *  @note revision changes on cache installation; it is not a kernel mount ID. */
+int tiku_volumes_cached(tiku_volumes_t *out, uint64_t *revision);
+
 #endif /* TIKU_VOLUME_H_ */

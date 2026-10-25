@@ -203,7 +203,9 @@ static void draw(tiku_window_t *window, tiku_surface_t *s,
         tiku_str("prefs.fonts.sample_body"), TIKU_C_TEXT, 3);
     const char *status = p->save_status ? p->save_status(p->save_context) : "";
     tiku_text_block_draw(s, l.help, TIKU_MEASURE_PLAIN,
-        status && *status ? status : tiku_str("prefs.fonts.help"), TIKU_C_TEXT, 3);
+                         status && *status ? status
+                                           : tiku_str("prefs.fonts.help"),
+                         TIKU_C_TEXT, 3);
     buttons_draw(p, s);
 }
 

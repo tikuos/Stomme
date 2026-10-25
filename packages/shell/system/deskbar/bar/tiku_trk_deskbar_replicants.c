@@ -256,8 +256,8 @@ tiku_trk_deskbar_load_replicants(tiku_trk_deskbar_t *db)
             if (height != NULL) *height++ = '\0';
             if (tab[0] != '\0' && db->backend != NULL &&
                 db->backend->ops->stat != NULL &&
-                db->backend->ops->stat(db->backend, tab,
-                                                          &(tiku_model_t){0}) == 0 &&
+                db->backend->ops->stat(db->backend, tab, &(tiku_model_t){0}) ==
+                    0 &&
                 tiku_trk_deskbar_add_replicant(db, line, tab) >= 0) {
                 if (height != NULL) {
                     (void)tiku_trk_deskbar_set_replicant_height(db, tab,
@@ -492,8 +492,8 @@ tiku_trk_deskbar_trayicons(const tiku_trk_deskbar_t *db, int i,
     return db->trayicon_count;
 }
 
-int
-tiku_trk_deskbar_replicant_at(const tiku_trk_deskbar_t *db, int index, tiku_trk_replicant_t *out)
+int tiku_trk_deskbar_replicant_at(const tiku_trk_deskbar_t *db, int index,
+                                  tiku_trk_replicant_t *out)
 {
     if (!db || !out || index < 0 || index >= db->tray_count) return -1;
     *out = db->tray[index]; return 0;

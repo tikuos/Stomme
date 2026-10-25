@@ -178,8 +178,8 @@ tiku_trk_poseview_restore_columns(tiku_trk_poseview_t *v)
     return tiku_trk_poseview_apply_columns(v,rec,got);
 }
 
-int
-tiku_trk_poseview_apply_columns(tiku_trk_poseview_t *v, const void *bytes, size_t got)
+int tiku_trk_poseview_apply_columns(tiku_trk_poseview_t *v, const void *bytes,
+                                    size_t got)
 {
     column_rec_t rec[TIKU_TRK_COLUMNS_MAX];
     int n, kept = 0, i, j, order = -1;

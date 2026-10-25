@@ -60,9 +60,10 @@ const char *tiku_circuitview_label(int command)
 int tiku_circuitview_enabled(const tiku_circuitview_t *v, int id)
 {
     if (v->style_open && id != CIRCUIT_CLOSE) return 0;
-    if (id == CIRCUIT_EXPORT) return v->choose && v->document && v->image.px &&
-        !v->exporting && !v->loading && !v->needs_load && !v->busy && !v->needs_render &&
-        v->rendered_generation == v->generation;
+    if (id == CIRCUIT_EXPORT)
+        return v->choose && v->document && v->image.px && !v->exporting &&
+               !v->loading && !v->needs_load && !v->busy && !v->needs_render &&
+               v->rendered_generation == v->generation;
     if (id == CIRCUIT_SAVE_VIEW)
         return v->document && v->path[0] && v->settings_dir[0] &&
         !v->saving_view && !v->loading && !v->needs_load;
@@ -226,15 +227,18 @@ void tiku_circuitview_action(tiku_circuitview_t *v, int command)
     if (command == CIRCUIT_LAYER_STYLE) { cv_style_open(v); return; }
     if (command == CIRCUIT_SAVE_VIEW) { cv_save_view(v); return; }
     if (command >= CIRCUIT_MEASURE && command <= CIRCUIT_UNIT_MIL) {
-        if (command == CIRCUIT_MEASURE) { v->measure = !v->measure; v->dragging = 0; }
-        else if (command == CIRCUIT_MEASURE_CLEAR) {
+        if (command == CIRCUIT_MEASURE) {
+            v->measure = !v->measure;
+            v->dragging = 0;
+        } else if (command == CIRCUIT_MEASURE_CLEAR) {
             if (!v->measure_points) v->measure = 0;
             cv_measure_reset(v);
         } else if (command == CIRCUIT_MEASURE_COPY) {
             char text[512];
             cv_measure_text(v,text,sizeof text);
             tiku_clipboard_set(text);
-        } else v->units = command - CIRCUIT_UNIT_MM;
+        } else
+            v->units = command - CIRCUIT_UNIT_MM;
         if (v->dirty) *v->dirty = 1;
         tiku_circuitview_menus(v); return;
     }
@@ -305,6 +309,7 @@ void tiku_circuitview_action(tiku_circuitview_t *v, int command)
         tiku_circuitview_clear_project(v);
         tiku_circuit_release(v->document);
         v->document = NULL;
+        v->resource_document++;
         tiku_image_free(&v->image);
         v->selected = SIZE_MAX;
         tiku_circuitview_changed(v);
@@ -322,6 +327,7 @@ void tiku_circuitview_action(tiku_circuitview_t *v, int command)
         tiku_circuitview_clear_project(v);
         tiku_circuit_release(v->document);
         v->document = d;
+        v->resource_document++;
         tiku_image_free(&v->image);
         v->selected = SIZE_MAX;
         v->fit = 1;

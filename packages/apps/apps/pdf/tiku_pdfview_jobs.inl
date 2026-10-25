@@ -101,13 +101,16 @@ static int pv_load_locked(tiku_pdfview_t *c, pv_load_t *j)
                   "or press Escape.");
     } else {
         c->keyfile[0] = 0;
-        pv_say(c, j->err == TIKU_PDF_KEY_FILE ?
-               TIKU_PRODUCT_PDF_THAT_IS_NOT_A_KEY_TIKUPDF_READS_AN_RSA_KEY_IN_A_P12_PFX
-               "or .pem file. Choose another with File > Open Key..." :
-               j->keyfile[0] ? "That key is not one this PDF was sealed to. "
-               "Choose another with File > Open Key..." :
-               "This PDF is sealed to a certificate. Choose your key file "
-               "(.p12, .pfx or .pem), then type its password.");
+        pv_say(
+            c,
+            j->err == TIKU_PDF_KEY_FILE
+                ? TIKU_PRODUCT_PDF_THAT_IS_NOT_A_KEY_TIKUPDF_READS_AN_RSA_KEY_IN_A_P12_PFX
+                "or .pem file. Choose another with File > Open Key..."
+            : j->keyfile[0]
+                ? "That key is not one this PDF was sealed to. "
+                  "Choose another with File > Open Key..."
+                : "This PDF is sealed to a certificate. Choose your key file "
+                  "(.p12, .pfx or .pem), then type its password.");
         if (!j->keyfile[0] && c->choose) c->choose(c->ctx, 1);
     }
     pv_menus(c);
@@ -179,6 +182,7 @@ static void pv_load_done(void *ctx)
     snprintf(d->key, sizeof d->key, "pdf:%p", (void *)d);
     atomic_init(&d->search, c->search_gen);
     c->doc = d;
+    c->resource_document++;
     c->npage = j->npage;
     c->pw = j->pw;
     c->ph = j->ph;
@@ -196,8 +200,8 @@ static void pv_load_done(void *ctx)
     snprintf(c->title, sizeof c->title, "%s",
              j->title && j->title[0] ? j->title : name ? name + 1 : j->path);
     if (c->window)
-        snprintf(c->window->title, sizeof c->window->title, TIKU_PRODUCT_PDF_TITLE_FORMAT,
-                 name ? name + 1 : j->path);
+        snprintf(c->window->title, sizeof c->window->title,
+                 TIKU_PRODUCT_PDF_TITLE_FORMAT, name ? name + 1 : j->path);
     c->fit = PV_BY_WIDTH;
     c->may_copy = j->may_copy;
     c->sig = j->sig;

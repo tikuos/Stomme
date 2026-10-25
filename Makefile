@@ -201,3 +201,8 @@ test-tools:
 $(BUILD)/tools/glyphdump: kits/interface/tools/glyphdump.c $(LIBRARIES)
 	@mkdir -p $(dir $@)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(INCLUDES) -o $@ $< $(LIBRARIES) $(LDFLAGS) $(LDLIBS)
+
+.PHONY: resource-client
+resource-client: $(BUILD)/stomme-resources
+$(BUILD)/stomme-resources: examples/stomme_resources.c $(BUILD)/lib/libtiku_application.a $(BUILD)/lib/libtiku_support.a
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(INCLUDES) -o $@ $< $(BUILD)/lib/libtiku_application.a $(BUILD)/lib/libtiku_support.a $(LDFLAGS) -lm -pthread

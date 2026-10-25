@@ -193,7 +193,8 @@ browser_menu_invoke(app_t *a, int command)
     case TIKU_TRK_CMD_FIND:
     case TIKU_TRK_CMD_GET_INFO:
     case TIKU_TRK_CMD_PREFERENCES:
-        snprintf(a->status, sizeof a->status, "%s is not available in this shell",
+        snprintf(a->status, sizeof a->status,
+                 "%s is not available in this shell",
                  tiku_trk_sc_label(command, 0u));
         break;
     default:
@@ -379,7 +380,8 @@ browser_cmd_template(app_t *a, int command, const char *template_path,
                      slash != NULL ? slash + 1 : made);
         } else {
             snprintf(a->status, sizeof a->status, "%.200s",
-                     error[0] != '\0' ? error : "could not create from template");
+                     error[0] != '\0' ? error
+                                      : "could not create from template");
         }
         a->dirty = 1;
         return 1;

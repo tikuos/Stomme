@@ -13,6 +13,7 @@
 #include <unistd.h>
 
 static tiku_resource_channel_t *channel;
+static int print_result;
 
 /** @brief Build a session-correlated request with a fresh mutation identity. */
 static tiku_msg_t *request(const char *op, const char *path)
@@ -87,7 +88,16 @@ static int change(const char *path, tiku_msg_t *value, int invoke)
         if (!message || !tiku_msg_add_string(message, "job", job)) { tiku_msg_free(message); return -1; }
         result = call(message); if (!result) return -1;
         state = tiku_msg_find_string(result, "state", 0);
-        if (state && !strcmp(state, "succeeded")) { tiku_msg_free(result); return 0; }
+        if (state && !strcmp(state, "succeeded")) {
+            if(print_result) {
+                tiku_msg_t *snapshot=tiku_msg_find_message(result,"snapshot",0);
+                tiku_msg_t *applied=tiku_msg_find_message(snapshot,"applied",0);char text[16000];
+                int size=applied?tiku_resource_value_render(applied,text,sizeof text):-1;
+                tiku_msg_free(applied);tiku_msg_free(snapshot);
+                if(size<0){tiku_msg_free(result);return -1;}printf("%.*s\n",size,text);
+            }
+            tiku_msg_free(result); return 0;
+        }
         if (!state || (strcmp(state, "queued") && strcmp(state, "running"))) {
             fprintf(stderr, "settings job: %s %s %s\n", state ? state : "invalid", tiku_msg_find_string(result,"code",0), tiku_msg_find_string(result,"effect",0)); tiku_msg_free(result); return -1;
         }
@@ -204,7 +214,19 @@ static tiku_msg_t *record_value(const char *kind, int count, char **arguments)
 {
     static const char *const frame_keys[]={"x","y","width","height"}, *const pose_keys[]={"x","y","flags"}, *const dock_keys[]={"dock","width"}, *const position_keys[]={"x","y"};
     tiku_msg_t *out=NULL,*item=NULL;
-    if(!strcmp(kind,"document")&&count==1) {
+    if(!strcmp(kind,"object")&&count%2==0) {
+        out=tiku_msg_new(0);int valid=out&&tiku_msg_add_string(out,"type","object");
+        for(int i=0;i<count&&valid;i+=2) {
+            const char *key=arguments[i]+2;tiku_msg_t *value=NULL;
+            if(arguments[i][0]=='t'&&arguments[i][1]==':')value=tiku_resource_value_string(TIKU_RESOURCE_TEXT,arguments[i+1]);
+            else if(arguments[i][0]=='i'&&arguments[i][1]==':') {
+                char *end;errno=0;long long number=strtoll(arguments[i+1],&end,10);
+                if(!errno&&end!=arguments[i+1]&&!*end)value=tiku_resource_value_integer(TIKU_RESOURCE_INTEGER,number);
+            }
+            valid=*key&&member(out,key,value);
+        }
+        if(valid)return out;
+    } else if(!strcmp(kind,"document")&&count==1) {
         out=tiku_msg_new(0);
         if(out&&tiku_msg_add_string(out,"type","object")&&member(out,"path",tiku_resource_value_string(TIKU_RESOURCE_TEXT,arguments[0])))return out;
     } else if(!strcmp(kind,"script")&&count>=5&&(count-5)%2==0) {
@@ -258,7 +280,8 @@ int main(int argc, char **argv)
     if (argc==4 && !strcmp(argv[2],"read")) { status=read_value(argv[3])?1:0; goto done; }
     if (argc==4 && !strcmp(argv[2],"stream")) { status=stream_value(argv[3])?1:0; goto done; }
     if (argc==4 && !strcmp(argv[2],"audit")) { status=audit(argv[3])?1:0; goto done; }
-    if (argc>=4 && !strcmp(argv[2],"action")) {
+    if (argc>=4 && (!strcmp(argv[2],"action")||!strcmp(argv[2],"action-result"))) {
+        print_result=!strcmp(argv[2],"action-result");
         value=argc==4?tiku_msg_new(0):argc>=5?record_value(argv[4],argc-5,argv+5):NULL;
         if (argc==4 && value && !tiku_msg_add_string(value,"type","object")) { tiku_msg_free(value);value=NULL; }
         if (value && !change(argv[3],value,1)) status=0;

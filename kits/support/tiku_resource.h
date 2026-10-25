@@ -29,8 +29,10 @@
 #define TIKU_RESOURCE_FEATURE_COLLECTION UINT64_C(64)
 /** @brief Frozen, scoped binary read leases. */
 #define TIKU_RESOURCE_FEATURE_STREAM UINT64_C(128)
+/** @brief Atomic application catalogs staged across bounded messages. */
+#define TIKU_RESOURCE_FEATURE_PROVIDER_CATALOG UINT64_C(256)
 /** @brief Supported protocol feature bits. */
-#define TIKU_RESOURCE_FEATURES UINT64_C(255)
+#define TIKU_RESOURCE_FEATURES UINT64_C(511)
 /** @brief Maximum retained bytes per stream or connection. */
 #define TIKU_RESOURCE_STREAM_BYTES (4u * 1024u * 1024u)
 /** @brief Maximum bytes in one stream read. */
@@ -192,14 +194,19 @@ typedef struct {
 } tiku_resource_replacement_t;
 
 /** @brief Validate complete unique paths, typed values and persistence scopes. */
-tiku_resource_error_t tiku_resource_replacements_check(const tiku_resource_replacement_t *, size_t count);
+tiku_resource_error_t
+tiku_resource_replacements_check(const tiku_resource_replacement_t *,
+                                 size_t count);
 /** @brief Encode a bounded replacement list; the caller frees its message. */
-tiku_msg_t *tiku_resource_replacements_message(const tiku_resource_replacement_t *, size_t count);
+tiku_msg_t *
+tiku_resource_replacements_message(const tiku_resource_replacement_t *,
+                                   size_t count);
 /** @brief Decode owned list inputs into a zeroed array of TRANSACTION_MAX slots. */
 tiku_resource_error_t tiku_resource_replacements_decode(const tiku_msg_t *,
     tiku_resource_replacement_t *, size_t *count);
 /** @brief Release entries allocated by replacements_decode. */
-void tiku_resource_replacements_clear(tiku_resource_replacement_t *, size_t count);
+void tiku_resource_replacements_clear(tiku_resource_replacement_t *,
+                                      size_t count);
 
 /** @brief Stable error code suitable for protocol replies. */
 const char *tiku_resource_error_name(tiku_resource_error_t error);
@@ -221,13 +228,14 @@ tiku_resource_error_t tiku_resource_request_check(const tiku_msg_t *request,
                                                   uint64_t features);
 
 /** @brief Preflight a flattened message's bounds, names, types and nesting. */
-tiku_resource_error_t tiku_resource_message_check(const void *bytes, size_t size);
+tiku_resource_error_t tiku_resource_message_check(const void *bytes,
+                                                  size_t size);
 /** @brief Check a flattened message with reserved outer message levels. */
 tiku_resource_error_t tiku_resource_message_check_nested(const void *bytes,
     size_t size, unsigned ancestors);
 /** @brief Decode a preflighted message; output is NULL on failure. */
-tiku_resource_error_t tiku_resource_message_decode(const void *bytes, size_t size,
-                                                   tiku_msg_t **out);
+tiku_resource_error_t
+tiku_resource_message_decode(const void *bytes, size_t size, tiku_msg_t **out);
 
 /** @brief Validate one complete typed value, including bounded nested values. */
 tiku_resource_error_t tiku_resource_value_check(const tiku_msg_t *value);
@@ -235,7 +243,8 @@ tiku_resource_error_t tiku_resource_value_check(const tiku_msg_t *value);
 tiku_msg_t *tiku_resource_value_string(tiku_resource_type_t type,
                                      const char *value);
 /** @brief Create a boolean, integer or color value; caller frees the result. */
-tiku_msg_t *tiku_resource_value_integer(tiku_resource_type_t type, int64_t value);
+tiku_msg_t *tiku_resource_value_integer(tiku_resource_type_t type,
+                                        int64_t value);
 /** @brief Render canonical scalar text or diagnostic JSON, followed by newline.
  *  @return Bytes written, or -1 without a truncated successful result. */
 int tiku_resource_value_render(const tiku_msg_t *value, void *out, size_t max);

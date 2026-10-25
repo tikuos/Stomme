@@ -21,8 +21,10 @@ typedef struct { uint8_t r, g, b, a; } tiku_trk_color_t;
  *
  * @return 0, or -1 when @p size is short of four or a pointer is NULL.
  */
-int tiku_trk_color_parse(const void *data, unsigned size, tiku_trk_color_t *out);
+int tiku_trk_color_parse(const void *data, unsigned size,
+                         tiku_trk_color_t *out);
 /** @brief Copy @p color into @p desktop; either NULL leaves it alone. */
-void tiku_trk_color_set(tiku_trk_color_t *desktop, const tiku_trk_color_t *color);
+void tiku_trk_color_set(tiku_trk_color_t *desktop,
+                        const tiku_trk_color_t *color);
 
 #endif

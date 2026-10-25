@@ -130,4 +130,15 @@ int tiku_host_print(tiku_host_t *host, uint64_t request, const void *pdf,
                     void *context);
 /** @brief Cancel an outstanding native print request. */
 void tiku_host_print_cancel(tiku_host_t *host, uint64_t request);
+/** @brief Native host canvas facts; no display or input queries are performed. */
+typedef struct {
+    char backend[16];
+    int available, scale, logical_width, logical_height, native_width, native_height;
+    int fullscreen, mapped, accessibility_endpoint, print_endpoint;
+} tiku_host_observation_t;
+/** @brief Copy cached backend/window facts; NULL host reports unavailable. */
+void tiku_host_observe(const tiku_host_t *,tiku_host_observation_t *);
+/** @brief Copy current jobs from this host's native print owner. */
+size_t tiku_host_print_observe(tiku_host_t *,tiku_print_job_observation_t *,size_t capacity);
+
 #endif /* TIKU_HOST_H_ */

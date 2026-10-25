@@ -24,7 +24,7 @@ int main(void)
     tiku_work_job_t job={.run=run,.done=complete,.free=release};tiku_work_observation_t rows[128];size_t count;
     strcpy(job.key,"observed-serial");
     for(int i=0;i<64;i++)CHECK(!tiku_work_post(&job));
-    CHECK(tiku_work_post(&job)<0);count=tiku_work_observe(rows,128);CHECK(count==64);
+    CHECK(tiku_work_post(&job)<0);tiku_work_stats_t stats;tiku_work_stats(&stats);CHECK(stats.posted==64&&stats.active==64&&stats.rejected==1&&stats.queued+stats.running+stats.finished_pending==64);count=tiku_work_observe(rows,128);CHECK(count==64);
     for(size_t i=0;i<count;i++){CHECK(rows[i].id&&rows[i].state<=1);for(size_t j=0;j<i;j++)CHECK(rows[j].id!=rows[i].id);}
     CHECK(tiku_work_cancel(job.key)==64);gate=1;
     for(int i=0;i<10000&&tiku_work_busy();i++){tiku_work_collect();usleep(1000);}
@@ -35,5 +35,6 @@ int main(void)
     for(int i=0;i<10000&&tiku_work_busy();i++){tiku_work_collect();usleep(1000);}
     CHECK(!tiku_work_busy()&&done==1&&frees==65);count=tiku_work_observe(rows,128);CHECK(count==64);
     int found=0;for(size_t i=0;i<count;i++)if(rows[i].id>maximum){CHECK(rows[i].state==2&&!rows[i].cancellation_requested);found=1;}
+    tiku_work_stats(&stats);CHECK(stats.posted==65&&stats.collected==65&&stats.cancelled==64&&!stats.active&&stats.retained==64);
     CHECK(found);puts("PASS work observations: copied identities, bounded history and native cancellation outcomes");return 0;
 }

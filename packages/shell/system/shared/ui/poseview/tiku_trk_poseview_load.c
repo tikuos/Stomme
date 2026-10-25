@@ -792,14 +792,17 @@ tiku_trk_poseview_new(tiku_backend_t *backend, const char *path)
     v->font_px = TIKU_TRK_FONT_REF;
     tiku_trk_repaint_init(&v->repaint);
 
-    v->columns[0] = (tiku_trk_column_t){ tiku_str("label.name"),  240, TIKU_TRK_COL_NAME,
-                                         0, TIKU_TRK_ALIGN_LEFT };
-    v->columns[1] = (tiku_trk_column_t){ tiku_str("label.kind"),  140, TIKU_TRK_COL_KIND,
-                                         0, TIKU_TRK_ALIGN_LEFT };
-    v->columns[2] = (tiku_trk_column_t){ tiku_str("label.value"), 190, TIKU_TRK_COL_VALUE,
-                                         0, TIKU_TRK_ALIGN_LEFT };
-    v->columns[3] = (tiku_trk_column_t){ tiku_str("label.cap"),    60, TIKU_TRK_COL_CAP,
-                                         0, TIKU_TRK_ALIGN_LEFT };
+    v->columns[0] =
+        (tiku_trk_column_t){tiku_str("label.name"), 240, TIKU_TRK_COL_NAME, 0,
+                            TIKU_TRK_ALIGN_LEFT};
+    v->columns[1] =
+        (tiku_trk_column_t){tiku_str("label.kind"), 140, TIKU_TRK_COL_KIND, 0,
+                            TIKU_TRK_ALIGN_LEFT};
+    v->columns[2] =
+        (tiku_trk_column_t){tiku_str("label.value"), 190, TIKU_TRK_COL_VALUE,
+                            0, TIKU_TRK_ALIGN_LEFT};
+    v->columns[3] = (tiku_trk_column_t){
+        tiku_str("label.cap"), 60, TIKU_TRK_COL_CAP, 0, TIKU_TRK_ALIGN_LEFT};
     v->column_count = 4;
     tiku_trk_poseview_reflow_columns(v);
 

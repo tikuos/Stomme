@@ -186,6 +186,16 @@ int tiku_pdf_view_turned(const tiku_pdf_view_t *v);
 int tiku_pdf_view_find(tiku_pdf_view_t *v, const char *text, int dir,
                        unsigned flags);
 
+/** @brief Native PDF character-gap selection metadata, excluding selected text. */
+typedef struct {
+    int anchor_page,focus_page;
+    int64_t anchor,focus;
+    int selected,copy_allowed;
+} tiku_pdf_view_selection_t;
+/** @brief Copy native selection endpoints and author copy permission; zero without a document. */
+int tiku_pdf_view_selection(const tiku_pdf_view_t *,
+                            tiku_pdf_view_selection_t *);
+
 /** @brief The selected text onto the clipboard, as far as the clipboard
  *         and the document's author allow; the status says how it went.
  *  @return 1 when something was copied. */

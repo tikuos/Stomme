@@ -8,6 +8,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #include "tiku_richdoc_private.h"
+#include <stdatomic.h>
+/** @brief Process-local identities shared by documents of this engine. */
+static atomic_uint_fast64_t resource_identity;
+/** @brief Assign a nonzero identity after creation or whole replacement. */
+static uint64_t new_resource_identity(void)
+{
+    return atomic_fetch_add_explicit(&resource_identity, 1,
+                                     memory_order_relaxed) +
+           1;
+}
+uint64_t tiku_richdoc_identity(const tiku_richdoc_t *doc)
+{
+    return doc?doc->resource_identity:0;
+}
+
 
 tiku_rich_status_t
 tiku_richdoc_create(const tiku_rich_limits_t *limits, tiku_richdoc_t **out)
@@ -35,6 +50,7 @@ tiku_richdoc_create(const tiku_rich_limits_t *limits, tiku_richdoc_t **out)
     doc->memory = memory;
     doc->limits = effective;
     doc->generation = 1;
+    doc->resource_identity = new_resource_identity();
     doc->next_id = 2;
     doc->next_anchor = 1;
     doc->root = tiku_rd_build(doc, &empty, &doc->next_id, &status);
@@ -95,6 +111,7 @@ tiku_richdoc_import(tiku_richdoc_t *doc, const tiku_rich_source_t *source,
     doc->root = root;
     doc->next_id = next;
     doc->generation++;
+    doc->resource_identity = new_resource_identity();
     root->state = doc->generation;
     doc->saved_state = root->state;
     tiku_rd_anchors_reset(doc);

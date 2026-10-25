@@ -338,3 +338,19 @@ tiku_print_native_close(tiku_print_native_t *native)
     if (!--native->refs)
         free(native);
 }
+
+size_t tiku_print_native_observe(tiku_print_native_t *native,tiku_print_job_observation_t *out,size_t capacity)
+{
+    size_t count=0;if(!native)return 0;
+    for(unsigned i=0;i<PRINT_JOBS;i++)if(native->jobs[i]) {
+        print_job_t *job=native->jobs[i];
+        if(out&&count<capacity) {
+            tiku_print_job_observation_t *row=&out[count];memset(row,0,sizeof *row);
+            row->request=job->request;row->bytes=job->bytes;row->started=1;row->cancellation_requested=atomic_load(&job->cancel);
+            row->finished=atomic_load(&job->finished);snprintf(row->title,sizeof row->title,"%s",job->title);
+            if(row->finished){row->status=job->status;snprintf(row->reason,sizeof row->reason,"%s",job->reason);}
+        }
+        count++;
+    }
+    return count;
+}

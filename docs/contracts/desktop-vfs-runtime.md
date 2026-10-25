@@ -99,7 +99,7 @@ releases its queue. Host connection cleanup closes its owned subscriptions.
 
 The default capacities are 16 providers, 256 nodes including implicit parents,
 32 watches, 16 events per watch and 16 retained mutation outcomes. Configurable
-maxima are 256 providers, 4,096 nodes, 256 watches, 256 events per watch and 16
+maxima are 512 providers, 16384 nodes, 256 watches, 256 events per watch and 16
 outcomes. A principal has at most 32 watches and 256 queued events. Snapshots
 and messages have a 65,536-byte encoded bound; values have 128 members, nesting
 depth 8 and text length 4,096 bytes. Registered snapshots reserve three outer
@@ -444,9 +444,12 @@ against other processes of the same user.
 
 The desktop composition owns its registry, endpoint, eight connection slots and
 read backend on the desktop thread. A later desktop startup failure drains
-filesystem work and retires the optional resource endpoint. It starts when
-`STOMME_RESOURCE_DIRECTORY=/absolute/private/directory` is set, mounts at
-`/.stomme`, and rejects an existing host node or mount at that prefix.
+filesystem work and retires the resource endpoint. An explicit
+`STOMME_RESOURCE_DIRECTORY=/absolute/private/directory` selects its runtime
+directory. Otherwise the desktop creates a private `/tmp/stomme-desktop-XXXXXX`
+directory and exports it to child applications. Normal teardown removes the
+automatically created directory after the service closes. The read backend mounts
+at `/.stomme` and rejects an existing host node or mount at that prefix.
 `STOMME_RESOURCE_MOUNT` selects an explicit canonical alternative which leaves
 space for resource paths in the host backend path bound. A startup failure is
 reported; it does not hide an existing node or silently change the prefix.
@@ -725,11 +728,12 @@ finish. The shared owner outlives its bound chooser, which detaches before
 teardown. Get Info refreshes open views after commit and after API changes.
 Standalone chooser controllers without a bound owner retain their cache API.
 
-The desktop host allocates 8192 registry nodes for settings and catalog entries.
-The configurable registry limit is 16384 nodes.
+The desktop session configures 16384 registry nodes and 512 provider slots for
+settings, catalog entries and discovery. The portable resource limit is 16384
+nodes.
 The portable registry's default remains 256. Collection children retain normal
 provider revisions, read authority and bounded snapshot rules. The endpoint
-remains opt-in through `STOMME_RESOURCE_DIRECTORY`.
+uses the desktop session directory described above.
 
 
 ## Native Desktop preferences
@@ -872,7 +876,7 @@ application entries remain owned by the existing Startup preferences controller.
 
 ## Windows and the composited workspace
 
-The desktop registry reserves 64 provider slots. Portable registry defaults
+The desktop registry reserves 512 provider slots. Portable registry defaults
 remain 16 providers and 256 resources. Each live window uses a separate provider
 incarnation under `/windows/<id>`. Its opaque ID is allocated at registration;
 a closed native slot, replaced application window or new connection gets a new
@@ -957,7 +961,7 @@ Live listeners, links and ordinary files are preserved. Ordinary endpoint open
 continues to refuse preexisting paths.
 `/notifications` copies the existing alert, progress and status models.
 `/services/lifecycle` reports observed and registered entity counts and capacity.
-The host registry permits 256 providers and 16384 nodes; portable defaults remain
+The host registry permits 512 providers and 16384 nodes; portable defaults remain
 16 providers and 256 nodes.
 
 `/jobs/<id>` observes worker or file-engine generations. The work pool copies
@@ -977,3 +981,321 @@ paths and selection flags. Changed generations or order reject the request
 before dispatch. Native script errors remain explicit in the result, and deletes
 use the native Trash operation. `/session/actions/request-end` and `request-quit`
 open the existing quit confirmation; `restore` uses the saved-folder controller.
+
+## Native desktop services
+
+The shell registers display, input, audio, clipboard, volume, accessibility,
+printing and metrics resources when its resource session opens. Observations
+reconcile on the desktop thread every 250 ms. Registry capacities are 512
+providers and 16384 nodes in the desktop; portable defaults remain 16 and 256.
+
+`/display/<id>` contains identity, host, geometry, scale and capabilities object
+states for the existing desktop host canvas. Geometry uses logical canvas
+coordinates. A headless host reports native availability false and unknown scale.
+This inventory does not enumerate physical monitors or provide display settings.
+`/input` contains capabilities, focus, keymap, modifiers and pointer states. Focus
+joins the opaque window identity. Modifiers and pointer coordinates describe
+normalized events observed by the shell. Native layout queries and input
+injection are unsupported; key contents are not recorded.
+
+`/audio/availability` copies engine configuration, backend name and the last
+open outcome. Reading it does not open an audio device. `/audio/playback` reports
+current engine progress and event counts. `/audio/volume` copies engine volume
+and names its existing editable owner, `/settings/sound/volume`.
+
+`/clipboard` exposes availability, generation, owner and types object states.
+Publisher attribution is unknown. The source is the native process clipboard;
+external selections arrive through the existing host events. Content is read
+through `actions/read-content`, with a current generation token, representation
+`text` or `typed`, integer offset and maximum of 1 through 2048 bytes. Typed
+reads require an exact MIME member. The result contains canonical base64, byte
+counts, next offset, completion and generation. Reads can reconstruct native
+representations up to the existing store limits. `actions/publish-content`
+accepts a current generation, UTF-8 text up to 4096 bytes and optionally one MIME
+with canonical base64 up to 3072 decoded bytes. Publication uses the existing
+atomic text-and-typed import. The native store retains its four-format, 16 MiB
+limits. A changed native stamp or transfer token rejects a queued operation.
+Closing the provider preserves native clipboard content.
+
+`/volumes/status` reports cached inventory availability, observed record count,
+registered count and capacity. A full native table conservatively reports an
+incomplete inventory. Each `/volumes/<id>` contains identity, mounts, capacity,
+free-space, flags and state object states. Device, mount, source and filesystem
+identify the observed native record; replacement retires its provider. This
+identity does not establish an atomic kernel mount incarnation. An unobserved
+remount can escape that comparison. Unmount requires an empty object, rechecks
+the cached native identity and native policy, saves positions through the shared
+controller and queues the existing worker. Its result reports request acceptance,
+not completed unmount. Worker notifications remain authoritative. Boot volumes
+are refused. Eject returns unsupported because there is no native physical eject
+controller. Cached inventory reads do not scan the host filesystem.
+
+`/accessibility/applications` and `generations` are frozen NDJSON streams of
+application-window publications. `/accessibility/trees` contains complete native
+semantic packets in 2048-byte base64 chunks, with offsets, total bytes, window,
+connection, incarnation, document and generation. Reconstruct the packet and use
+`tiku_access_decode` to retain Unicode text, source identities and character
+geometry. The aggregate wire budget is 2 MiB. An encoding refusal retains the
+previous complete stream with unavailable feedback; generations report the
+current refusal. Capabilities report completeness and product support.
+`actions/perform-action` accepts window, document and generation counters, node
+integer and action name: focus, select, replace, activate, insert or delete.
+Editing offsets count Unicode scalars. Select, replace and delete require first
+and last; insert requires first; replace and insert require text up to 4096
+bytes. Current owner, generation, node state and ranges are checked again before
+the native application message is queued. Queue acceptance does not establish
+application completion. No input-gesture grant is created.
+
+`/printers/native` describes the native print dialog service, not physical printer
+inventory. Identity, capabilities and state are object states; jobs is a frozen
+NDJSON stream of actual prepared application grants and native jobs. Submit and
+cancel actions require the exact window, ticket, connection and incarnation of
+an existing live user-authorized grant. Submit also requires canonical PDF
+base64, up to 3072 decoded bytes; the native application path retains its existing
+larger limit. Actions cannot create a print grant. Headless submit reports native
+host unavailable; cancel can retire a prepared grant. Completion means dialog
+submission or cancellation, without asserting physical printing. TikuDesktop's
+product configuration disables remote semantic and printing services; descriptors
+remain discoverable and capabilities explain unsupported operations. KintsugiOS
+enables those services.
+
+`/metrics` reports provider and node counts, current transport sessions, work and
+resource job counts, queue depths and drops. Counters distinguish work-pool
+refusals, conductor input drops and paused resource watches. There is no native
+input-drop counter. These observations do not expose host kernel or network
+administration. Native content reads require authenticated content and
+cross-application authority. Actions additionally require invocation and host
+control. Existing owner permissions and generation checks remain in force.
+
+
+## Native application providers
+
+Application Kit discovers the optional module symbol `tiku_app_resources_v1`,
+declared in `tiku_app_resources.h`. Its version and table size are checked while
+loading the module. The application descriptor and services remain ABI version
+5. `examples/application-resources` builds a counter module and executable
+against an exported SDK and supplies a display-free callback smoke check.
+
+The runner creates the resource owner before application start, then attaches
+the returned model. Catalog, capture, stream and change callbacks run on the
+application thread. Catalog paths are relative to the assigned namespace;
+initial snapshots are owned return values. Paths and schema strings are
+borrowed until the next callback. The runner copies descriptors and releases
+returned snapshots and stream bytes. An optional retirement callback releases
+module-owned resource state before the descriptor's stop callback destroys its
+model. A catalog-revision callback avoids rebuilding an unchanged schema.
+
+The native window connection carries the assignment handshake and provider
+management messages. The host assigns a principal for that connection generation
+and returns its namespace through lifecycle capabilities. Native application
+assignments grant READ, WRITE, INVOKE, CONTENT and PROVIDER; they grant neither
+CROSS_APP nor HOST_CONTROL. The bridge accepts provider management operations,
+and forces assigned resources to require READ and CONTENT. The authenticated
+control service remains the consumer endpoint. Same-user process identity is
+not an operating-system sandbox.
+
+The runner supplies identity, state and window/menu/control/command collections.
+Their `entries` streams contain frozen native observations. Controls contain
+recorded display-list facts; an application without such a frame reports an
+incomplete control capture. Commands invoke current enabled native menu entries
+with exact integer `window` and `command` arguments. Native dispatch reports
+`request_dispatched`; a menu operation can open a dialog or queue a file worker.
+It does not establish that a file was saved or a dialog accepted. Native exit
+waits for completion acknowledgement, transport failure or a five-second bound
+before the runner destroys its model.
+
+### Catalog and stream publication
+
+Feature bit 256, PROVIDER_CATALOG, selects staged catalogs, owner stream uploads
+and availability publication. `provider-stage` supplies a catalog ID, integer
+offset and total, and up to 32 initial descriptors per request. Pages are ordered
+and bounded by 4096 resources and 4 MiB of staging storage. `provider-commit`
+installs a complete catalog atomically. `provider-abort`, disconnect or a
+30-second staging deadline discards unpublished entries. Legacy registration
+retains its existing bound. Schema replacement retires the old provider before
+installing a fresh incarnation in the assigned namespace; old handles, jobs
+and stream leases retire with it.
+
+`provider-stream` supplies a current provider stamp, resource path, transfer ID,
+unsigned decimal offset and total, and a blob of at most 32768 bytes. The upload
+is bounded by 4 MiB. Complete uploads replace the frozen content atomically;
+partial uploads leave the preceding snapshot readable. Offset zero begins a new
+unpublished transfer. An empty stream has total zero and an empty blob. Transfers
+expire after 30 seconds. Read leases retain their frozen content until expiry,
+close or provider retirement and require CONTENT on each access.
+
+`provider-availability` marks read-only observations unavailable while retaining
+the preceding value. A failed setting capture retains its preceding setting
+value and makes the runner's `state.capture_complete` false. Recovery publishes
+the next native capture. The client reconciles stale management stamps through
+provider status; it does not repeat a completed native controller effect.
+
+### Application models and documents
+
+Shared Editor preferences use the native preference replacement and persistence
+controller. Editor commands use CodeView and EditDoc, including version-checked
+native file saves. Calculator actions call the same keypad or field controller
+as native input. Reader and viewer adapters expose their native source identity,
+path, type, selection, viewport and object counts. Circuit exports details,
+sheets and units through native view actions. Its layer collection contains
+positional layer settings with an explicit generation precondition and validated
+color, opacity and visibility. TikuDesktop retains its BASIC and C source-view
+observations in product-owned adapters.
+
+Write and Notes adapters remain product-owned and select their product's
+Document provider. Kintsugi additionally owns Word, Deck and their advanced
+Document adapters. The basic product has no dependency on those implementations.
+Word exports its registered command keys and validated application preferences;
+command dispatch rechecks the native window, selection context and enabled
+state. Native command return values control application exit; a dispatched
+command reports `request_dispatched`. Model callbacks request exit through
+`tiku_app_resources_request_exit`; the runner holds native window teardown until
+the result is acknowledged or its wait expires. Preference snapshots distinguish
+current defaults, confirmed persisted
+defaults and pending or failed persistence.
+
+Documents live under `documents/<opaque-id>` within an application namespace.
+IDs derive from owner entropy, a native lifetime identity and a domain; they
+remain stable within that owner and change after source replacement. Identity,
+path, type, dirty, selection, view, commands and objects describe the live native
+session. Viewer commands use the application's native menu surface. Editable
+Document sessions expose native typed commands for history, formatting, links,
+images, tables and supported layout operations. Deck delegates slide commands
+to SlideView and exposes its active text or notes document through the Document
+controller. Picture input is bounded inline pixel content; native placement and
+history remain under Deck ownership.
+
+Document changes require an opaque `context` from the current selection capture.
+It covers document lifetime, native generation, selection and relevant view or
+restriction state. Native controllers resolve object and selection identities
+and preserve permission checks, validation and undo. Editor selection previews
+contain at most 16 `anchor:caret` strings; their digest covers every native range.
+Deck previews bound visible shape IDs while their digest covers the selection.
+Neither preview truncation weakens its context precondition.
+
+Authorized `read-text` actions accept bounded cursors and return at most 4096
+UTF-8 bytes with a continuation cursor. Document text uses paragraph and byte
+cursors. Editor and Reader use byte offsets. An invalid UTF-8 boundary or a
+budget unable to hold the next scalar is rejected. Object inspection uses
+bounded native snapshot APIs and returns `id:parent:kind` rows. Nested command payloads and observations remain
+subject to the negotiated frame and depth bounds. Save uses the existing native
+path and conflict checks; unnamed documents and confirmation-dependent requests
+remain under the application's existing interaction rules. A queued save is
+reported as queued, and dirty-state publication tracks its native completion.
+
+## Device and development owners
+
+`/devices/capabilities` reports whether the product selects native board
+services. Reading it does not enumerate or open serial ports. TikuDesktop selects
+the board owner. KintsugiOS reports `supported=false` and
+`reason=product_board_services_disabled`; it does not register discovery or
+board control providers. The shared framework has no firmware build dependency.
+
+TikuDesktop's `/settings/tracker/currentdevice` and `currentdeviceport` are
+read-only text states. Their desired/applied values follow the native current
+device owner. Persisted values follow the settings owner's last confirmed saved
+table. A selected disconnected device can remain named by the native owner.
+KintsugiOS omits these two preferences from its native table and resource catalog.
+
+TikuDesktop registers `/devices/discovery/state`, the complete candidate-cache
+stream `/devices/discovery/candidates`, and native `scan`, `connect` and
+`use-host` actions below `/devices/discovery/actions`. A connect proposal contains
+one text member, `port`, which must still occur in the native candidate cache at
+dispatch. The other actions require an empty object. Scan/connect results report
+native dispatch; connection and UID verification are observed separately.
+
+A mounted board receives an opaque resource identity at `/devices/<id>`.
+Its `identity`, `connection`, `mounts`, `configuration`, `stats`, `build-jobs`
+and `debug-sessions` collections refer to the existing native owners.
+`mounts/namespace` names the ordinary `/devices/<board>` filesystem mount and
+its slot generation. Resource paths are inside the desktop resource service;
+they are distinct from paths routed to the board filesystem backend.
+
+Native identity is the backend's identity captured at open. Connection state
+reports the current mounting and the most recent UID-verified worker sample;
+it does not promise instantaneous wire liveness. Statistics are bounded node
+samples, with individual availability flags and a monotonic sample time.
+Unplug/replug retires the provider incarnation. A resource handle, queued save
+or frozen stream cannot acquire the replacement mounting's authority.
+
+`configuration/name` and `configuration/cpu-target` accept complete objects
+with text members `value` and `context`. The context comes from the latest
+published setting. The keyed worker checks the bound UID, displayed readback,
+configuration revision/incarnation, recovery state and advertised CPU rates
+before saving. Managed settings declare `user` durability and use the same
+configuration-v1 outbox and receipts as Device Preferences. Legacy settings
+declare `session`; their retention across device reset is unknown.
+Advertised but unreadable management state, pending recovery and unavailable
+nodes refuse writes. `configuration/status` exposes those conditions and the
+native recovery-window reference. Enrollment and recovery remain explicit
+native Device Preferences operations.
+
+Board reads and saves share the native `board:/devices/<board>` worker key.
+An individual resource cancellation does not cancel unrelated work on that key.
+Cancellation is accepted before the atomic write boundary; after that boundary
+it reports too late. A worker checks its bounded execution deadline before
+accepting effects. Shutdown retires resources, waits up to five seconds for the
+controller's workers, then detaches any remaining completion owners and retains
+their borrowed backends through process exit.
+
+Per-board actions include `use-current`, `preferences`, `development`,
+`disconnect` and `refresh`. They dispatch to the native desktop owners.
+`development` opens the native firmware/development view; installation and
+flashing retain the native application's confirmation and device handoff rules.
+Board content requires READ and CONTENT; host-owned changes also require
+HOST_CONTROL with WRITE or INVOKE. Assigned application publication authority
+does not itself grant host control.
+
+Native Bench and the source IDE applications publish `development/kind`,
+`development/target` and `development/state` within their assigned `/apps/<id>`
+providers. Their existing `menus` and `commands/invoke` expose enabled native
+commands and preserve window/command validation. A board's
+`build-jobs/sources` and `debug-sessions/sources` streams contain references to
+matching running application providers, including their incarnation and
+revision. The binding is the native application's selected mount name; it is
+not a claim that a historical tool run belongs to the current device UID.
+Each bounded stream includes an explicit catalog-completeness row. The
+application retains authority over its queue, debug session and command checks.
+
+
+## Resource Inspector and public clients
+
+Application Kit exports `tiku_resource_client.h` for creating-thread local clients.
+It owns negotiation, correlated requests, interleaved watch events, bounded pages,
+job queries, stream capture and receipt reconciliation. Mutation transport loss
+returns `unknown_outcome` with the request ID retained. Mutations are not replayed
+automatically. Descriptions publish `host_control_required` so client-side grant
+checks distinguish host-owned and app-owned resources; server validation remains
+authoritative.
+
+Support Kit exports `tiku_resource_literal.h` for bounded typed literals and
+lossless JSON proposals. Resource Inspector uses existing native controls and a
+worker-owned client. The packaged `stomme-resources` executable uses the same
+SDK. [Resource Inspector and local clients](../guides/resource-inspector.md)
+describes their namespace, endpoint, mutation and event workflows.
+
+
+## Service discovery resources
+
+The desktop session registers read-only `/about`, `/capabilities`, `/events` and
+`/schema` providers. `/about` reports product/version from product configuration,
+ABI 5 and generated foundation-content, SDK and native-host identities. Exported
+identity headers carry `TIKU_FOUNDATION_REVISION` and `TIKU_SDK_HOST` alongside
+`TIKU_SDK_IDENTITY`; these describe the selected build.
+
+Capability resources report the interactive endpoint's offered feature bits,
+host-offered protocol limits, protocol major version and current registry
+provider/node capacities and counts. Per-peer selected limits remain in the
+negotiated channel result. Provider counts expose no private names or content.
+Schema resources describe descriptor fields, scope definitions, public kinds and
+the per-resource version contract. They confer no authority.
+
+Event resources report session incarnation, overflow recovery and selected live
+subscription counts, queued events and the maximum active subscription sequence.
+Sequences belong to subscriptions, not a global event clock; the maximum can fall
+when a subscription retires. `tiku_resource_events_observe` provides owner-thread
+counts with an optional excluded provider key. Desktop event telemetry excludes
+subscriptions to the `events` provider from its own counts and sequence maximum
+to avoid feedback from observing those metrics. Dynamic discovery states refresh
+on the session thread at intervals of at least 100 milliseconds. Capture failure
+retains the preceding complete snapshot.

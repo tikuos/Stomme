@@ -22,7 +22,8 @@
 #include "tiku_resource_endpoint.h"
 #include <strings.h>
 
-/** @brief Apply committed shared preferences to live desktop views and sound. */
+/** @brief Apply committed shared preferences to live desktop views and sound.
+ */
 static void settings_changed(void *context)
 {
     desktop_t *app = context;
@@ -33,25 +34,35 @@ static void settings_changed(void *context)
     desktop_damage_all(app);
 }
 
-/** @brief Apply committed Deskbar and font values to the existing native owners. */
+/** @brief Apply committed Deskbar and font values to the existing native
+ * owners.
+ */
 static void record_settings_changed(void *context)
 {
     desktop_t *app = context;
-    tiku_trk_deskbar_apply_settings(app->deskbar, &app->deskbar_prefs_window.model.value);
+    tiku_trk_deskbar_apply_settings(app->deskbar,
+                                    &app->deskbar_prefs_window.model.value);
     tiku_trk_fontprefs_apply(&app->fonts_window.model);
     desktop_damage_all(app);
 }
 
-/** @brief Apply accepted native Desktop preferences through its existing view. */
+/** @brief Apply accepted native Desktop preferences through its existing
+ * view.
+ */
 static void desktop_settings_changed(void *context)
 {
     desktop_t *app = context;
-    tiku_trk_folder_window_t *folder = tiku_trk_desktop_view_folder(&app->desktop_view);
+    tiku_trk_folder_window_t *folder =
+        tiku_trk_desktop_view_folder(&app->desktop_view);
     if (folder && folder->view) {
         int size = app->desktop_prefs_window.model.value.icon_size;
-        if (tiku_trk_poseview_icon_size(folder->view) != size) tiku_trk_poseview_set_icon_size(folder->view, size);
+        if (tiku_trk_poseview_icon_size(folder->view) != size)
+            tiku_trk_poseview_set_icon_size(folder->view, size);
         tiku_trk_folder_window_forget(folder);
-        tiku_trk_desktop_settings_feedback(app->desktop_settings,folder->bg_drawn ? &folder->bg_applied : NULL,tiku_trk_poseview_icon_size(folder->view));
+        tiku_trk_desktop_settings_feedback(
+            app->desktop_settings,
+            folder->bg_drawn ? &folder->bg_applied : NULL,
+            tiku_trk_poseview_icon_size(folder->view));
     }
     desktop_damage_all(app);
 }
@@ -59,16 +70,21 @@ static void desktop_settings_changed(void *context)
 /** @brief Enqueue the Desktop window's current native proposals. */
 static int desktop_settings_submit(void *context)
 {
-    return tiku_trk_desktop_settings_submit(((desktop_t *)context)->desktop_settings);
+    return tiku_trk_desktop_settings_submit(
+        ((desktop_t *)context)->desktop_settings);
 }
 
-/** @brief Report native Desktop persistence feedback to its preferences window. */
+/** @brief Report native Desktop persistence feedback to its preferences
+ * window.
+ */
 static const char *desktop_settings_status(void *context)
 {
-    return tiku_trk_desktop_settings_status(((desktop_t *)context)->desktop_settings);
+    return tiku_trk_desktop_settings_status(
+        ((desktop_t *)context)->desktop_settings);
 }
 
-/** @brief Redraw preferences after the committed association cache changes. */
+/** @brief Redraw preferences after the committed association cache changes.
+ */
 static void catalog_settings_changed(void *context)
 {
     desktop_t *app = context;
@@ -79,22 +95,28 @@ static void catalog_settings_changed(void *context)
     desktop_damage_all(app);
 }
 
-/** @brief Read pending or failed record persistence feedback for native preferences. */
+/** @brief Read pending or failed record persistence feedback for native
+ * preferences.
+ */
 static const char *record_save_status(void *context)
 {
-    return tiku_trk_record_settings_status(((desktop_t *)context)->record_settings);
+    return tiku_trk_record_settings_status(
+        ((desktop_t *)context)->record_settings);
 }
 
-/** @brief Submit the current Deskbar GUI proposal through its record owner. */
+/** @brief Submit the current Deskbar GUI proposal through its record owner.
+ */
 static int record_bar_submit(void *context)
 {
-    return tiku_trk_record_settings_submit(((desktop_t *)context)->record_settings, 0);
+    return tiku_trk_record_settings_submit(
+        ((desktop_t *)context)->record_settings, 0);
 }
 
 /** @brief Submit the current Fonts GUI proposal through its record owner. */
 static int record_font_submit(void *context)
 {
-    return tiku_trk_record_settings_submit(((desktop_t *)context)->record_settings, 1);
+    return tiku_trk_record_settings_submit(
+        ((desktop_t *)context)->record_settings, 1);
 }
 
 /** @brief A script's resize: the same path a window manager's takes. */
@@ -370,14 +392,18 @@ desktop_parse_args(int argc, char **argv, desktop_options_t *o)
         }
 #if TIKU_SHELL_BOARD_SERVICES
 
-        if (strcmp(argv[i], "-d") == 0)                      { o->use_device = 1; }
+        if (strcmp(argv[i], "-d") == 0) {
+            o->use_device = 1;
+        }
         /*
          * -devices: boards are mounted under /devices, each under its own
          * name, with the local files at the root; -d puts one board at
          * the root.  With -devices and no -p, mount_devices() only lists
          * the ports for the Devices menu.
          */
-        else if (strcmp(argv[i], "-devices") == 0) { o->want_devices = 1; }
+        else if (strcmp(argv[i], "-devices") == 0) {
+            o->want_devices = 1;
+        }
         /*
          * -listen [port]: take in boards that dial in over TCP, on
          * TIKU_LINK_TCP_PORT unless a port is given.  Off by default.
@@ -388,15 +414,19 @@ desktop_parse_args(int argc, char **argv, desktop_options_t *o)
                 argv[i + 1][0] <= '9') {
                 o->listen_port = atoi(argv[++i]);
             }
+        } else if (strcmp(argv[i], "-p") == 0 && i + 1 < argc) {
+            o->port = argv[++i];
         }
-        else if (strcmp(argv[i], "-p") == 0 && i + 1 < argc) { o->port = argv[++i]; }
         /*
          * -mount: where the board -p names is mounted, in place of
          * /devices/<name>, so a script written for /devices/board1 runs
          * against whatever board is on the cable.
          */
-        else if (strcmp(argv[i], "-mount") == 0 && i + 1 < argc) { o->mount_at = argv[++i]; o->want_devices = 1; }
-        else if (strcmp(argv[i], "-b") == 0 && i + 1 < argc) { o->baud = atoi(argv[++i]);
+        else if (strcmp(argv[i], "-mount") == 0 && i + 1 < argc) {
+            o->mount_at = argv[++i];
+            o->want_devices = 1;
+        } else if (strcmp(argv[i], "-b") == 0 && i + 1 < argc) {
+            o->baud = atoi(argv[++i]);
 #else
 
         if (strcmp(argv[i], "-d") == 0 ||
@@ -408,26 +438,34 @@ desktop_parse_args(int argc, char **argv, desktop_options_t *o)
             fprintf(stderr, "KintsugiOS: unsupported option %s\n", argv[i]);
             return 2;
 #endif
- }
-        else if (strcmp(argv[i], "-shot") == 0 && i + 1 < argc) { o->shot = argv[++i]; }
-        else if (strcmp(argv[i], "-shotmenu") == 0) { o->shot_menu = 1; }
-        else if (strcmp(argv[i], "-script") == 0 && i + 1 < argc) { o->script_path = argv[++i]; }
-                else if (strcmp(argv[i], "-mute") == 0) { o->mute = 1; }
-        else if (strcmp(argv[i], "-fullscreen") == 0) { o->fullscreen = 1; }
-        else if (strcmp(argv[i], "-after") == 0 && i + 1 < argc) {
+        } else if (strcmp(argv[i], "-shot") == 0 && i + 1 < argc) {
+            o->shot = argv[++i];
+        } else if (strcmp(argv[i], "-shotmenu") == 0) {
+            o->shot_menu = 1;
+        } else if (strcmp(argv[i], "-script") == 0 && i + 1 < argc) {
+            o->script_path = argv[++i];
+        } else if (strcmp(argv[i], "-mute") == 0) {
+            o->mute = 1;
+        } else if (strcmp(argv[i], "-fullscreen") == 0) {
+            o->fullscreen = 1;
+        } else if (strcmp(argv[i], "-after") == 0 && i + 1 < argc) {
             o->after = argv[++i];
-        }
-        else if (strcmp(argv[i], "-conduct") == 0 && i + 1 < argc) { o->conduct_path = argv[++i]; }
-        else if (strcmp(argv[i], "-conduct-tty") == 0 && i + 1 < argc) { o->conduct_tty = argv[++i]; }
-        else if (strcmp(argv[i], "-conduct-token") == 0 && i + 1 < argc) { o->conduct_token = argv[++i]; }
-        else if (strcmp(argv[i], "-conduct-query-token") == 0 && i + 1 < argc) { o->conduct_query_token = argv[++i]; }
-        else if (strcmp(argv[i], "-shotedit") == 0 && i + 1 < argc) {
+        } else if (strcmp(argv[i], "-conduct") == 0 && i + 1 < argc) {
+            o->conduct_path = argv[++i];
+        } else if (strcmp(argv[i], "-conduct-tty") == 0 && i + 1 < argc) {
+            o->conduct_tty = argv[++i];
+        } else if (strcmp(argv[i], "-conduct-token") == 0 && i + 1 < argc) {
+            o->conduct_token = argv[++i];
+        } else if (strcmp(argv[i], "-conduct-query-token") == 0 &&
+                   i + 1 < argc) {
+            o->conduct_query_token = argv[++i];
+        } else if (strcmp(argv[i], "-shotedit") == 0 && i + 1 < argc) {
             o->shot_edit = argv[++i];
-        }
-        else if (strcmp(argv[i], "-shotfind") == 0 && i + 1 < argc) {
+        } else if (strcmp(argv[i], "-shotfind") == 0 && i + 1 < argc) {
             o->shot_find = argv[++i];
+        } else if (strcmp(argv[i], "-shotpanel") == 0) {
+            o->shot_panel = 1;
         }
-        else if (strcmp(argv[i], "-shotpanel") == 0) { o->shot_panel = 1; }
 #if TIKU_SHELL_BOARD_SERVICES
 
         else if (strcmp(argv[i], "-shotlive") == 0) { o->shot_live = 1; }
@@ -511,15 +549,34 @@ boot_namespace(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
     }
     {
         const char *directory=getenv("STOMME_RESOURCE_DIRECTORY");
+        if (!directory || !*directory) {
+            snprintf(app->resource_temporary, sizeof app->resource_temporary,
+                     "/tmp/stomme-desktop-XXXXXX");
+            if (!mkdtemp(app->resource_temporary) ||
+                setenv("STOMME_RESOURCE_DIRECTORY", app->resource_temporary,
+                       1)) {
+                fprintf(stderr,
+                        "resource service: private directory unavailable\n");
+                return 1;
+            }
+            directory = app->resource_temporary;
+        }
         if(directory && *directory){
             const char *mount=getenv("STOMME_RESOURCE_MOUNT");
             const char *fixture=getenv("STOMME_RESOURCE_TEST_PROVIDER");
-            if(desktop_lifecycle_vfs_restarting(app)&&tiku_resource_endpoint_recover(directory)) {
-                fprintf(stderr,"resource service: endpoint recovery refused\n");return 1;
+            if (desktop_lifecycle_vfs_restarting(app) &&
+                tiku_resource_endpoint_recover(directory)) {
+                fprintf(stderr,
+                        "resource service: endpoint recovery refused\n");
+                return 1;
             }
-            app->resource_session=tiku_trk_resource_session_open(app->backend,directory,
-                mount && *mount?mount:"/.stomme",TIKU_SHELL_PRODUCT_NAME,fixture && !strcmp(fixture,"1"));
-            if(!app->resource_session){fprintf(stderr,"resource service: startup refused\n");return 1;}
+            app->resource_session = tiku_trk_resource_session_open(
+                app->backend, directory, mount && *mount ? mount : "/.stomme",
+                TIKU_SHELL_PRODUCT_NAME, fixture && !strcmp(fixture, "1"));
+            if (!app->resource_session) {
+                fprintf(stderr, "resource service: startup refused\n");
+                return 1;
+            }
         }
     }
     /* From here a folder under /devices is listed by a worker. */
@@ -565,7 +622,8 @@ boot_namespace(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
      * it while that work runs.  A scripted or conducted run opens no
      * window.
      */
-    if (o->script_path == NULL && o->conduct_path == NULL && o->conduct_tty == NULL) {
+    if (o->script_path == NULL && o->conduct_path == NULL &&
+        o->conduct_tty == NULL) {
         app->host = tiku_host_open(DESK_W, DESK_H, TIKU_SHELL_DESKTOP_TITLE);
         if (app->host == NULL) {
             fprintf(stderr, "tracker: no display\n");
@@ -713,10 +771,14 @@ boot_settings(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
             ? app->backend->ops->state_store(app->backend) : NULL,
         DESK_W, DESK_H, &app->dirty);
     if (app->desktop_prefs_window.store && app->desktop_prefs_window.node[0]) {
-        tiku_trk_folder_window_t *folder = tiku_trk_desktop_view_folder(&app->desktop_view);
-        if (folder && folder->view) app->desktop_prefs_window.model.value.icon_size = tiku_trk_poseview_icon_size(folder->view);
-        app->desktop_settings = tiku_trk_desktop_settings_open(app->desktop_prefs_window.store,
-            app->desktop_prefs_window.node, &app->desktop_prefs_window.model, desktop_settings_changed, app);
+        tiku_trk_folder_window_t *folder =
+            tiku_trk_desktop_view_folder(&app->desktop_view);
+        if (folder && folder->view)
+            app->desktop_prefs_window.model.value.icon_size =
+                tiku_trk_poseview_icon_size(folder->view);
+        app->desktop_settings = tiku_trk_desktop_settings_open(
+            app->desktop_prefs_window.store, app->desktop_prefs_window.node,
+            &app->desktop_prefs_window.model, desktop_settings_changed, app);
         if (!app->desktop_settings) return 1;
         app->desktop_prefs_window.save_context = app;
         app->desktop_prefs_window.submit_save = desktop_settings_submit;
@@ -803,8 +865,8 @@ boot_fonts(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
  *        the thumbnail queue and the node-icon cache.
  * @return -1 to go on.
  */
-static int
-boot_applications(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
+static int boot_applications(desktop_t *app, const desktop_options_t *o,
+                             desktop_loop_t *lp)
 {
     (void)o;
     (void)lp;
@@ -872,13 +934,21 @@ boot_icons(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
             &alert_model(app)->open);
         if (path[0]) {
             char types_path[TIKU_PATH_MAX];
-            if (snprintf(types_path, sizeof types_path, TIKU_SHELL_TYPE_SETTINGS_PATH, home) >= (int)sizeof types_path) return 1;
-            app->catalog_settings = tiku_trk_catalog_settings_open_with_file(app->store, &app->apps, &app->types, types_path, catalog_settings_changed, app);
+            if (snprintf(types_path, sizeof types_path,
+                         TIKU_SHELL_TYPE_SETTINGS_PATH,
+                         home) >= (int)sizeof types_path)
+                return 1;
+            app->catalog_settings = tiku_trk_catalog_settings_open_with_file(
+                app->store, &app->apps, &app->types, types_path,
+                catalog_settings_changed, app);
             if (!app->catalog_settings) return 1;
-            tiku_trk_open_with_window_bind_settings(&app->open_with_window, app->catalog_settings);
-            app->settings = tiku_trk_settings_open_with_desktop(prefs_model(app), path,
-                tiku_trk_resource_session_registry(app->resource_session), app->record_settings, app->catalog_settings, app->desktop_settings,
-                settings_changed, app);
+            tiku_trk_open_with_window_bind_settings(&app->open_with_window,
+                                                    app->catalog_settings);
+            app->settings = tiku_trk_settings_open_with_desktop(
+                prefs_model(app), path,
+                tiku_trk_resource_session_registry(app->resource_session),
+                app->record_settings, app->catalog_settings,
+                app->desktop_settings, settings_changed, app);
             if (!app->settings) {
                 fprintf(stderr, "settings controller: startup refused\n");
                 return 1;
@@ -1202,11 +1272,11 @@ boot_shots(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
         tiku_trk_find_set_mode(find_model(app), TIKU_QMODE_ATTRIBUTE);
         find_model(app)->row[0].field = TIKU_QF_VALUE;
         find_model(app)->row[0].op = TIKU_OP_IS;
-        snprintf(find_model(app)->row[0].value, sizeof find_model(app)->row[0].value, "1");
+        snprintf(find_model(app)->row[0].value,
+                 sizeof find_model(app)->row[0].value, "1");
         find_model(app)->everywhere = 0;
         {
             int k;
-
             for (k = 0; k < find_model(app)->place_count; k++) {
                 if (strcmp(find_model(app)->place[k], "dev") == 0) {
                     find_model(app)->place_mask = 1u << k;
@@ -1218,7 +1288,6 @@ boot_shots(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
                                       sizeof err);
         {
             int k;
-
             for (k = 0; k < app->folder_count; k++) {
                 (void)refresh_results(app, &app->folders[k]);
             }
@@ -1226,7 +1295,6 @@ boot_shots(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
         tiku_trk_find_window_close(&app->find_window);
     }
 #endif
-
     if (o->shot_panel) {
         /* Set the panel up through its model: open it, choose attribute
          * mode, fill two rows joined by or, scope it to the first place,
@@ -1236,12 +1304,13 @@ boot_shots(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
         (void)tiku_trk_find_add_row(find_model(app));
         find_model(app)->row[0].field = TIKU_QF_UNIT;
         find_model(app)->row[0].op = TIKU_OP_IS;
-        snprintf(find_model(app)->row[0].value, sizeof find_model(app)->row[0].value,
-                 "bytes");
+        snprintf(find_model(app)->row[0].value,
+                 sizeof find_model(app)->row[0].value, "bytes");
         find_model(app)->row[0].join = TIKU_JOIN_OR;
         find_model(app)->row[1].field = TIKU_QF_UNIT;
         find_model(app)->row[1].op = TIKU_OP_IS;
-        snprintf(find_model(app)->row[1].value, sizeof find_model(app)->row[1].value, "s");
+        snprintf(find_model(app)->row[1].value,
+                 sizeof find_model(app)->row[1].value, "s");
         find_model(app)->everywhere = 0;
         find_model(app)->place_mask = 1u;
         (void)panel_search(app, find_model(app));
@@ -1429,7 +1498,8 @@ desktop_boot(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
 
     app->running = 1;
     if (desktop_resources_open(app)) {
-        fprintf(stderr,"desktop resource providers: startup refused\n"); return 1;
+        fprintf(stderr, "desktop resource providers: startup refused\n");
+        return 1;
     }
     app->applied_hide_dotfiles = -1;
     app->applied_full_path = -1;
@@ -1472,7 +1542,8 @@ desktop_teardown(desktop_t *app, desktop_loop_t *lp)
     if (getenv("TIKU_FRAME_STATS")) desktop_frame_report(app, stderr);
 #if TIKU_SHELL_BOARD_SERVICES
 
-    int vfs_drained = desktop_vfs_destroy(app);
+    int vfs_drained = desktop_devices_vfs_close(app);
+    vfs_drained = desktop_vfs_destroy(app) && vfs_drained;
 #endif
 
     tiku_trk_open_with_window_destroy(&app->open_with_window);
@@ -1546,11 +1617,15 @@ desktop_teardown(desktop_t *app, desktop_loop_t *lp)
     /* A timed-out service worker owns its backend until process exit. */
     if (vfs_drained) {
         tiku_trk_resource_session_close(app->resource_session);
+        if (app->resource_temporary[0])
+            rmdir(app->resource_temporary);
         tiku_backend_close(app->backend);
     }
 #else
 
     tiku_trk_resource_session_close(app->resource_session);
+    if (app->resource_temporary[0])
+        rmdir(app->resource_temporary);
     tiku_backend_close(app->backend);
 #endif
 

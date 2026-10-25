@@ -42,10 +42,12 @@ typedef struct {
     tiku_alert_t      *alert;       /* the shell's, for the confirm  */
     struct tiku_store *store;       /* where preferred lives         */
     tiku_trk_catalog_settings_t *settings; /**< borrowed preference owner */
-    tiku_trk_app_t pending_app;     /**< captured launch target after a saved choice */
-    uint64_t pending_generation;   /**< originating workspace window generation */
-    int pending;                   /**< waits for its accepted preference save */
-    char status[96];               /**< save progress or failure shown above the list */
+    tiku_trk_app_t
+        pending_app; /**< captured launch target after a saved choice */
+    uint64_t
+        pending_generation; /**< originating workspace window generation */
+    int pending;            /**< waits for its accepted preference save */
+    char status[96]; /**< save progress or failure shown above the list */
     /* The question being asked. */
     tiku_trk_cand_t        cand[TIKU_TRK_APP_MAX];
     int                    count;
@@ -73,7 +75,9 @@ void tiku_trk_open_with_window_init(tiku_trk_open_with_window_t *controller,
  *  @note Rebinding detaches an outstanding launch completion. */
 void tiku_trk_open_with_window_bind_settings(tiku_trk_open_with_window_t *,
     tiku_trk_catalog_settings_t *);
-/** @brief Detach accepted save completions and close before freeing the controller. */
+/** @brief Detach accepted save completions and close before freeing the
+ * controller.
+ */
 void tiku_trk_open_with_window_destroy(tiku_trk_open_with_window_t *);
 
 /**

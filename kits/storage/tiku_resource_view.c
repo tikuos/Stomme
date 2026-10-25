@@ -90,29 +90,63 @@ tiku_resource_error_t tiku_resource_describe(tiku_resource_registry_t *registry,
         char revision[21];
         const tiku_resource_spec_t *spec = &node->spec;
         snprintf(revision, sizeof revision, "%llu", (unsigned long long)node->provider->stamp.revision);
-        ok = ok && tiku_msg_add_string(message, "provider", node->provider->key) &&
-            tiku_msg_add_string(message, "incarnation", node->provider->stamp.incarnation) &&
-            tiku_msg_add_string(message, "revision", revision) &&
-            tiku_msg_add_int32(message, "schema_version", (int32_t)spec->schema_version) &&
-            tiku_msg_add_bool(message, "sensitive", spec->sensitive) &&
-            tiku_msg_add_bool(message, "public_read", spec->public_read) &&
-            tiku_msg_add_int64(message, "read_scopes", (int64_t)spec->read_scopes) &&
-            tiku_msg_add_int64(message, "change_scopes", (int64_t)spec->change_scopes) &&
-            tiku_msg_add_string(message, "availability", node->unavailable ? "unavailable" : "available") &&
-            tiku_msg_add_string(message, "persistence", spec->persistence) &&
-            tiku_msg_add_string(message, "controller", spec->controller) &&
-            tiku_msg_add_bool(message, "atomic", spec->kind == TIKU_RESOURCE_SETTING && node->provider->atomic.commit != NULL) &&
-            tiku_msg_add_string(message, "transaction_group", spec->kind == TIKU_RESOURCE_SETTING && node->provider->atomic.commit ? node->provider->key : "") &&
-            tiku_msg_add_string(message, "dispatch", node->provider->asynchronous ? "asynchronous" : "synchronous") &&
-            tiku_msg_add_int64(message, "change_features", (spec->kind == TIKU_RESOURCE_SETTING || spec->kind == TIKU_RESOURCE_ACTION) ?
-                (int64_t)(TIKU_RESOURCE_FEATURE_CHANGE | (node->provider->asynchronous ? TIKU_RESOURCE_FEATURE_JOBS : 0) |
-                    (spec->kind == TIKU_RESOURCE_SETTING && node->provider->atomic.commit ? TIKU_RESOURCE_FEATURE_TRANSACTION : 0)) : 0) &&
-            tiku_msg_add_string(schema, "type", tiku_resource_type_name(spec->schema.type)) &&
-            tiku_msg_add_int64(schema, "integer_min", spec->schema.integer_min) &&
-            tiku_msg_add_int64(schema, "integer_max", spec->schema.integer_max) &&
-            tiku_msg_add_double(schema, "number_min", spec->schema.number_min) &&
-            tiku_msg_add_double(schema, "number_max", spec->schema.number_max) &&
-            tiku_msg_add_int32(schema, "text_max", (int32_t)spec->schema.text_max);
+        ok = ok &&
+             tiku_msg_add_string(message, "provider", node->provider->key) &&
+             tiku_msg_add_string(message, "incarnation",
+                                 node->provider->stamp.incarnation) &&
+             tiku_msg_add_string(message, "revision", revision) &&
+             tiku_msg_add_int32(message, "schema_version",
+                                (int32_t)spec->schema_version) &&
+             tiku_msg_add_bool(message, "sensitive", spec->sensitive) &&
+             tiku_msg_add_bool(message, "public_read", spec->public_read) &&
+             tiku_msg_add_int64(message, "read_scopes",
+                                (int64_t)spec->read_scopes) &&
+             tiku_msg_add_int64(message, "change_scopes",
+                                (int64_t)spec->change_scopes) &&
+             tiku_msg_add_bool(message, "host_control_required",
+                               !node->provider->principal[0]) &&
+             tiku_msg_add_string(message, "availability",
+                                 node->unavailable ? "unavailable"
+                                                   : "available") &&
+             tiku_msg_add_string(message, "persistence", spec->persistence) &&
+             tiku_msg_add_string(message, "controller", spec->controller) &&
+             tiku_msg_add_bool(message, "atomic",
+                               spec->kind == TIKU_RESOURCE_SETTING &&
+                                   node->provider->atomic.commit != NULL) &&
+             tiku_msg_add_string(message, "transaction_group",
+                                 spec->kind == TIKU_RESOURCE_SETTING &&
+                                         node->provider->atomic.commit
+                                     ? node->provider->key
+                                     : "") &&
+             tiku_msg_add_string(message, "dispatch",
+                                 node->provider->asynchronous
+                                     ? "asynchronous"
+                                     : "synchronous") &&
+             tiku_msg_add_int64(
+                 message, "change_features",
+                 (spec->kind == TIKU_RESOURCE_SETTING ||
+                  spec->kind == TIKU_RESOURCE_ACTION)
+                     ? (int64_t)(TIKU_RESOURCE_FEATURE_CHANGE |
+                                 (node->provider->asynchronous
+                                      ? TIKU_RESOURCE_FEATURE_JOBS
+                                      : 0) |
+                                 (spec->kind == TIKU_RESOURCE_SETTING &&
+                                          node->provider->atomic.commit
+                                      ? TIKU_RESOURCE_FEATURE_TRANSACTION
+                                      : 0))
+                     : 0) &&
+             tiku_msg_add_string(schema, "type",
+                                 tiku_resource_type_name(spec->schema.type)) &&
+             tiku_msg_add_int64(schema, "integer_min",
+                                spec->schema.integer_min) &&
+             tiku_msg_add_int64(schema, "integer_max",
+                                spec->schema.integer_max) &&
+             tiku_msg_add_double(schema, "number_min",
+                                 spec->schema.number_min) &&
+             tiku_msg_add_double(schema, "number_max",
+                                 spec->schema.number_max) &&
+             tiku_msg_add_int32(schema, "text_max",
+                                (int32_t)spec->schema.text_max);
         for (i = 0; ok && i < spec->schema.choice_count; i++)
             ok = tiku_msg_add_string(schema, "choice", spec->schema.choices[i]);
         ok = ok && tiku_msg_add_message(message, "value_schema", schema);

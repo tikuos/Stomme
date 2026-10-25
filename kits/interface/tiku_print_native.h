@@ -32,4 +32,14 @@ void tiku_print_native_poll(tiku_print_native_t *native);
 /** @brief Cancel requests and invalidate callbacks; captured resources survive
  * until native work stops. */
 void tiku_print_native_close(tiku_print_native_t *native);
+/** @brief Copied native job metadata; status is known after completion. */
+typedef struct {
+    uint64_t request;
+    size_t bytes;
+    int started, cancellation_requested, finished, status;
+    char title[256], reason[256];
+} tiku_print_job_observation_t;
+/** @brief Copy current native jobs on the owner thread; return required count. */
+size_t tiku_print_native_observe(tiku_print_native_t *,tiku_print_job_observation_t *,size_t capacity);
+
 #endif

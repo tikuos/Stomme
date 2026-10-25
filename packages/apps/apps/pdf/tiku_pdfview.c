@@ -113,6 +113,7 @@ typedef struct {
 } pv_layout_t;
 
 struct tiku_pdfview {
+    uint64_t resource_document; /**< successful document adoption counter */
     tiku_workspace_t *workspace;
     tiku_window_t *window;
     int *dirty, refs, generation, loading;
@@ -286,7 +287,8 @@ static void pv_forget(tiku_pdfview_t *c)
     c->laid_scale = 0; c->search_gen++; c->query[0] = 0;
     c->path[0] = c->title[0] = c->hint[0] = 0;
     if (c->window)
-        snprintf(c->window->title, sizeof c->window->title, TIKU_PRODUCT_PDF_NAME);
+        snprintf(c->window->title, sizeof c->window->title,
+                 TIKU_PRODUCT_PDF_NAME);
     (void)tiku_list_set_count(&c->list, 0);
     tiku_scroll_init(&c->vbar, PV_LINE);
     tiku_scroll_init(&c->hbar, PV_LINE);
@@ -836,4 +838,54 @@ int tiku_pdfview_file(tiku_pdfview_t *c, const char *path)
     if (!c || !c->workspace) return 0;
     tiku_pdfview_open(c);
     return pv_load(c, path, "");
+}
+
+/** @brief Copy public PDF view, selection and page metadata without protected text. */
+static tiku_resource_error_t resource_observe(void *state, const char *field,
+                                              tiku_msg_t **out)
+{
+    tiku_pdfview_t *c = state;
+    tiku_msg_t *value = tiku_app_resource_object(0);
+    int bad = 0;
+    if (!strcmp(field, "selection")) {
+        bad |= VR_BOOL(value, "supported", 1);
+        bad |= VR_BOOL(value, "copy_allowed", c->may_copy);
+        bad |= VR_BOOL(value, "selected", c->selected);
+        bad |= VR_INT(value, "anchor_page", c->anchor.page);
+        bad |= VR_INT(value, "anchor", c->anchor.at);
+        bad |= VR_INT(value, "focus_page", c->focus.page);
+        bad |= VR_INT(value, "focus", c->focus.at);
+    } else if (!strcmp(field, "view")) {
+        bad |= VR_NUMBER(value, "scale", c->scale);
+        bad |= VR_INT(value, "rotation", c->turn);
+        bad |= VR_INT(value, "scroll_y", c->vbar.value);
+        bad |= VR_INT(value, "scroll_x", c->hbar.value);
+        bad |= VR_INT(value, "fit", c->fit);
+        bad |= VR_BOOL(value, "bookmarks_session", c->bookmarks_session);
+    } else if (!strcmp(field, "objects")) {
+        bad |= VR_INT(value, "pages", c->npage);
+        bad |= VR_INT(value, "outline", c->noutline);
+        bad |= VR_INT(value, "signatures", c->nsig);
+    } else {
+        tiku_msg_free(value);
+        return TIKU_RESOURCE_UNSUPPORTED;
+    }
+    if (bad) {
+        tiku_msg_free(value);
+        return TIKU_RESOURCE_NO_MEMORY;
+    }
+    *out = value;
+    return 0;
+}
+vr_document_t tiku_pdfview_resource_document(tiku_pdfview_t *c)
+{
+    return (vr_document_t){.identity = c->resource_document + 1,
+                           .generation = c->resource_document + 1,
+                           .path = c->doc ? c->path : "",
+                           .type = "application/pdf",
+                           .available = c->doc != NULL,
+                           .busy = c->loading,
+                           .read_only = 1,
+                           .controller = c,
+                           .observe = resource_observe};
 }

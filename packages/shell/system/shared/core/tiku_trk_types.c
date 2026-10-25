@@ -211,14 +211,20 @@ int tiku_trk_types_write_record(FILE *file, const tiku_trk_typerec_t *record)
 {
     int i, count = 0;
     if (!file || !record) return -1;
-    if (fprintf(file, "%s\t%s\t%s\t", record->type, record->desc, record->icon) < 0) return -1;
+    if (fprintf(file, "%s\t%s\t%s\t", record->type, record->desc,
+                record->icon) < 0)
+        return -1;
     for (i = 0; i < record->ncol; i++) {
         const char *name = tiku_trk_types_column_name(record->col[i]);
-        if (!name || fprintf(file, "%s%s", count++ ? "," : "", name) < 0) return -1;
+        if (!name || fprintf(file, "%s%s", count++ ? "," : "", name) < 0)
+            return -1;
     }
     for (i = 0; i < record->nattr; i++)
-        if (fprintf(file, "%sattr:%s", count++ ? "," : "", record->attr[i]) < 0) return -1;
-    if (record->document && fprintf(file, "%sdocument", count ? "," : "") < 0) return -1;
+        if (fprintf(file, "%sattr:%s", count++ ? "," : "", record->attr[i]) <
+            0)
+            return -1;
+    if (record->document && fprintf(file, "%sdocument", count ? "," : "") < 0)
+        return -1;
     return ferror(file) ? -1 : 0;
 }
 
@@ -229,7 +235,9 @@ int tiku_trk_types_save(const tiku_trk_types_t *db, const char *path)
     if (!db || !path || !(file = fopen(path, "w"))) return -1;
     if (fputs("# type\tdescription\ticon\tcolumns\n", file) < 0) error = 1;
     for (i = 0; i < db->n && !error; i++)
-        if (tiku_trk_types_write_record(file, &db->rec[i]) || fputc('\n', file) == EOF) error = 1;
+        if (tiku_trk_types_write_record(file, &db->rec[i]) ||
+            fputc('\n', file) == EOF)
+            error = 1;
     if (fclose(file)) error = 1;
     return error ? -1 : 0;
 }

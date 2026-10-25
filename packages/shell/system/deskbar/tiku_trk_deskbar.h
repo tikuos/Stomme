@@ -154,7 +154,8 @@ typedef struct {
 
 /** @brief The Deskbar; its fields are private to system/deskbar/bar. */
 typedef struct tiku_trk_deskbar tiku_trk_deskbar_t;
-/** @brief The Deskbar's settings, as tiku_trk_deskbar_prefs.h defines them. */
+/** @brief The Deskbar's settings, as tiku_trk_deskbar_prefs.h defines them.
+ */
 typedef struct tiku_trk_deskbar_settings tiku_trk_deskbar_settings_t;
 
 /**
@@ -308,7 +309,8 @@ int tiku_trk_deskbar_menu_bottom(const tiku_trk_deskbar_t *db);
  *        its open submenu: the margin the pointer may cross without the
  *        menu closing (DB-036).
  */
-int tiku_trk_deskbar_menu_keeps_open(const tiku_trk_deskbar_t *db, int x, int y);
+int tiku_trk_deskbar_menu_keeps_open(const tiku_trk_deskbar_t *db, int x,
+                                     int y);
 /**
  * @brief Whether a quit shortcut closes the open preferences window: 1 only
  *        with @p shortcut_quit and @p prefs_open.  The bar itself is never
@@ -660,8 +662,10 @@ int tiku_trk_deskbar_refresh(tiku_trk_deskbar_t *db);
 int tiku_trk_deskbar_refresh_except(tiku_trk_deskbar_t *db,
                                     const char *except);
 
-/** @brief Copy one live replicant by tray index; return 0 or -1 out of range. */
-int tiku_trk_deskbar_replicant_at(const tiku_trk_deskbar_t *, int, tiku_trk_replicant_t *);
+/** @brief Copy one live replicant by tray index; return 0 or -1 out of range.
+ */
+int tiku_trk_deskbar_replicant_at(const tiku_trk_deskbar_t *, int,
+                                  tiku_trk_replicant_t *);
 
 /** @brief The paths of the replicants, into @p out.
  *  @return how many were written, at most @p max. */

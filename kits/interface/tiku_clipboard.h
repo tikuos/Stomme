@@ -94,4 +94,8 @@ size_t tiku_clipboard_length(void);
  */
 unsigned tiku_clipboard_stamp(void);
 
+/** @brief Borrow one typed representation by publication order; zero at the end.
+ *  @note Outputs point into the native store and expire on clipboard change. */
+int tiku_clipboard_format_at(size_t index,tiku_clipboard_format_t *out);
+
 #endif /* TIKU_CLIPBOARD_H_ */

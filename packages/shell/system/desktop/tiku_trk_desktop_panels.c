@@ -673,7 +673,9 @@ info_opens_with_fill(desktop_t *app, tiku_trk_info_t *info)
     }
 }
 
-/** @brief Refresh open Info views after a committed or failed preference save. */
+/** @brief Refresh open Info views after a committed or failed preference
+ * save.
+ */
 static void info_preferred_saved(void *context, tiku_resource_error_t error)
 {
     desktop_t *app = context;
@@ -681,10 +683,18 @@ static void info_preferred_saved(void *context, tiku_resource_error_t error)
     for (i = 0; i < TIKU_TRK_INFO_WINDOW_MAX; i++)
         if (app->info_windows.window[i] && app->info_windows.window[i]->open)
             info_opens_with_fill(app, &app->info_windows.model[i]);
-    snprintf(app->status, sizeof app->status, "%s", error == TIKU_RESOURCE_STALE ?
-        "Associations changed. Retry your choice." : error == TIKU_RESOURCE_UNKNOWN_OUTCOME ?
-        "Save outcome unknown. Check File Associations." : error ?
-        "Could not save the preferred application." : "File association saved.");
+    snprintf(app->status, sizeof app->status, "%s",
+             error == TIKU_RESOURCE_STALE
+                 ? "Associations changed. Retry your choice."
+             : error == TIKU_RESOURCE_UNKNOWN_OUTCOME
+                 ? "Save outcome unknown. Check File Associations."
+             : error ? "Could not save the preferred application."
+                     : "File association saved.");
+    if (!error)
+        snprintf(app->status, sizeof app->status,
+                 "%.*s opens with %s (saved).", 80, app->preferred_file,
+                 app->preferred_handler[0] ? app->preferred_handler
+                                           : "the default application");
     desktop_damage_all(app);
 }
 
@@ -717,8 +727,19 @@ info_opens_with_next(desktop_t *app, tiku_trk_info_t *info)
         }
     }
     if (app->catalog_settings) {
-        tiku_resource_error_t error = tiku_trk_catalog_settings_prefer(app->catalog_settings,
-            types, 1, at + 1 < count ? cand[at + 1].app->name : "", info_preferred_saved, app);
+        const char *handler = at + 1 < count ? cand[at + 1].app->name : "";
+        tiku_resource_error_t error =
+            tiku_trk_catalog_settings_prefer_validate(app->catalog_settings,
+                                                      types, 1, handler);
+        if (!error) {
+            snprintf(app->preferred_file, sizeof app->preferred_file, "%s",
+                     info->model.name);
+            snprintf(app->preferred_handler, sizeof app->preferred_handler,
+                     "%s", handler);
+            error = tiku_trk_catalog_settings_prefer(
+                app->catalog_settings, types, 1, app->preferred_handler,
+                info_preferred_saved, app);
+        }
         snprintf(app->status, sizeof app->status, "%s", error ?
             "Could not start saving. Retry after other settings finish." :
             "Saving the preferred application...");

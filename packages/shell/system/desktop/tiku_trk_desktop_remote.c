@@ -352,35 +352,10 @@ access_action(void *context, uint32_t node, uint64_t document,
               uint64_t generation, unsigned action, int first, int last,
               const char *text)
 {
-    tiku_remote_window_t *window = context;
-    if (!window || !window->session || !window->session->used ||
-        !window->window || !window->opened || !window->access ||
-        tiku_access_document(window->access) != document ||
-        tiku_access_generation(window->access) != generation)
-        return 0;
-    desktop_t *app = window->access_context;
-    if (!app)
-        return 0;
-    tiku_workspace_activate(app->desk, window->window);
-    remote_focus(app, window->window);
-    desktop_damage_all(app);
-    tiku_msg_t *message = tiku_msg_new(TIKU_MSG_ACCESS_ACTION);
-    int sent = message &&
-               tiku_msg_add_int32(message, "window", window->win_id) &&
-               tiku_msg_add_int32(message, "node", node) &&
-               tiku_msg_add_int64(message, "document", document) &&
-               tiku_msg_add_int64(message, "generation", generation) &&
-               tiku_msg_add_int32(message, "action", action) &&
-               tiku_msg_add_int32(message, "first", first) &&
-               tiku_msg_add_int32(message, "last", last) &&
-               (!text || tiku_msg_add_string(message, "text", text));
-    if (sent) {
-        tiku_remote_gesture(window, tiku_remote_gesture_clock());
-        /* The listener/session APIs keep the window's owning channel. */
-        sent = tiku_remote_session_tell(window->session, message);
-    }
-    tiku_msg_free(message);
-    return sent;
+    tiku_remote_window_t *window=context;
+    return desktop_access_perform(window ? window->access_context : NULL,
+                                  window, node, document, generation, action,
+                                  first, last, text, 1);
 }
 /** @brief Accept a bounded logical tree only for a live session-owned window.
  */
@@ -498,6 +473,7 @@ static void
 print_done(void *context, uint64_t ticket, int status, const char *reason)
 {
     desktop_t *app = context;
+    desktop_host_vfs_print_done(app,ticket,status,reason);
     tiku_print_rpc_done(&app->printing, ticket, status, reason);
 }
 /** @brief Submit an owned final PDF to the native host after its print grant.
@@ -551,6 +527,7 @@ remote_hear(desktop_t *app)
                                          tiku_remote_gesture_clock());
 #endif
 
+            if(desktop_app_vfs_message(app,i,m)){tiku_msg_free(m);continue;}
             if (tiku_msg_what(m) == TIKU_MSG_CLIP_REQUEST) {
                 tiku_msg_t *reply = tiku_clip_reply(m);
 
@@ -859,4 +836,54 @@ remote_sweep(desktop_t *app)
         }
         i++;
     }
+}
+
+int desktop_access_perform(desktop_t *app, tiku_remote_window_t *window,
+                           uint32_t node, uint64_t document,
+                           uint64_t generation, unsigned action, int first,
+                           int last, const char *text, int native_gesture)
+{
+#if TIKU_SHELL_REMOTE_SERVICES
+
+    if (!app || !window || !window->session || !window->session->used ||
+        window->session->fd<0 ||
+        !window->window || !window->opened || !window->access ||
+        tiku_access_document(window->access) != document ||
+        tiku_access_generation(window->access) != generation)
+        return 0;
+    tiku_workspace_activate(app->desk, window->window);
+    remote_focus(app, window->window);
+    desktop_damage_all(app);
+    tiku_msg_t *message = tiku_msg_new(TIKU_MSG_ACCESS_ACTION);
+    int sent = message &&
+               tiku_msg_add_int32(message, "window", window->win_id) &&
+               tiku_msg_add_int32(message, "node", node) &&
+               tiku_msg_add_int64(message, "document", document) &&
+               tiku_msg_add_int64(message, "generation", generation) &&
+               tiku_msg_add_int32(message, "action", action) &&
+               tiku_msg_add_int32(message, "first", first) &&
+               tiku_msg_add_int32(message, "last", last) &&
+               (!text || tiku_msg_add_string(message, "text", text));
+    if (sent) {
+        if (native_gesture)
+            tiku_remote_gesture(window, tiku_remote_gesture_clock());
+        /* The listener/session APIs keep the window's owning channel. */
+        sent = tiku_remote_session_tell(window->session, message);
+    }
+    tiku_msg_free(message);
+    return sent;
+
+#else
+    (void)app;
+    (void)window;
+    (void)node;
+    (void)document;
+    (void)generation;
+    (void)action;
+    (void)first;
+    (void)last;
+    (void)text;
+    (void)native_gesture;
+    return 0;
+#endif
 }

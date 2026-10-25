@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0 */
 #include "tiku_hex_model.h"
 #include <ctype.h>
+#include <stdatomic.h>
+/** @brief Non-reused file-session identities within the native application process. */
+static atomic_uint_fast64_t resource_identity;
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -37,16 +40,21 @@ int hex_load(hex_model_t *m, const char *path)
     if (!path || !*path || strlen(path) >= sizeof m->path)
         return hex_error(m, "Invalid or overlong local filename.");
     int fd = open(path, O_RDONLY | O_CLOEXEC | O_NONBLOCK | O_NOFOLLOW);
-    if (fd < 0) return hex_error(m, "Cannot read file. Use a regular local file, not a symbolic link.");
+    if (fd < 0)
+        return hex_error(
+            m,
+            "Cannot read file. Use a regular local file, not a symbolic link.");
     if (fstat(fd, &before) || !S_ISREG(before.st_mode) || before.st_size < 0 ||
         (uint64_t)before.st_size > HEX_LIMIT) {
-        close(fd); return hex_error(m, "Only regular files up to 16 MiB can be opened.");
+        close(fd);
+        return hex_error(m, "Only regular files up to 16 MiB can be opened.");
     }
     size_t n = (size_t)before.st_size;
     unsigned char *bytes = malloc(n ? n : 1), *original = malloc(n ? n : 1);
     if (!bytes || !original) {
         free(bytes); free(original); close(fd);
-        return hex_error(m, "Not enough memory; the current document was kept.");
+        return hex_error(m,
+                         "Not enough memory; the current document was kept.");
     }
     int ok = hex_read(fd, bytes, n) && !fstat(fd, &after) &&
         before.st_size == after.st_size &&
@@ -55,11 +63,18 @@ int hex_load(hex_model_t *m, const char *path)
         before.st_ctim.tv_sec == after.st_ctim.tv_sec &&
         before.st_ctim.tv_nsec == after.st_ctim.tv_nsec;
     close(fd);
-    if (!ok) { free(bytes); free(original); return hex_error(m, "File changed or could not be read completely. Try again."); }
+    if (!ok) {
+        free(bytes);
+        free(original);
+        return hex_error(
+            m, "File changed or could not be read completely. Try again.");
+    }
     memcpy(original, bytes, n);
     char name[512]; snprintf(name, sizeof name, "%s", path);
     hex_free(m);
     m->bytes = bytes; m->original = original; m->size = n; m->identity = after;
+    m->resource_document=atomic_fetch_add(&resource_identity,1)+1;
+    m->resource_revision=1;
     snprintf(m->path, sizeof m->path, "%s", name);
     return 1;
 }
@@ -70,6 +85,7 @@ static void hex_set(hex_model_t *m, size_t at, unsigned char byte)
 {
     m->changed -= m->bytes[at] != m->original[at];
     m->bytes[at] = byte;
+    m->resource_revision++;
     m->changed += m->bytes[at] != m->original[at];
     m->cursor = at;
 }
@@ -79,7 +95,8 @@ int hex_replace(hex_model_t *m, size_t at, unsigned char byte)
     if (at >= m->size || m->bytes[at] == byte) return 0;
     m->used = m->position;
     if (m->used == HEX_HISTORY) {
-        memmove(m->history, m->history + 1, (HEX_HISTORY - 1) * sizeof m->history[0]);
+        memmove(m->history, m->history + 1,
+                (HEX_HISTORY - 1) * sizeof m->history[0]);
         m->used--; m->position--;
     }
     m->history[m->used++] = (hex_change_t){at, m->bytes[at], byte};
@@ -96,7 +113,9 @@ int hex_undo(hex_model_t *m, int redo)
 
 int hex_offset(const char *text, size_t size, size_t *offset)
 {
-    if (!text || !*text || *text == '-' || *text == '+' || isspace((unsigned char)*text)) return 0;
+    if (!text || !*text || *text == '-' || *text == '+' ||
+        isspace((unsigned char)*text))
+        return 0;
     char *end; errno = 0;
     unsigned long long n = strtoull(text, &end,
         text[0] == '0' && (text[1] == 'x' || text[1] == 'X') ? 16 : 10);
@@ -115,7 +134,12 @@ int hex_pattern(const char *text, unsigned char *bytes, size_t *size)
             ch >= 'A' && ch <= 'F' ? ch - 'A' + 10 : -1;
         if (digit < 0) return 0;
         if (high < 0) high = digit;
-        else { if (n >= 64) return 0; bytes[n++] = (unsigned char)(high * 16 + digit); high = -1; }
+        else {
+            if (n >= 64)
+                return 0;
+            bytes[n++] = (unsigned char)(high * 16 + digit);
+            high = -1;
+        }
     }
     if (high >= 0 || !n) return 0;
     *size = n; return 1;
@@ -162,13 +186,19 @@ int hex_save(hex_model_t *m, const char *path)
         return hex_error(m, "No document, or invalid destination.");
     int same = !strcmp(path, m->path);
     if (same && !hex_unchanged(m, path))
-        return hex_error(m, "Original changed, disappeared, or has multiple links. Use Save As with a new name.");
+        return hex_error(
+            m,
+            "Original changed, disappeared, or has multiple links. Use Save As with a new name.");
     if (!same && (lstat(path, &st) == 0 || errno != ENOENT))
-        return hex_error(m, "Save As needs a new filename; existing files are never replaced.");
-    if (same && access(path, W_OK)) return hex_error(m, "Original is read-only. Use Save As.");
+        return hex_error(
+            m,
+            "Save As needs a new filename; existing files are never replaced.");
+    if (same && access(path, W_OK))
+        return hex_error(m, "Original is read-only. Use Save As.");
     snprintf(temp, sizeof temp, "%s.tikuhex-XXXXXX", path);
     int fd = mkstemp(temp);
-    if (fd < 0) return hex_error(m, "Cannot create a temporary file in that folder.");
+    if (fd < 0)
+        return hex_error(m, "Cannot create a temporary file in that folder.");
     int ok = 1;
     for (size_t at = 0; at < m->size; ) {
         ssize_t n = write(fd, m->bytes + at, m->size - at);
@@ -182,9 +212,13 @@ int hex_save(hex_model_t *m, const char *path)
     if (same && ok) ok = hex_unchanged(m, path);
     if (ok) ok = same ? !rename(temp, path) : !link(temp, path);
     if (!same || !ok) (void)unlink(temp);
-    if (!ok) return hex_error(m, "Save failed or original changed. Your edits remain in memory.");
+    if (!ok)
+        return hex_error(
+            m,
+            "Save failed or original changed. Your edits remain in memory.");
     if (path != m->path) snprintf(m->path, sizeof m->path, "%s", path);
     if (stat(path, &m->identity)) memset(&m->identity, 0, sizeof m->identity);
-    memcpy(m->original, m->bytes, m->size); m->changed = 0; m->error[0] = 0;
+    memcpy(m->original, m->bytes, m->size); m->changed = 0;
+    m->resource_revision++; m->error[0] = 0;
     return 1;
 }

@@ -61,12 +61,12 @@ def run(args):
             for attempt in range(8):
                 result = subprocess.run([str(temp / name), str(control), *map(str, values)], capture_output=True, text=True, timeout=20)
                 history.append(dict(client=name, arguments=values, exit=result.returncode, stdout=result.stdout, stderr=result.stderr))
-                if values and values[0]=='list' and result.returncode and result.stderr.strip()=='stale_cursor':
+                if values and success and result.returncode and ((values[0]=='list' and result.stderr.strip()=='stale_cursor') or (values[0]=='stream' and result.stderr.strip()=='stale_revision')):
                     time.sleep(.08)
                     continue
                 assert (result.returncode == 0) == success, history[-1]
                 return result.stdout.strip()
-            raise AssertionError(('unstable enumeration',values))
+            raise AssertionError(('unstable read-only collection',values))
 
         def read(path):
             """Read independently reported configured, saved and effective fields."""

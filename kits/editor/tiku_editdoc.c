@@ -11,6 +11,21 @@
  */
 
 #include "tiku_editdoc_private.h"
+#include <stdatomic.h>
+/** @brief Process-local identities shared by documents of this engine. */
+static atomic_uint_fast64_t resource_identity;
+/** @brief Assign a nonzero identity after creation or whole replacement. */
+static uint64_t new_resource_identity(void)
+{
+    return atomic_fetch_add_explicit(&resource_identity, 1,
+                                     memory_order_relaxed) +
+           1;
+}
+uint64_t tiku_editdoc_identity(const tiku_editdoc_t *doc)
+{
+    return doc?doc->resource_identity:0;
+}
+
 
 #include <stdint.h>
 #include <string.h>
@@ -35,6 +50,7 @@ tiku_editdoc_create(const tiku_editdoc_limits_t *limits, tiku_editdoc_t **doc)
     }
     d->refs = 1;
     d->generation = 1;
+    d->resource_identity = new_resource_identity();
     d->exec_line = -1;
     d->max_bytes = TIKU_EDITDOC_MAX_BYTES_DEFAULT;
     if (limits && limits->max_bytes)
@@ -106,6 +122,7 @@ tiku_editdoc_load(tiku_editdoc_t *doc, const char *text, size_t length)
     tiku_ed_marks_snap(doc);
     tiku_ed_history_clear(&doc->history);
     doc->generation++;
+    doc->resource_identity = new_resource_identity();
     tiku_ed_commit_end();
     tiku_ed_text_free(&old);
 

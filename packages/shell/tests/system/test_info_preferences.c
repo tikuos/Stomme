@@ -30,7 +30,9 @@ int main(void)
     app->info_windows.window[0]=tiku_workspace_open(app->desk,"Info",(tiku_rect_t){0,0,400,300},NULL,NULL,NULL);CHECK(app->info_windows.window[0]);
     info_opens_with_fill(app,info);CHECK(!strcmp(info->opens_with,"Default application"));
     info_opens_with_next(app,info);CHECK(!strcmp(info->opens_with,"Default application") && strstr(app->status,"Saving"));drain(app);
-    CHECK(!strcmp(info->opens_with,"Editor") && strstr(app->status,"saved"));
+    CHECK(!strcmp(info->opens_with, "Editor") &&
+          strstr(app->status, "saved") &&
+          strstr(app->status, "sample.txt opens with Editor"));
     {tiku_store_t *disk=tiku_store_sidecar_open("info");CHECK(disk && !strcmp(tiku_trk_launch_preferred(disk,"text/plain",value,sizeof value),"Editor"));tiku_store_free(disk);}
     info_opens_with_next(app,info);drain(app);CHECK(!strcmp(info->opens_with,"Viewer"));
     info_opens_with_next(app,info);drain(app);CHECK(!strcmp(info->opens_with,"Default application"));

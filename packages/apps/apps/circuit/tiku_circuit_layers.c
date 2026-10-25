@@ -132,3 +132,20 @@ void tiku_circuitview_layers_action(tiku_circuitview_t *v, int command)
     }
     (void)publish(v,layers,count,selected,named);
 }
+
+int cv_layer_replace(tiku_circuitview_t *v, size_t index, uint64_t generation,
+                     uint32_t colour, unsigned opacity, int visible)
+{
+ size_t count=tiku_circuit_layer_count(v->document);
+ if (v->loading || v->needs_load || v->style_open ||
+     generation != v->generation || index >= count || opacity > 255 ||
+     (visible != 0 && visible != 1))
+     return 0;
+ tiku_circuit_layer_t layers[TIKU_CIRCUIT_LAYERS_MAX];
+ for (size_t i = 0; i < count; i++)
+     layers[i] = *tiku_circuit_layer(v->document, i);
+ layers[index].colour = 0xff000000u | (colour & 0xffffffu);
+ layers[index].opacity = opacity;
+ layers[index].visible = visible;
+ return publish(v,layers,count,v->sheet,0);
+}

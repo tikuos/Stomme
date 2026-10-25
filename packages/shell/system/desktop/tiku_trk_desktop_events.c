@@ -156,8 +156,8 @@ desktop_key_down(desktop_t *app, const tiku_event_t *ev, desktop_loop_t *lp)
  * picks up to date, apply the settings to the windows, and reload the
  * add-ons when their files change.
  */
-void
-desktop_turn_begin(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
+void desktop_turn_begin(desktop_t *app, const desktop_options_t *o,
+                        desktop_loop_t *lp)
 {
     (void)o;
     /*
@@ -180,7 +180,8 @@ desktop_turn_begin(desktop_t *app, const desktop_options_t *o, desktop_loop_t *l
     {
         struct timespec now;
         if (!clock_gettime(CLOCK_MONOTONIC, &now)) {
-            desktop_resources_poll(app, (uint64_t)now.tv_sec * 1000 + (uint64_t)now.tv_nsec / 1000000);
+            desktop_resources_poll(app, (uint64_t)now.tv_sec * 1000 +
+                                            (uint64_t)now.tv_nsec / 1000000);
             tiku_trk_desktop_settings_poll(app->desktop_settings,
                 (uint64_t)now.tv_sec * 1000 + (uint64_t)now.tv_nsec / 1000000);
             tiku_trk_record_settings_poll(app->record_settings,
@@ -235,7 +236,16 @@ desktop_turn_begin(desktop_t *app, const desktop_options_t *o, desktop_loop_t *l
     pick_sweep(app);
     remote_sweep(app);
     tiku_trk_window_resources_poll(app->window_resources);
-    {struct timespec now;if(!clock_gettime(CLOCK_MONOTONIC,&now))desktop_lifecycle_vfs_poll(app,(uint64_t)now.tv_sec*1000+(uint64_t)now.tv_nsec/1000000);}
+    {
+        struct timespec now;
+        if (!clock_gettime(CLOCK_MONOTONIC, &now))
+            desktop_lifecycle_vfs_poll(app,
+                                       (uint64_t)now.tv_sec * 1000 +
+                                           (uint64_t)now.tv_nsec / 1000000);
+        if (!clock_gettime(CLOCK_MONOTONIC, &now))
+            desktop_host_vfs_poll(app, (uint64_t)now.tv_sec * 1000 +
+                                           (uint64_t)now.tv_nsec / 1000000);
+    }
     sync_folder_preferences(app);
     sync_addons(app, 0);
 }
@@ -306,7 +316,8 @@ desktop_turn_end(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
         /* Frame start, not frame end: drawing time is inside the budget. */
         app->last_present = before_present -
             app->frame_samples[(app->frame_sample_count-1) % 128];
-        if (o->shot != NULL && lp->shot_at > 0 && tiku_trk_now() >= lp->shot_at) {
+        if (o->shot != NULL && lp->shot_at > 0 &&
+            tiku_trk_now() >= lp->shot_at) {
             (void)tiku_surface_png(app->surf, o->shot);
             printf("wrote %s\n", o->shot);
             fflush(stdout);

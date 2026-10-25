@@ -191,7 +191,8 @@ static void run(void *ctx)
             tiku_circuit_project_scene(j->project, j->sheet));
     }
 render:
-    if (!j->result && j->action != CIRCUIT_RELOAD && j->action != CIRCUIT_ADD_LAYER)
+    if (!j->result && j->action != CIRCUIT_RELOAD &&
+        j->action != CIRCUIT_ADD_LAYER)
         j->result = cv_restore_view(j->settings_dir,j->path,&j->document,
             &j->units,&j->sheets,&j->details);
     if (!j->result) {
@@ -241,7 +242,9 @@ static void done(void *ctx)
     tiku_circuitview_changed(v);
     cv_measure_reset(v);
     if (j->units >= 0) {
-        v->units = j->units; v->show_sheets = j->sheets; v->show_details = j->details;
+        v->units = j->units;
+        v->show_sheets = j->sheets;
+        v->show_details = j->details;
     }
     tiku_circuit_release(v->document);
     tiku_image_free(&v->image);
@@ -256,6 +259,7 @@ static void done(void *ctx)
     v->sheets.top = 0;
     tiku_scroll_release(&v->sheet_scroll);
     v->document = j->document;
+    if(j->action!=CIRCUIT_ADD_LAYER)v->resource_document++;
     j->document = NULL;
     v->image = j->image;
     memset(&j->image, 0, sizeof j->image);
@@ -336,7 +340,8 @@ void tiku_circuitview_picked(tiku_circuitview_t *v, const char *path)
     if (path && *path) {
         if (action == CIRCUIT_EXPORT) {
             cv_export(v,path);
-        } else if (action == CIRCUIT_ADD_LAYER && !tiku_circuitview_layer_room(v)) {
+        } else if (action == CIRCUIT_ADD_LAYER &&
+                   !tiku_circuitview_layer_room(v)) {
             tiku_circuitview_note(v, tiku_circuit_layer_count(v->document) ?
                 "The layer stack is full; the chosen file was not added." :
                 "Add Layer needs an open artwork, drill or job drawing; the "

@@ -46,6 +46,9 @@ int tiku_resource_channel_step(tiku_resource_channel_t *, int timeout_ms);
 int tiku_resource_channel_send(tiku_resource_channel_t *, const tiku_msg_t *, int timeout_ms);
 /** @brief Receive one complete message; output is NULL on error. */
 int tiku_resource_channel_receive(tiku_resource_channel_t *, tiku_msg_t **out, int timeout_ms);
+/** @brief Wait for a complete buffered frame without consuming a partial frame.
+ * @return One ready, zero idle/partial, or -1 after retiring an invalid stream. */
+int tiku_resource_channel_wait(tiku_resource_channel_t *, int timeout_ms);
 /** @brief Negotiated feature mask, or zero before negotiation. */
 uint64_t tiku_resource_channel_features(const tiku_resource_channel_t *);
 /** @brief Negotiated session identity, or NULL before negotiation. */

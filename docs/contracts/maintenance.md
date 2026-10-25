@@ -98,3 +98,12 @@ reopening are part of the rehearsal. A serialized schema change requires an
 explicit migration and downgrade policy; preserving file bytes does not prove
 that an earlier implementation can read them. A rollback with unchanged data
 formats does not establish compatibility with unrelated historical releases.
+
+
+## Resource provider qualification
+
+[Provider development](../guides/resource-providers.md),
+[schema evolution](../guides/resource-schema-evolution.md),
+[coverage and release qualification](../guides/resource-release.md) and
+[troubleshooting](../guides/resource-troubleshooting.md) define the resource
+service's development and maintenance procedures.

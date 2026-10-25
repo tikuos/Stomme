@@ -96,4 +96,12 @@ typedef struct {
  *  @return Required count; up to capacity entries are copied. Loop thread only. */
 size_t tiku_work_observe(tiku_work_observation_t *out, size_t capacity);
 
+/** @brief Copied pool counts; rejected counts capacity and identity refusals. */
+typedef struct {
+    unsigned long long posted, collected, cancelled, rejected;
+    unsigned active, queued, running, finished_pending, retained;
+} tiku_work_stats_t;
+/** @brief Copy cumulative and current pool counts under its lock. */
+void tiku_work_stats(tiku_work_stats_t *out);
+
 #endif /* TIKU_WORK_H_ */

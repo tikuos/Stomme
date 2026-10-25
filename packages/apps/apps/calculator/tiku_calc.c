@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "tiku_app.h"
+#include "tiku_app_resources.h"
 #include "tiku_dialog.h"
 #include "tiku_font.h"
 #include "tiku_ui.h"
@@ -144,7 +145,8 @@ static int calc_event(void *state, const tiku_event_t *ev)
         return 0;
     }
     tiku_dialog_result_t r = tiku_dialog_event(&p->dialog, ev);
-    if (r.activated != TIKU_DIALOG_NONE && calc_action(p, r.activated)) return 1;
+    if (r.activated != TIKU_DIALOG_NONE && calc_action(p, r.activated))
+        return 1;
     calc_paint(p);
     return 0;
 }
@@ -160,14 +162,16 @@ static int calc_start(void **state, const tiku_app_services_t *services)
     calc_clear(&p->model);
     p->surface = tiku_surface_new(CALC_W, CALC_H, TIKU_C_PANEL);
     if (p->surface == NULL) { free(p); return -1; }
-    p->id = services->open(services->ctx, TIKU_PRODUCT_CALCULATOR_NAME, CALC_W, CALC_H);
+    p->id = services->open(services->ctx, TIKU_PRODUCT_CALCULATOR_NAME, CALC_W,
+                           CALC_H);
     if (!p->id) { tiku_surface_free(p->surface); free(p); return -1; }
     if (services->help_page != NULL)
         (void)services->help_page(services->ctx, "apps/calc.html");
     tiku_dialog_init(&p->dialog);
     memset(&menu, 0, sizeof menu);
     menu.nmenu = 1;
-    snprintf(menu.menu[0].title, sizeof menu.menu[0].title, TIKU_PRODUCT_CALCULATOR_NAME);
+    snprintf(menu.menu[0].title, sizeof menu.menu[0].title,
+             TIKU_PRODUCT_CALCULATOR_NAME);
     menu.menu[0].nitem = 2;
     menu.menu[0].item[0].command = C_COPY;
     menu.menu[0].item[0].enabled = 1;
@@ -200,13 +204,120 @@ static int calc_pick(void *state, uint32_t window, int command)
 }
 
 /** @brief Calculator's descriptor, which the export below hands on. */
-const tiku_app_descriptor_t tiku_calc_app = {
-    .id = TIKU_PRODUCT_CALCULATOR_ID, .name = TIKU_PRODUCT_CALCULATOR_NAME, .start = calc_start,
-    .stop = calc_stop, .event = calc_event, .pick = calc_pick
-};
+const tiku_app_descriptor_t tiku_calc_app = {.id = TIKU_PRODUCT_CALCULATOR_ID,
+                                             .name =
+                                                 TIKU_PRODUCT_CALCULATOR_NAME,
+                                             .start = calc_start,
+                                             .stop = calc_stop,
+                                             .event = calc_event,
+                                             .pick = calc_pick};
 #ifdef TIKU_APP_SO
 /** @brief The one symbol a loader looks for; see tiku_app.h. */
 const tiku_app_export_t tiku_app_v1 = {
     TIKU_APP_ABI, (uint32_t)sizeof(tiku_app_descriptor_t), &tiku_calc_app
 };
 #endif
+
+/** @brief Copy the calculator's current native model without manufacturing input gestures. */
+static tiku_msg_t *resource_value(calc_t *app)
+{
+ tiku_msg_t *value=tiku_app_resource_object(0);int bad=0;
+ bad |= tiku_app_resource_member(
+     value, "display",
+     tiku_resource_value_string(TIKU_RESOURCE_TEXT, app->model.entry));
+ bad |= tiku_app_resource_member(
+     value, "error",
+     tiku_resource_value_integer(TIKU_RESOURCE_BOOLEAN, app->model.error));
+ char accumulator[64];
+ snprintf(accumulator, sizeof accumulator, "%.17g", app->model.acc);
+ bad |= tiku_app_resource_member(
+     value, "accumulator",
+     tiku_resource_value_string(TIKU_RESOURCE_TEXT, accumulator));
+ bad |= tiku_app_resource_member(
+     value, "operation",
+     tiku_resource_value_integer(TIKU_RESOURCE_INTEGER, app->model.op));
+ bad |= tiku_app_resource_member(
+     value, "fresh",
+     tiku_resource_value_integer(TIKU_RESOURCE_BOOLEAN, app->model.fresh));
+ if(bad){tiku_msg_free(value);return NULL;}return value;
+}
+/** @brief Capture native calculation state and its optimistic input precondition. */
+static tiku_resource_error_t resource_capture(void *state,
+                                              tiku_app_resources_t *owner,
+                                              const char *path,
+                                              tiku_resource_snapshot_t *out)
+{
+ (void)owner;if(strcmp(path,"calculation"))return TIKU_RESOURCE_UNSUPPORTED;
+ tiku_msg_t *value = resource_value(state);
+ char token[65];
+ if (!value || tiku_app_resource_token(value, token) ||
+     tiku_app_resource_member(
+         value, "context",
+         tiku_resource_value_string(TIKU_RESOURCE_TEXT, token))) {
+     tiku_msg_free(value);
+     return TIKU_RESOURCE_NO_MEMORY;
+ }
+ return tiku_app_resource_snapshot(out, value, "observed")
+            ? TIKU_RESOURCE_NO_MEMORY
+            : 0;
+}
+/** @brief Enumerate native state and the calculator's existing input controller. */
+static int resource_catalog(void *state, tiku_app_resources_t *owner,
+                            size_t index, tiku_resource_initial_t *out)
+{
+    if (index > 1)
+        return 0;
+    if (!index) {
+        out->spec =
+            (tiku_resource_spec_t){.path = "calculation",
+                                   .kind = TIKU_RESOURCE_STATE,
+                                   .schema_version = 1,
+                                   .schema = {.type = TIKU_RESOURCE_OBJECT},
+                                   .persistence = "none"};
+        return resource_capture(state, owner, "calculation", &out->initial)
+                   ? -1
+                   : 1;
+    }
+    return tiku_app_resource_initial(out, "commands/key", TIKU_RESOURCE_ACTION,
+                                     TIKU_RESOURCE_OBJECT,
+                                     tiku_app_resource_object(0));
+}
+/** @brief Recheck native calculation state before forwarding one validated input. */
+static tiku_resource_error_t
+resource_change(void *state, tiku_app_resources_t *owner, const char *path,
+                const tiku_msg_t *value, int invoke,
+                tiku_resource_snapshot_t *out, tiku_resource_effect_t *effect)
+{
+    if (!invoke)
+        return TIKU_RESOURCE_UNSUPPORTED;
+    calc_t *app = state;
+    char expected[65], actual[65];
+    tiku_msg_t *current = resource_value(app);
+    int error = !current || tiku_app_resource_token(current, actual);
+    tiku_msg_free(current);
+    if (error)
+        return TIKU_RESOURCE_UNAVAILABLE;
+    if (!tiku_app_resource_text(value, "context", expected, sizeof expected))
+        return TIKU_RESOURCE_VALUE;
+    if (strcmp(expected, actual))
+        return TIKU_RESOURCE_STALE;
+    if (strcmp(path, "commands/key"))
+        return TIKU_RESOURCE_UNSUPPORTED;
+    const char *keys[] = {"context", "key"};
+    char key[2];
+    if (!tiku_app_resource_keys(value, keys, 2) ||
+        !tiku_app_resource_text(value, "key", key, sizeof key) || !key[0] ||
+        !strchr("0123456789.+-*/=%ncb", key[0]))
+        return TIKU_RESOURCE_VALUE;
+    calc_action(app, CALC_KEY + (unsigned char)key[0]);
+    *effect = TIKU_RESOURCE_EFFECT_PARTIAL;
+    return resource_capture(state, owner, "calculation", out);
+}
+/** @brief Optional versioned native application resource callbacks. */
+__attribute__((visibility("default")))
+const tiku_app_resource_export_t tiku_app_resources_v1 = {
+    .version = 1,
+    .size = sizeof(tiku_app_resource_export_t),
+    .catalog = resource_catalog,
+    .capture = resource_capture,
+    .change = resource_change};

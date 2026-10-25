@@ -54,8 +54,15 @@ static int start(void **state, const tiku_app_services_t *services)
         char directory[4096];
         const char *base = getenv("XDG_CONFIG_HOME");
         int n;
-        if (base && base[0] == '/') n = snprintf(directory,sizeof directory,TIKU_PRODUCT_CIRCUIT_CONFIG_PATH,base);
-        else { base = getenv("HOME"); n = snprintf(directory,sizeof directory,TIKU_PRODUCT_CIRCUIT_HOME_CONFIG_PATH,base ? base : ""); }
+        if (base && base[0] == '/')
+            n = snprintf(directory, sizeof directory,
+                         TIKU_PRODUCT_CIRCUIT_CONFIG_PATH, base);
+        else {
+            base = getenv("HOME");
+            n = snprintf(directory, sizeof directory,
+                         TIKU_PRODUCT_CIRCUIT_HOME_CONFIG_PATH,
+                         base ? base : "");
+        }
         if (base && base[0] == '/' && n > 0 && (size_t)n < sizeof directory)
             tiku_circuitview_settings(a->viewer,directory);
         tiku_circuitview_picker(a->viewer,
@@ -143,12 +150,66 @@ static void picked(void *state, uint32_t id, const char *path)
     }
 }
 
-static const tiku_app_descriptor_t descriptor = {
-    .id = TIKU_PRODUCT_CIRCUIT_ID, .name = TIKU_PRODUCT_CIRCUIT_NAME, .start = start, .stop = stop,
-    .tick = tick, .event_in = event, .pick = pick, .picked = picked,
-    .closed = closed
-};
+static const tiku_app_descriptor_t descriptor = {.id = TIKU_PRODUCT_CIRCUIT_ID,
+                                                 .name =
+                                                     TIKU_PRODUCT_CIRCUIT_NAME,
+                                                 .start = start,
+                                                 .stop = stop,
+                                                 .tick = tick,
+                                                 .event_in = event,
+                                                 .pick = pick,
+                                                 .picked = picked,
+                                                 .closed = closed};
 /** @brief The one symbol a loader looks for; see tiku_app.h. */
 __attribute__((visibility("default"))) const tiku_app_export_t tiku_app_v1 = {
     TIKU_APP_ABI, sizeof(tiku_app_descriptor_t), &descriptor
 };
+/** @brief Borrow current document facts from the application's native viewer. */
+static vr_document_t resource_document(void *state)
+{
+    circuit_app_t *app = state;
+    vr_document_t document = tiku_circuitview_resource_document(app->viewer);
+    document.window =
+        tiku_window_app_id(app->host, tiku_circuitview_handle(app->viewer));
+    return document;
+}
+/** @brief Enumerate the native document's current resource schema. */
+static int resource_catalog(void *state, tiku_app_resources_t *owner,
+                            size_t index, tiku_resource_initial_t *out)
+{
+    vr_document_t document = resource_document(state);
+    return vr_catalog(owner, &document, index, out);
+}
+/** @brief Copy a public native document observation on its owner thread. */
+static tiku_resource_error_t resource_capture(void *state,
+                                              tiku_app_resources_t *owner,
+                                              const char *path,
+                                              tiku_resource_snapshot_t *out)
+{
+    vr_document_t document = resource_document(state);
+    return vr_capture(owner, &document, path, out);
+}
+/** @brief Use the native viewer's supported document controller. */
+static tiku_resource_error_t
+resource_change(void *state, tiku_app_resources_t *owner, const char *path,
+                const tiku_msg_t *value, int invoke,
+                tiku_resource_snapshot_t *out, tiku_resource_effect_t *effect)
+{
+    vr_document_t document = resource_document(state);
+    return vr_change(owner, &document, path, value, invoke, out, effect);
+}
+/** @brief Rebuild document schemas after the native viewer adopts another source. */
+static uint64_t resource_revision(void *state)
+{
+ vr_document_t d=resource_document(state);
+ return d.identity*UINT64_C(1099511628211)+d.generation;
+}
+/** @brief Optional versioned native application resource callbacks. */
+__attribute__((visibility("default")))
+const tiku_app_resource_export_t tiku_app_resources_v1 = {
+    .version = 1,
+    .size = sizeof(tiku_app_resource_export_t),
+    .catalog_revision = resource_revision,
+    .catalog = resource_catalog,
+    .capture = resource_capture,
+    .change = resource_change};

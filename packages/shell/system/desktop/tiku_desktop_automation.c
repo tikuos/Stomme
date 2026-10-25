@@ -57,7 +57,11 @@ sync_addons(desktop_t *app, int force)
     }
 }
 
-void desktop_script_request(desktop_t *app,folder_t *folder,const tiku_trk_req_t *req,tiku_trk_rep_t *rep)
+/** @brief Dispatch a native file-manager script through its current folder
+ * owner.
+ */
+void desktop_script_request(desktop_t *app, folder_t *folder,
+                            const tiku_trk_req_t *req, tiku_trk_rep_t *rep)
 {
     int i;
     memset(rep,0,sizeof *rep);

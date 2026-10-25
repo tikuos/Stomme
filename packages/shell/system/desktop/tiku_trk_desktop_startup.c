@@ -483,35 +483,71 @@ void desktop_startup_destroy(desktop_t *app)
     app->startup = NULL;
 }
 
+/** @brief Return the native startup catalog count, or zero without its owner.
+ */
 int desktop_startup_count(const desktop_t *app)
 {
     return app->startup ? app->startup->count : 0;
 }
 
+/** @brief Copy a native startup policy or application row as an owned typed
+ * object.
+ */
 tiku_msg_t *desktop_startup_observe(desktop_t *app, int index)
 {
     struct desktop_startup *p = app->startup;
     tiku_msg_t *out = trk_value_container("object"); int bad = 0;
     if (!p || index > p->count) { tiku_msg_free(out); return NULL; }
     if (index <= 0) {
-        bad |= trk_value_member(out, "kind", tiku_resource_value_string(TIKU_RESOURCE_TEXT,"policy"));
-        bad |= trk_value_member(out, "restore_folders", tiku_resource_value_integer(TIKU_RESOURCE_BOOLEAN,p->saved.restore));
-        bad |= trk_value_member(out, "fallback_folders", tiku_resource_value_integer(TIKU_RESOURCE_BOOLEAN,p->saved.fallback));
-        bad |= trk_value_member(out, "application_count", tiku_resource_value_integer(TIKU_RESOURCE_INTEGER,p->count));
+        bad |= trk_value_member(
+            out, "kind",
+            tiku_resource_value_string(TIKU_RESOURCE_TEXT, "policy"));
+        bad |= trk_value_member(out, "restore_folders",
+                                tiku_resource_value_integer(
+                                    TIKU_RESOURCE_BOOLEAN, p->saved.restore));
+        bad |= trk_value_member(out, "fallback_folders",
+                                tiku_resource_value_integer(
+                                    TIKU_RESOURCE_BOOLEAN, p->saved.fallback));
+        bad |= trk_value_member(
+            out, "application_count",
+            tiku_resource_value_integer(TIKU_RESOURCE_INTEGER, p->count));
         if (index < 0) {
-            bad |= trk_value_member(out, "safe_mode_at_boot", tiku_resource_value_integer(TIKU_RESOURCE_BOOLEAN,app->resource_safe_mode));
-            bad |= trk_value_member(out, "restore_at_boot", tiku_resource_value_integer(TIKU_RESOURCE_BOOLEAN,app->resource_boot_restore));
-            bad |= trk_value_member(out, "fallback_at_boot", tiku_resource_value_integer(TIKU_RESOURCE_BOOLEAN,app->resource_boot_fallback));
+            bad |= trk_value_member(
+                out, "safe_mode_at_boot",
+                tiku_resource_value_integer(TIKU_RESOURCE_BOOLEAN,
+                                            app->resource_safe_mode));
+            bad |= trk_value_member(
+                out, "restore_at_boot",
+                tiku_resource_value_integer(TIKU_RESOURCE_BOOLEAN,
+                                            app->resource_boot_restore));
+            bad |= trk_value_member(
+                out, "fallback_at_boot",
+                tiku_resource_value_integer(TIKU_RESOURCE_BOOLEAN,
+                                            app->resource_boot_fallback));
         }
     } else {
-        start_app_t *a = &p->items[index-1]; int at = start_index(&p->saved,a->id);
+        start_app_t *a = &p->items[index - 1];
+        int at = start_index(&p->saved, a->id);
         if (at < 0 && a->legacy[0]) at = start_index(&p->saved,a->legacy);
-        bad |= trk_value_member(out, "kind", tiku_resource_value_string(TIKU_RESOURCE_TEXT,"application"));
-        bad |= trk_value_member(out, "id", tiku_resource_value_string(TIKU_RESOURCE_TEXT,a->id));
-        bad |= trk_value_member(out, "label", tiku_resource_value_string(TIKU_RESOURCE_TEXT,a->label));
-        bad |= trk_value_member(out, "path", tiku_resource_value_string(TIKU_RESOURCE_TEXT,a->path));
-        bad |= trk_value_member(out, "trusted", tiku_resource_value_integer(TIKU_RESOURCE_BOOLEAN,a->trusted));
-        bad |= trk_value_member(out, "enabled", tiku_resource_value_integer(TIKU_RESOURCE_BOOLEAN,at < 0 ? a->trusted : p->saved.choice[at].enabled));
+        bad |= trk_value_member(
+            out, "kind",
+            tiku_resource_value_string(TIKU_RESOURCE_TEXT, "application"));
+        bad |= trk_value_member(
+            out, "id", tiku_resource_value_string(TIKU_RESOURCE_TEXT, a->id));
+        bad |= trk_value_member(
+            out, "label",
+            tiku_resource_value_string(TIKU_RESOURCE_TEXT, a->label));
+        bad |= trk_value_member(
+            out, "path",
+            tiku_resource_value_string(TIKU_RESOURCE_TEXT, a->path));
+        bad |= trk_value_member(
+            out, "trusted",
+            tiku_resource_value_integer(TIKU_RESOURCE_BOOLEAN, a->trusted));
+        bad |= trk_value_member(
+            out, "enabled",
+            tiku_resource_value_integer(TIKU_RESOURCE_BOOLEAN,
+                                        at < 0 ? a->trusted
+                                               : p->saved.choice[at].enabled));
     }
     if (bad) { tiku_msg_free(out); return NULL; }
     return out;

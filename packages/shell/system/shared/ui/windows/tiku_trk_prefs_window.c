@@ -123,10 +123,12 @@ draw(tiku_window_t *window, tiku_surface_t *surface,
         button.y = content.y + y;
         button.w = width;
         button.h = height;
-        tiku_ui_button(surface, button, i ? tiku_str("button.revert") : tiku_str("button.defaults"),
-                            (enabled ? 0u : TIKU_S_DISABLED) |
-                            (tiku_press_held(&controller->press, i + 1)
-                                 ? TIKU_S_PRESSED : 0u));
+        tiku_ui_button(
+            surface, button,
+            i ? tiku_str("button.revert") : tiku_str("button.defaults"),
+            (enabled ? 0u : TIKU_S_DISABLED) |
+                (tiku_press_held(&controller->press, i + 1) ? TIKU_S_PRESSED
+                                                            : 0u));
     }
 }
 

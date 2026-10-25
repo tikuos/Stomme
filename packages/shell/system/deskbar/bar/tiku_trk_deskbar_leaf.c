@@ -256,9 +256,12 @@ db_build_leaf(tiku_trk_deskbar_t *db)
 
         for (i = 0; i < slots; i++) {
             const char *prefix = tiku_mount_prefix_at(db->backend, i);
+            tiku_backend_t *store = tiku_mount_at(db->backend, i);
             const char *leaf;
 
             if (prefix == NULL ||
+                (store && store->ops &&
+                 !strcmp(store->ops->name, "stomme-resources")) ||
                 (prefix[0] == '/' && prefix[1] == '\0')) {
                 continue;       /* the root has no row of its own */
             }

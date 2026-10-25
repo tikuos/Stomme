@@ -223,8 +223,8 @@ browser_key_edit(app_t *a, const tiku_event_t *event, unsigned key,
             char made[TIKU_PATH_MAX], err[200];
 
             if (a->fs != NULL &&
-                tiku_fs_new_folder(a->fs, tiku_trk_poseview_path(a->view), made, sizeof made, err,
-                                       sizeof err) == 0) {
+                tiku_fs_new_folder(a->fs, tiku_trk_poseview_path(a->view),
+                                   made, sizeof made, err, sizeof err) == 0) {
                 const char *slash = strrchr(made, '/');
 
                 snprintf(a->status, sizeof a->status, "created '%.180s'",

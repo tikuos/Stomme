@@ -42,6 +42,15 @@ def source_files(root):
     return files
 
 
+def identity_header(data):
+    """Expose the selected SDK identity, foundation content revision and native host."""
+    fields = [('TIKU_SDK_IDENTITY', 'sdk_identity'),
+              ('TIKU_FOUNDATION_REVISION', 'foundation_revision'),
+              ('TIKU_SDK_HOST', 'host')]
+    return ''.join('#define ' + macro + ' ' + json.dumps(data[key]) + '\n'
+                   for macro, key in fields).encode()
+
+
 def write_changed(path, data):
     """Preserve a generated file's timestamp when its bytes match."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -182,7 +191,7 @@ def compose(root, product, output, host, flags, allow_dirty=False):
                          development=actual != lock['source_sha256'], source_root=str(root),
                          source_revision=source_revision(root))
     write_changed(output / 'identity.json', (json.dumps(identity_data, indent=2) + '\n').encode())
-    write_changed(output / 'tiku_sdk_identity.h', ('#define TIKU_SDK_IDENTITY "' + identity + '"\n').encode())
+    write_changed(output / 'tiku_sdk_identity.h', identity_header(identity_data))
     write_changed(output / 'sources.mk', ''.join(lines).encode())
     inventory = {name: dict(owner=owners[name], kit=file_kit(name), source=str(path), sha256=hashlib.sha256(path.read_bytes()).hexdigest())
                  for name, path in sorted(selected.items()) if path.suffix in {'.c', '.h', '.inl', '.m'}}

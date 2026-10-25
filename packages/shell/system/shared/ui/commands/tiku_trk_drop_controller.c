@@ -631,7 +631,8 @@ tiku_trk_drop_controller_execute_into(tiku_trk_drop_controller_t *controller,
         return;
     }
     if (in_view && controller->drag->payload_size > 0u &&
-        (strcmp(controller->drag->payload_type, "application/x-rgb-color") == 0 ||
+        (strcmp(controller->drag->payload_type, "application/x-rgb-color") ==
+             0 ||
          strcmp(controller->drag->payload_type, "text/x-color") == 0)) {
         tiku_trk_color_t color;
 

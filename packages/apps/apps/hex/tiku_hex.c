@@ -5,6 +5,7 @@
 #include "tiku_app_product.h"
 #include "tiku_hex_model.h"
 #include "tiku_app.h"
+#include "tiku_viewer_resources.h"
 #include "tiku_dialog.h"
 #include "tiku_field_event.h"
 #include "tiku_text_layout_paint.h"
@@ -62,23 +63,34 @@ static void hex_controls(hex_app_t *p)
         if (i == 1) enabled = p->model.changed != 0;
         if (i == 2 || i == 3) enabled &= p->model.bytes != NULL;
         if (i == 4) enabled &= !p->readonly && p->model.position > 0;
-        if (i == 5) enabled &= !p->readonly && p->model.position < p->model.used;
+        if (i == 5)
+            enabled &= !p->readonly && p->model.position < p->model.used;
         if (i == 7) enabled &= p->model.size > 0;
-        tiku_dialog_add(&p->dialog, H_OPEN + i, (tiku_rect_t){xs[i], 14, ws[i], 28},
+        tiku_dialog_add(&p->dialog, H_OPEN + i,
+                        (tiku_rect_t){xs[i], 14, ws[i], 28},
                         TIKU_DIALOG_BUTTON, enabled);
     }
     for (int i = 0; i < 2; i++) tiku_dialog_add(&p->dialog, H_OFFSET + i,
         hex_field(i), TIKU_DIALOG_INPUT, !p->pending);
-    tiku_dialog_add(&p->dialog, H_GO, (tiku_rect_t){220, 58, 58, 28}, TIKU_DIALOG_BUTTON, !p->pending);
-    tiku_dialog_add(&p->dialog, H_FIND, (tiku_rect_t){653, 58, 150, 28}, TIKU_DIALOG_BUTTON, !p->pending);
-    tiku_dialog_add(&p->dialog, H_GRID, hex_grid(p), TIKU_DIALOG_INPUT, !p->pending);
+    tiku_dialog_add(&p->dialog, H_GO, (tiku_rect_t){220, 58, 58, 28},
+                    TIKU_DIALOG_BUTTON, !p->pending);
+    tiku_dialog_add(&p->dialog, H_FIND, (tiku_rect_t){653, 58, 150, 28},
+                    TIKU_DIALOG_BUTTON, !p->pending);
+    tiku_dialog_add(&p->dialog, H_GRID, hex_grid(p), TIKU_DIALOG_INPUT,
+                    !p->pending);
     int y = p->height - 42;
-    tiku_dialog_add(&p->dialog, H_PREV, (tiku_rect_t){16, y, 92, 28}, TIKU_DIALOG_BUTTON, !p->pending && p->top > 0);
-    tiku_dialog_add(&p->dialog, H_NEXT, (tiku_rect_t){116, y, 92, 28}, TIKU_DIALOG_BUTTON,
+    tiku_dialog_add(&p->dialog, H_PREV, (tiku_rect_t){16, y, 92, 28},
+                    TIKU_DIALOG_BUTTON, !p->pending && p->top > 0);
+    tiku_dialog_add(&p->dialog, H_NEXT, (tiku_rect_t){116, y, 92, 28},
+                    TIKU_DIALOG_BUTTON,
                     !p->pending && (p->top + HEX_ROWS) * 16 < p->model.size);
     if (p->pending) {
-        tiku_dialog_add(&p->dialog, H_CANCEL, (tiku_rect_t){p->width - 266, y, 118, 28}, TIKU_DIALOG_BUTTON, 1);
-        tiku_dialog_add(&p->dialog, H_DISCARD, (tiku_rect_t){p->width - 140, y, 124, 28}, TIKU_DIALOG_BUTTON, 1);
+        tiku_dialog_add(&p->dialog, H_CANCEL,
+                        (tiku_rect_t){p->width - 266, y, 118, 28},
+                        TIKU_DIALOG_BUTTON, 1);
+        tiku_dialog_add(&p->dialog, H_DISCARD,
+                        (tiku_rect_t){p->width - 140, y, 124, 28},
+                        TIKU_DIALOG_BUTTON, 1);
     }
     tiku_dialog_end(&p->dialog);
 }
@@ -93,7 +105,8 @@ static void hex_menus(hex_app_t *p)
     const unsigned keys[] = {'o', 's', 0, 'w'};
     menus.menu[0].nitem = 4;
     for (int i = 0; i < 4; i++) {
-        snprintf(menus.menu[0].item[i].label, sizeof menus.menu[0].item[i].label, "%s", labels[i]);
+        snprintf(menus.menu[0].item[i].label,
+                 sizeof menus.menu[0].item[i].label, "%s", labels[i]);
         menus.menu[0].item[i].command = commands[i];
         menus.menu[0].item[i].sc = (char)keys[i];
         menus.menu[0].item[i].mods = keys[i] ? TIKU_MOD_CMD : 0;
@@ -125,10 +138,12 @@ static void hex_inspect(hex_app_t *p, int x, int y)
             little |= (uint32_t)b[i] << (8 * i); big = (big << 8) | b[i];
         }
         int row = y + 66 + (n - 2) * 40;
-        if (left >= (size_t)n) snprintf(text, sizeof text, "LE%d: %u", n * 8, little);
+        if (left >= (size_t)n)
+            snprintf(text, sizeof text, "LE%d: %u", n * 8, little);
         else snprintf(text, sizeof text, "LE%d: —", n * 8);
         hex_line(p, (tiku_rect_t){x, row, p->width - x - 20, 26}, text);
-        if (left >= (size_t)n) snprintf(text, sizeof text, "BE%d: %u", n * 8, big);
+        if (left >= (size_t)n)
+            snprintf(text, sizeof text, "BE%d: %u", n * 8, big);
         else snprintf(text, sizeof text, "BE%d: —", n * 8);
         hex_line(p, (tiku_rect_t){x, row + 26, p->width - x - 20, 26}, text);
     }
@@ -146,7 +161,8 @@ static void hex_bytes(hex_app_t *p)
     tiku_text(p->surface, f, 16, 108, "Offset", TIKU_C_TEXT);
     for (int col = 0; col < 16; col++) {
         char text[4]; snprintf(text, sizeof text, "%02X", col);
-        tiku_text(p->surface, f, hx + col * 3 * p->cell, 108, text, TIKU_C_TEXT);
+        tiku_text(p->surface, f, hx + col * 3 * p->cell, 108, text,
+                  TIKU_C_TEXT);
     }
     tiku_text(p->surface, f, ax, 108, "ASCII", TIKU_C_TEXT);
     for (int row = 0; row < HEX_ROWS; row++) {
@@ -171,12 +187,17 @@ static void hex_bytes(hex_app_t *p)
             text[0] = b >= 32 && b < 127 ? (char)b : '.'; text[1] = 0;
             tiku_text(p->surface, f, ascii.x, y + f->ascent, text, color);
             if (b != p->model.original[at])
-                tiku_fill(p->surface, (tiku_rect_t){hex.x, y + p->row - 3, hex.w, 2}, color);
+                tiku_fill(p->surface,
+                          (tiku_rect_t){hex.x, y + p->row - 3, hex.w, 2},
+                          color);
         }
     }
-    if (!p->model.size) hex_line(p, (tiku_rect_t){24, g.y + 20, g.w - 32, 30},
-        p->model.bytes ? "Empty file (0 bytes). This editor preserves file length." :
-        "Open a local binary file or device dump. Files start read-only.");
+    if (!p->model.size)
+        hex_line(
+            p, (tiku_rect_t){24, g.y + 20, g.w - 32, 30},
+            p->model.bytes
+                ? "Empty file (0 bytes). This editor preserves file length."
+                : "Open a local binary file or device dump. Files start read-only.");
     hex_inspect(p, ax + 16 * p->cell + 22, g.y + 8);
     if (tiku_dialog_focused(&p->dialog, H_GRID))
         tiku_frame(p->surface, tiku_inset(g, 2), TIKU_C_FOCUS);
@@ -198,12 +219,19 @@ static const char *hex_foot(hex_app_t *p)
 static void hex_paint(hex_app_t *p)
 {
     hex_controls(p);
-    tiku_fill(p->surface, (tiku_rect_t){0, 0, p->width, p->height}, TIKU_C_PANEL);
+    tiku_fill(p->surface, (tiku_rect_t){0, 0, p->width, p->height},
+              TIKU_C_PANEL);
     hex_bytes(p);
     hex_line(p, (tiku_rect_t){16, 58, 56, 28}, "Offset:");
     hex_line(p, (tiku_rect_t){302, 58, 70, 28}, "Hex find:");
-    const char *labels[] = {"Open…", "Save", "Save As…", p->readonly ? "Read-only" : "Editing bytes",
-        "Undo", "Redo", p->ascii ? "Input: ASCII" : "Input: Hex", "Copy"};
+    const char *labels[] = {"Open…",
+                            "Save",
+                            "Save As…",
+                            p->readonly ? "Read-only" : "Editing bytes",
+                            "Undo",
+                            "Redo",
+                            p->ascii ? "Input: ASCII" : "Input: Hex",
+                            "Copy"};
     for (int i = 0; i < p->dialog.count; i++) {
         tiku_dialog_control_t *c = &p->dialog.control[i];
         unsigned flags = (c->enabled ? 0 : TIKU_S_DISABLED) |
@@ -228,13 +256,16 @@ static void hex_paint(hex_app_t *p)
         p->model.cursor, p->model.cursor, p->model.bytes[p->model.cursor],
         p->model.bytes[p->model.cursor], p->model.size, p->model.changed,
         p->high >= 0 ? "  |  First hex digit entered; type the second." : "");
-    else snprintf(text, sizeof text, "0 bytes | Read-only until you enable editing");
+    else
+        snprintf(text, sizeof text,
+                 "0 bytes | Read-only until you enable editing");
     hex_line(p, (tiku_rect_t){16, p->height - 102, p->width - 32, 26}, text);
     hex_line(p, (tiku_rect_t){16, p->height - 73, p->width - 32, 26},
         hex_foot(p));
     if (!p->pending) hex_line(p, (tiku_rect_t){224, p->height - 42,
         p->width - 240, 28}, p->model.path);
-    p->services->frame(p->services->ctx, p->id, p->surface->px, p->width, p->height);
+    p->services->frame(p->services->ctx, p->id, p->surface->px, p->width,
+                       p->height);
     hex_menus(p);
 }
 
@@ -244,7 +275,9 @@ static void hex_open_file(hex_app_t *p, const char *path)
 {
     if (hex_load(&p->model, path)) {
         p->readonly = 1; p->top = 0; p->high = -1;
-        snprintf(p->status, sizeof p->status, "Opened read-only. Enable Editing bytes to modify the buffer.");
+        snprintf(
+            p->status, sizeof p->status,
+            "Opened read-only. Enable Editing bytes to modify the buffer.");
     } else snprintf(p->status, sizeof p->status, "%s", p->model.error);
 }
 
@@ -268,7 +301,8 @@ static int hex_action(hex_app_t *p, int command)
     }
     if (command == H_SAVE && p->model.changed) {
         if (hex_save(&p->model, p->model.path)) {
-            snprintf(p->status, sizeof p->status, "Saved %zu bytes.", p->model.size);
+            snprintf(p->status, sizeof p->status, "Saved %zu bytes.",
+                     p->model.size);
             int next = p->pending; p->pending = 0; p->save_failed = 0;
             if (next) return hex_action(p, next);
         } else {
@@ -281,7 +315,9 @@ static int hex_action(hex_app_t *p, int command)
     if (p->pending) return 0;
     if ((command == H_OPEN || command == H_SAVEAS) && p->services->pick) {
         p->pick_save = command == H_SAVEAS;
-        p->services->pick(p->services->ctx, p->id, p->pick_save ? TIKU_APP_PICK_SAVE : TIKU_APP_PICK_OPEN,
+        p->services->pick(p->services->ctx, p->id,
+                          p->pick_save ? TIKU_APP_PICK_SAVE
+                                       : TIKU_APP_PICK_OPEN,
                           NULL, p->pick_save ? "copy.bin" : NULL);
     } else if (command == H_MODE) { p->readonly = !p->readonly; p->high = -1; }
     else if (command == H_INPUT) { p->ascii = !p->ascii; p->high = -1; }
@@ -292,18 +328,31 @@ static int hex_action(hex_app_t *p, int command)
         if (hex_offset(p->field[0].text, p->model.size, &offset)) {
             p->model.cursor = offset; hex_reveal(p); p->high = -1;
             tiku_dialog_focus(&p->dialog, H_GRID); p->status[0] = 0;
-        } else snprintf(p->status, sizeof p->status, "Enter an offset inside the file: decimal or 0x hexadecimal.");
+        } else
+            snprintf(
+                p->status, sizeof p->status,
+                "Enter an offset inside the file: decimal or 0x hexadecimal.");
     } else if (command == H_FIND) {
         unsigned char bytes[64]; size_t n;
         if (!hex_pattern(p->field[1].text, bytes, &n))
-            snprintf(p->status, sizeof p->status, "Enter 1–64 complete hex bytes, such as 00 FF 12.");
-        else if (!hex_find(&p->model, bytes, n)) snprintf(p->status, sizeof p->status, "Byte sequence not found.");
-        else { hex_reveal(p); p->high = -1; snprintf(p->status, sizeof p->status, "Match at 0x%zX (search wraps).", p->model.cursor); }
+            snprintf(p->status, sizeof p->status,
+                     "Enter 1–64 complete hex bytes, such as 00 FF 12.");
+        else if (!hex_find(&p->model, bytes, n))
+            snprintf(p->status, sizeof p->status, "Byte sequence not found.");
+        else {
+            hex_reveal(p);
+            p->high = -1;
+            snprintf(p->status, sizeof p->status,
+                     "Match at 0x%zX (search wraps).", p->model.cursor);
+        }
     } else if (command == H_COPY && p->model.size && p->services->clip_set) {
-        char text[4]; snprintf(text, sizeof text, "%02X", p->model.bytes[p->model.cursor]);
+        char text[4];
+        snprintf(text, sizeof text, "%02X", p->model.bytes[p->model.cursor]);
         p->services->clip_set(p->services->ctx, text);
-    } else if (command == H_PREV) p->top = p->top > HEX_ROWS ? p->top - HEX_ROWS : 0;
-    else if (command == H_NEXT && (p->top + HEX_ROWS) * 16 < p->model.size) p->top += HEX_ROWS;
+    } else if (command == H_PREV)
+        p->top = p->top > HEX_ROWS ? p->top - HEX_ROWS : 0;
+    else if (command == H_NEXT && (p->top + HEX_ROWS) * 16 < p->model.size)
+        p->top += HEX_ROWS;
     return 0;
 }
 
@@ -323,8 +372,13 @@ static void hex_key(hex_app_t *p, const tiku_event_t *e)
     else if (e->key == TIKU_KEY_HOME) at = 0;
     else if (e->key == TIKU_KEY_END) at = p->model.size - 1;
     else {
-        if (p->readonly) { snprintf(p->status, sizeof p->status, "Read-only: enable Editing bytes first."); return; }
-        unsigned char ch = e->text[0] ? (unsigned char)e->text[0] : (unsigned char)e->key;
+        if (p->readonly) {
+            snprintf(p->status, sizeof p->status,
+                     "Read-only: enable Editing bytes first.");
+            return;
+        }
+        unsigned char ch =
+            e->text[0] ? (unsigned char)e->text[0] : (unsigned char)e->key;
         if (p->ascii) {
             if (ch < 32 || ch > 126 || e->text[1]) return;
             hex_replace(&p->model, at, ch);
@@ -382,20 +436,29 @@ static int hex_event(void *state, const tiku_event_t *e)
             e->key == 'c' && p->dialog.focus == H_GRID ? H_COPY : 0;
         if (p->dialog.focus == H_GRID && !command) return 0;
     }
-    if (command) { int done = hex_action(p, command); hex_paint(p); return done; }
+    if (command) {
+        int done = hex_action(p, command);
+        hex_paint(p);
+        return done;
+    }
     tiku_dialog_result_t r = tiku_dialog_event(&p->dialog, e);
     if (r.activated >= 0 && hex_action(p, r.activated)) return 1;
     if (!p->pending) {
-        if (e->type == TIKU_EVENT_POINTER_DOWN && e->button == 1) hex_pointer(p, e);
+        if (e->type == TIKU_EVENT_POINTER_DOWN && e->button == 1)
+            hex_pointer(p, e);
         if (e->type == TIKU_EVENT_WHEEL) {
             if (e->dy < 0) p->top = p->top > 3 ? p->top - 3 : 0;
             else if ((p->top + 3) * 16 < p->model.size) p->top += 3;
         }
         for (int i = 0; i < 2; i++) {
-            if (r.taken && e->type == TIKU_EVENT_KEY_DOWN && e->key != TIKU_KEY_RETURN) continue;
-            tiku_field_result_t result = tiku_field_event(&p->field[i], &p->input[i],
-                e, hex_field(i), p->dialog.focus == H_OFFSET + i);
-            if (result == TIKU_FIELD_COMMITTED) hex_action(p, i ? H_FIND : H_GO);
+            if (r.taken && e->type == TIKU_EVENT_KEY_DOWN &&
+                e->key != TIKU_KEY_RETURN)
+                continue;
+            tiku_field_result_t result =
+                tiku_field_event(&p->field[i], &p->input[i], e, hex_field(i),
+                                 p->dialog.focus == H_OFFSET + i);
+            if (result == TIKU_FIELD_COMMITTED)
+                hex_action(p, i ? H_FIND : H_GO);
         }
         if (!r.taken && e->type == TIKU_EVENT_KEY_DOWN &&
             p->dialog.focus == H_GRID &&
@@ -413,9 +476,12 @@ static void hex_picked(void *state, uint32_t window, const char *path)
     if (!path || !*path || p->pending) return;
     if (p->pick_save) {
         int ok = hex_save(&p->model, path);
-        snprintf(p->status, sizeof p->status, "%s", ok ? "Saved copy." : p->model.error);
+        snprintf(p->status, sizeof p->status, "%s",
+                 ok ? "Saved copy." : p->model.error);
     } else if (!p->model.changed) hex_open_file(p, path);
-    else snprintf(p->status, sizeof p->status, "Open cancelled: edits were made while the picker was open.");
+    else
+        snprintf(p->status, sizeof p->status,
+                 "Open cancelled: edits were made while the picker was open.");
     hex_paint(p);
 }
 
@@ -425,7 +491,8 @@ static void hex_closed(void *state, uint32_t window)
 {
     hex_app_t *p = state;
     if (window != p->id || !p->model.changed) return;
-    p->id = p->services->open(p->services->ctx, TIKU_PRODUCT_HEX_UNSAVED_TITLE, p->width, p->height);
+    p->id = p->services->open(p->services->ctx, TIKU_PRODUCT_HEX_UNSAVED_TITLE,
+                              p->width, p->height);
     p->pending = H_CLOSE; hex_paint(p);
 }
 
@@ -440,12 +507,18 @@ static int hex_start(void **state, const tiku_app_services_t *services)
     p->height = 124 + HEX_ROWS * p->row + 114;
     p->surface = tiku_surface_new(p->width, p->height, TIKU_C_PANEL);
     if (!p->surface) { free(p); return -1; }
-    p->id = services->open(services->ctx, TIKU_PRODUCT_HEX_NAME, p->width, p->height);
+    p->id = services->open(services->ctx, TIKU_PRODUCT_HEX_NAME, p->width,
+                           p->height);
     if (!p->id) { tiku_surface_free(p->surface); free(p); return -1; }
     tiku_dialog_init(&p->dialog);
-    for (int i = 0; i < 2; i++) { tiku_field_start(&p->field[i], i ? "" : "0x0"); tiku_field_input_init(&p->input[i]); }
-    if (services->startup_document) hex_open_file(p, services->startup_document);
-    if (services->help_page) services->help_page(services->ctx, "apps/hex.html");
+    for (int i = 0; i < 2; i++) {
+        tiku_field_start(&p->field[i], i ? "" : "0x0");
+        tiku_field_input_init(&p->input[i]);
+    }
+    if (services->startup_document)
+        hex_open_file(p, services->startup_document);
+    if (services->help_page)
+        services->help_page(services->ctx, "apps/hex.html");
     hex_controls(p); tiku_dialog_focus(&p->dialog, H_GRID);
     hex_paint(p); *state = p; return 0;
 }
@@ -468,8 +541,16 @@ static void hex_stop(void *state)
             }
             int ok = at == p->model.size && !fsync(fd);
             if (close(fd)) ok = 0;
-            if (ok) fprintf(stderr, TIKU_PRODUCT_HEX_TIKUHEX_UNSAVED_BYTES_RECOVERED_TO_S_N, recovery);
-            else { unlink(recovery); fprintf(stderr, TIKU_PRODUCT_HEX_TIKUHEX_RECOVERY_WRITE_FAILED_N); }
+            if (ok)
+                fprintf(
+                    stderr,
+                    TIKU_PRODUCT_HEX_TIKUHEX_UNSAVED_BYTES_RECOVERED_TO_S_N,
+                    recovery);
+            else {
+                unlink(recovery);
+                fprintf(stderr,
+                        TIKU_PRODUCT_HEX_TIKUHEX_RECOVERY_WRITE_FAILED_N);
+            }
         }
     }
     hex_free(&p->model); tiku_surface_free(p->surface); free(p);
@@ -478,17 +559,238 @@ static void hex_stop(void *state)
 /** @brief A menu pick, carried out as a button's command.
  *  @return 1 to close. */
 static int hex_pick(void *state, uint32_t window, int command)
-{ (void)window; hex_app_t *p = state; int done = hex_action(p, command); hex_paint(p); return done; }
+{
+    (void)window;
+    hex_app_t *p = state;
+    int done = hex_action(p, command);
+    hex_paint(p);
+    return done;
+}
 
 /** @brief TikuHex's descriptor, which the export below hands on. */
-const tiku_app_descriptor_t tiku_hex_app = {
-    .id = TIKU_PRODUCT_HEX_ID, .name = TIKU_PRODUCT_HEX_NAME, .start = hex_start,
-    .stop = hex_stop, .event = hex_event, .pick = hex_pick,
-    .picked = hex_picked, .closed = hex_closed
-};
+const tiku_app_descriptor_t tiku_hex_app = {.id = TIKU_PRODUCT_HEX_ID,
+                                            .name = TIKU_PRODUCT_HEX_NAME,
+                                            .start = hex_start,
+                                            .stop = hex_stop,
+                                            .event = hex_event,
+                                            .pick = hex_pick,
+                                            .picked = hex_picked,
+                                            .closed = hex_closed};
 #ifdef TIKU_APP_SO
 /** @brief The one symbol a loader looks for; see tiku_app.h. */
 const tiku_app_export_t tiku_app_v1 = {
     TIKU_APP_ABI, (uint32_t)sizeof(tiku_app_descriptor_t), &tiku_hex_app
 };
 #endif
+
+static const char *const resource_commands[] = {"save", "undo", "redo",
+                                                "replace-byte", "read-bytes"};
+/** @brief Copy native content and cursor versions for checked binary operations. */
+static tiku_msg_t *resource_selection(hex_app_t *app)
+{
+    tiku_msg_t *value = tiku_app_resource_object(0);
+    int bad = VR_COUNTER(value, "document", app->model.resource_document + 1) |
+              VR_COUNTER(value, "generation", app->model.resource_revision) |
+              VR_COUNTER(value, "cursor", app->model.cursor) |
+              VR_BOOL(value, "read_only", app->readonly) |
+              VR_INT(value, "prompt", app->pending);
+    if (bad) {
+        tiku_msg_free(value);
+        return NULL;
+    }return value;
+}
+/** @brief Capture native binary-document observations without exposing model pointers. */
+static tiku_resource_error_t resource_observe(void *state, const char *field,
+                                              tiku_msg_t **out)
+{
+ hex_app_t *app=state;tiku_msg_t *value=NULL;int bad=0;
+ if (!strcmp(field, "selection")) {
+     value = resource_selection(app);
+     char token[65];
+     if (!value || tiku_app_resource_token(value, token))
+         bad = 1;
+     else
+         bad |= VR_TEXT(value, "context", token);
+ } else if (!strcmp(field, "view")) {
+     value = tiku_app_resource_object(0);
+     bad |= VR_BOOL(value, "ascii", app->ascii);
+     bad |= VR_BOOL(value, "read_only", app->readonly);
+     bad |= VR_COUNTER(value, "top", app->top);
+ } else if (!strcmp(field, "objects")) {
+     value = tiku_app_resource_object(0);
+     bad |= VR_COUNTER(value, "bytes", app->model.size);
+     bad |= VR_INT(value, "undo", app->model.position);
+     bad |= VR_INT(value, "redo", app->model.used - app->model.position);
+ } else
+     return TIKU_RESOURCE_UNSUPPORTED;
+ if (bad) {
+     tiku_msg_free(value);
+     return TIKU_RESOURCE_UNAVAILABLE;
+ }
+ *out = value;
+ return 0;
+}
+/** @brief Enumerate the native binary editor's supported document commands. */
+static int resource_option(void *state, size_t index,
+                           tiku_resource_initial_t *out)
+{
+    (void)state;
+    if (index >= 5)
+        return 0;
+    static char path[80];
+    snprintf(path, sizeof path, "commands/%s", resource_commands[index]);
+    return tiku_app_resource_initial(out, path, TIKU_RESOURCE_ACTION,
+                                     TIKU_RESOURCE_OBJECT,
+                                     tiku_app_resource_object(0));
+}
+/** @brief Preserve native save conflicts, history and readonly restrictions for binary edits. */
+static tiku_resource_error_t resource_apply(void *state, const char *path,
+                                            const tiku_msg_t *value,
+                                            int invoke,
+                                            tiku_resource_snapshot_t *out,
+                                            tiku_resource_effect_t *effect)
+{
+    hex_app_t *app = state;
+    if (strncmp(path, "commands/", 9) || !invoke)
+        return TIKU_RESOURCE_UNSUPPORTED;
+    const char *name = path + 9;
+    size_t command;
+    for (command = 0; command < 5; command++)
+        if (!strcmp(name, resource_commands[command]))
+            break;
+    if (command == 5)
+        return TIKU_RESOURCE_UNSUPPORTED;
+    char expected[65], actual[65];
+    tiku_msg_t *selection = resource_selection(app);
+    int bad = !selection || tiku_app_resource_token(selection, actual);
+    tiku_msg_free(selection);
+    if (bad)
+        return TIKU_RESOURCE_UNAVAILABLE;
+    if (!tiku_app_resource_text(value, "context", expected, sizeof expected))
+        return TIKU_RESOURCE_VALUE;
+    if (strcmp(expected, actual))
+        return TIKU_RESOURCE_STALE;
+    if (app->pending)
+        return TIKU_RESOURCE_BUSY;
+    if (!app->model.bytes)
+        return TIKU_RESOURCE_UNAVAILABLE;
+    const char *plain[] = {"context"},
+               *replacement[] = {"context", "offset", "byte"},
+               *reading[] = {"context", "offset", "limit"};
+    if (!tiku_app_resource_keys(value,
+                                command < 3    ? plain
+                                : command == 3 ? replacement
+                                               : reading,
+                                command < 3 ? 1 : 3))
+        return TIKU_RESOURCE_VALUE;
+    tiku_msg_t *result = tiku_app_resource_object(0);
+    int64_t offset = 0, n = 0;
+    if (command < 4 && app->readonly) {
+        tiku_msg_free(result);
+        return TIKU_RESOURCE_READ_ONLY;
+    }
+    if (command == 0) {
+        if (!hex_save(&app->model, app->model.path)) {
+            tiku_msg_free(result);
+            return TIKU_RESOURCE_APPLY_FAILED;
+        }
+    } else if (command < 3)
+        (void)hex_undo(&app->model, command == 2);
+    else if (command == 3) {
+        if (!app->model.size ||
+            !tiku_app_resource_integer(value, "offset", 0, app->model.size - 1,
+                                       &offset) ||
+            !tiku_app_resource_integer(value, "byte", 0, 255, &n)) {
+            tiku_msg_free(result);
+            return TIKU_RESOURCE_VALUE;
+        }
+        (void)hex_replace(&app->model, (size_t)offset, (unsigned char)n);
+    } else {
+        if (!tiku_app_resource_integer(value, "offset", 0, app->model.size,
+                                       &offset) ||
+            !tiku_app_resource_integer(value, "limit", 1, 256, &n)) {
+            tiku_msg_free(result);
+            return TIKU_RESOURCE_VALUE;
+        }
+        size_t count = app->model.size - (size_t)offset;
+        if (count > (size_t)n)
+            count = n;
+        char bytes[513];
+        for (size_t i = 0; i < count; i++)
+            snprintf(bytes + 2 * i, 3, "%02x", app->model.bytes[offset + i]);
+        bytes[2 * count] = 0;
+        bad |= VR_TEXT(result, "hex", bytes);
+        bad |= VR_COUNTER(result, "next", offset + count);
+        bad |= VR_BOOL(result, "eof", offset + count == app->model.size);
+    }
+    if (command < 4) {
+        *effect = TIKU_RESOURCE_EFFECT_PARTIAL;
+        hex_reveal(app);
+        hex_paint(app);
+    }
+    bad |= VR_BOOL(result, "dirty", app->model.changed != 0);
+    bad |= VR_TEXT(result, "command", name);
+    if (bad) {
+        tiku_msg_free(result);
+        return TIKU_RESOURCE_NO_MEMORY;
+    }
+    return tiku_app_resource_snapshot(out, result, "native_complete")
+               ? TIKU_RESOURCE_NO_MEMORY
+               : 0;
+}
+/** @brief Borrow current native binary model facts for document registration. */
+static vr_document_t resource_document(void *state)
+{
+    hex_app_t *app = state;
+    return (vr_document_t){.identity = app->model.resource_document + 1,
+                           .generation = app->model.resource_revision,
+                           .window = app->id,
+                           .path = app->model.path,
+                           .type = "application/octet-stream",
+                           .available = app->model.bytes != NULL,
+                           .dirty = app->model.changed != 0,
+                           .read_only = app->readonly,
+                           .controller = app,
+                           .observe = resource_observe,
+                           .option = resource_option,
+                           .change = resource_apply};
+}
+/** @brief Enumerate native binary-document observations and commands. */
+static int resource_catalog(void *state, tiku_app_resources_t *owner,
+                            size_t index, tiku_resource_initial_t *out)
+{
+    vr_document_t document = resource_document(state);
+    return vr_catalog(owner, &document, index, out);
+}
+/** @brief Copy public native binary model facts on its owner thread. */
+static tiku_resource_error_t resource_capture(void *state,
+                                              tiku_app_resources_t *owner,
+                                              const char *path,
+                                              tiku_resource_snapshot_t *out)
+{
+    vr_document_t document = resource_document(state);
+    return vr_capture(owner, &document, path, out);
+}
+/** @brief Forward current document requests to checked native controllers. */
+static tiku_resource_error_t
+resource_change(void *state, tiku_app_resources_t *owner, const char *path,
+                const tiku_msg_t *value, int invoke,
+                tiku_resource_snapshot_t *out, tiku_resource_effect_t *effect)
+{
+    vr_document_t document = resource_document(state);
+    return vr_change(owner, &document, path, value, invoke, out, effect);
+}
+/** @brief Rebuild document schemas after successful native file replacement. */
+static uint64_t resource_revision(void *state)
+{
+    return resource_document(state).identity;
+}
+/** @brief Optional versioned native application resource callbacks. */
+__attribute__((visibility("default")))
+const tiku_app_resource_export_t tiku_app_resources_v1 = {
+    .version = 1,
+    .size = sizeof(tiku_app_resource_export_t),
+    .catalog_revision = resource_revision,
+    .catalog = resource_catalog,
+    .capture = resource_capture,
+    .change = resource_change};

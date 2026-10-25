@@ -169,16 +169,13 @@ tracker_run(int argc, char **argv)
     desktop_options_t opt;
     desktop_loop_t lp;
     int code;
-
     /* The interface strings load first: the language comes from the
      * environment, with the built-in English as the fallback. */
     (void)tiku_strings_init(NULL, NULL);
     memset(&opt, 0, sizeof opt);
 #if TIKU_SHELL_BOARD_SERVICES
-
     opt.baud = 115200;
 #endif
-
     opt.argv0 = argv[0];
     memset(&lp, 0, sizeof lp);
     lp.started_at = tiku_trk_now();
@@ -205,7 +202,6 @@ tracker_run(int argc, char **argv)
         tiku_trk_resource_session_close(app.resource_session);
         return code;
     }
-
     /* A watchdog reports a turn of the loop that never ends; each turn
      * beats it. */
         tiku_watch_install(0);
@@ -219,13 +215,11 @@ tracker_run(int argc, char **argv)
         for (;;) {
             tiku_event_t ev;
             int have = 0;
-
             memset(&ev, 0, sizeof ev);
             if (lp.sc != NULL) {
                 tiku_trk_script_adapter_result_t script_result =
                     tiku_trk_script_adapter_next(&app.script_adapter, lp.sc,
                                                  &ev);
-
                 if (script_result == TIKU_TRK_SCRIPT_ADAPTER_STOP) {
                     app.running = 0;
                     break;
@@ -257,6 +251,7 @@ tracker_run(int argc, char **argv)
                  * dropped. */
                 continue;
             }
+            desktop_host_vfs_event(&app,&ev);
             if (ev.type != TIKU_EVENT_TEXT_INPUT)
                 (void)tiku_text_input_event(&app.legacy_commit, &ev);
             if (ev.type == TIKU_EVENT_KEY_DOWN ||
@@ -266,16 +261,13 @@ tracker_run(int argc, char **argv)
                 tiku_trk_loop_note_activity(app.loop);
             switch (ev.type) {
 #if TIKU_SHELL_REMOTE_SERVICES
-
             case TIKU_EVENT_PREEDIT:
             case TIKU_EVENT_TEXT_INPUT:
                 desktop_text_input(&app, &ev);
 #else
-
             case TIKU_EVENT_TEXT_INPUT:
                 desktop_text_input(&app, &ev);
 #endif
-
                 break;
             case TIKU_EVENT_CLIPBOARD:
                 clip_mirror(&app);
@@ -288,7 +280,6 @@ tracker_run(int argc, char **argv)
             case TIKU_EVENT_DEACTIVATED: {
                 tiku_window_t *fw = tiku_workspace_focused(app.desk);
 #if TIKU_SHELL_NOTE_TABS
-
                 if (fw && fw->auto_hide_tab) {
                     tiku_workspace_deactivate(app.desk, fw);
                     desktop_damage_all(&app);

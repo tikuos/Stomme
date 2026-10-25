@@ -478,9 +478,12 @@ static void offer_bundle(desktop_t *app, const char *dir,
     if (at >= 0) {
         snprintf(app->apps.app[at].id, sizeof app->apps.app[at].id,
                  "%s", m->id);
-        snprintf(app->apps.app[at].category,sizeof app->apps.app[at].category,"%s",m->category);
-        snprintf(app->apps.app[at].startup,sizeof app->apps.app[at].startup,"%s",m->startup);
-        snprintf(app->apps.app[at].help,sizeof app->apps.app[at].help,"%s",m->help);
+        snprintf(app->apps.app[at].category, sizeof app->apps.app[at].category,
+                 "%s", m->category);
+        snprintf(app->apps.app[at].startup, sizeof app->apps.app[at].startup,
+                 "%s", m->startup);
+        snprintf(app->apps.app[at].help, sizeof app->apps.app[at].help, "%s",
+                 m->help);
         snprintf(app->apps.app[at].icon, sizeof app->apps.app[at].icon,
                  "%s", m->icon);
     }

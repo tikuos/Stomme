@@ -195,9 +195,17 @@ VFS for desktop settings, state and actions. Its
 [local protocol](docs/contracts/desktop-vfs-protocol.md) defines caller context,
 conditional requests and change delivery. The
 [registry, broker and job APIs](docs/contracts/desktop-vfs-runtime.md) provide
-resource primitives; neither product mounts a desktop resource service.
+the private desktop service selected by both products. Its internal read
+namespace mounts at `/.stomme`.
 
-The desktop resource contracts are in `docs/contracts/desktop-vfs-runtime.md`.
-`examples/resource_client.c` is a standalone SDK client for the explicitly
-enabled desktop test provider. Shared shell startup selects a private endpoint
-through `STOMME_RESOURCE_DIRECTORY`; its read namespace mounts at `/.stomme`.
+[Resource Inspector and local clients](docs/guides/resource-inspector.md)
+describes the native inspector, packaged `stomme-resources` command and public
+SDK client. `make resource-client` builds the command in `build/`. The
+[SDK example](examples/resource-control/README.md) builds it from relocated
+public artifacts. `examples/resource_client.c` exercises the explicitly enabled
+desktop test provider.
+
+Resource service maintenance covers [provider development](docs/guides/resource-providers.md),
+[schema evolution](docs/guides/resource-schema-evolution.md),
+[coverage and release qualification](docs/guides/resource-release.md) and
+[troubleshooting](docs/guides/resource-troubleshooting.md).

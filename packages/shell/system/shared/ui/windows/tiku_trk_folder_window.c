@@ -490,7 +490,8 @@ queue_thumbnail(tiku_trk_folder_window_t *folder, tiku_trk_pose_t *pose)
         mini = MINI_ICON_FOR(render->row_h);
     }
     if (tiku_trk_nodeicon_resolve(render->icons, render->store, &pose->model,
-                                  art, sizeof art) != TIKU_TRK_ICON_FROM_THUMB) {
+                                  art,
+                                  sizeof art) != TIKU_TRK_ICON_FROM_THUMB) {
         return;
     }
     if (!tiku_thumb_fresh(render->store, pose->model.path,
@@ -924,7 +925,8 @@ draw_title(tiku_trk_folder_window_t *folder, tiku_surface_t *surface,
     }
 }
 
-/** @brief The folder's own icon in the bar's corner, from its node's facts. */
+/** @brief The folder's own icon in the bar's corner, from its node's facts.
+ */
 static void
 draw_folder_icon(tiku_trk_folder_window_t *folder,
                  tiku_surface_t *surface)

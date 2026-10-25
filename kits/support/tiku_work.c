@@ -53,6 +53,7 @@ static unsigned long   posted;
 static int             started;
 static tiku_work_observation_t history[SLOTS];
 static unsigned history_at, history_count;
+static unsigned long long collected_count, cancelled_count, rejected_count;
 static int             busy;        /* posted, not yet collected */
 
 /** @brief Milliseconds on a clock that does not step. */
@@ -209,11 +210,12 @@ post(const tiku_work_job_t *job, int slow)
     for (i = 0; i < SLOTS && slots[i].state != FREE; i++) {
     }
     if (i == SLOTS) {
+        if(rejected_count<ULLONG_MAX)rejected_count++;
         pthread_mutex_unlock(&lock);
         tiku_trail("work: full, %s refused", job->key);
         return -1;
     }
-    if(posted==ULONG_MAX){pthread_mutex_unlock(&lock);return -1;}
+    if(posted==ULONG_MAX){if(rejected_count<ULLONG_MAX)rejected_count++;pthread_mutex_unlock(&lock);return -1;}
     slots[i].began_ms=slots[i].ended_ms=0;
     slots[i].job = *job;
     slots[i].job.key[TIKU_WORK_KEY - 1] = '\0';
@@ -281,6 +283,8 @@ tiku_work_collect(void)
         record->state=s->cancelled?3:2;record->slow=s->slow;record->cancellation_requested=s->cancelled;
         record->posted_ms=s->posted_ms;record->began_ms=s->began_ms;record->ended_ms=s->ended_ms;
         if(history_count<SLOTS)history_count++;
+        if(collected_count<ULLONG_MAX)collected_count++;
+        if(s->cancelled&&cancelled_count<ULLONG_MAX)cancelled_count++;
         s->state = FREE;
         busy--;
         pthread_mutex_unlock(&lock);
@@ -356,4 +360,18 @@ size_t tiku_work_observe(tiku_work_observation_t *out,size_t capacity)
         count++;
     }
     pthread_mutex_unlock(&lock);return count;
+}
+
+void tiku_work_stats(tiku_work_stats_t *out)
+{
+    if(!out)return;
+    pthread_mutex_lock(&lock);memset(out,0,sizeof *out);
+    out->posted=posted;out->collected=collected_count;out->cancelled=cancelled_count;out->rejected=rejected_count;
+    out->active=(unsigned)busy;out->retained=history_count;
+    for(int i=0;i<SLOTS;i++) {
+        if(slots[i].state==QUEUED)out->queued++;
+        else if(slots[i].state==RUNNING)out->running++;
+        else if(slots[i].state==FINISHED)out->finished_pending++;
+    }
+    pthread_mutex_unlock(&lock);
 }

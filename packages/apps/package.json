@@ -11,14 +11,16 @@
     "hex",
     "terminal",
     "circuit",
-    "marker"
+    "marker",
+    "resource-inspector"
   ],
   "editor_common": [
     "apps/editor/tiku_editor_preferences.c",
     "apps/editor/tiku_editor_search_feedback.c",
     "apps/editor/tiku_editor_context.c",
     "apps/editor/tiku_editor_main.c",
-    "apps/editor/tiku_editor_file.c"
+    "apps/editor/tiku_editor_file.c",
+    "apps/editor/tiku_editor_resources.c"
   ],
   "tests": [
     "tests/apps/test_calc.c",
@@ -47,11 +49,18 @@
     "tests/fixtures/cms.inc",
     "tests/fixtures/pubsec.inc",
     "tests/fixtures/pdfsig.inc",
-    "tests/fixtures/image_fixtures.inc"
+    "tests/fixtures/image_fixtures.inc",
+    "tests/apps/test_editor_resources.c",
+    "tests/apps/test_document_resources.c",
+    "tests/apps/test_resource_inspector.c"
   ],
   "requires": {
     "marker": [
       "reader"
     ]
-  }
+  },
+  "common": [
+    "apps/shared/tiku_document_resources.h",
+    "apps/shared/tiku_viewer_resources.h"
+  ]
 }

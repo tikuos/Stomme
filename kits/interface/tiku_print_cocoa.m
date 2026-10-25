@@ -9,6 +9,7 @@
 #import <Cocoa/Cocoa.h>
 #import <PDFKit/PDFKit.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 @class TikuPrintJob;
@@ -227,4 +228,19 @@ tiku_print_native_close(tiku_print_native_t *native)
     }
     [jobs release];
     release(native);
+}
+
+size_t tiku_print_native_observe(tiku_print_native_t *native,tiku_print_job_observation_t *out,size_t capacity)
+{
+    size_t count=0;if(!native)return 0;
+    for(TikuPrintJob *job in [native->jobs allValues]) {
+        if(out&&count<capacity) {
+            tiku_print_job_observation_t *row=&out[count];memset(row,0,sizeof *row);
+            row->request=job->request;row->bytes=[job->data length];row->started=job->started;
+            row->cancellation_requested=job->cancelled;row->finished=job->finished;row->status=job->finished?job->status:0;
+            snprintf(row->title,sizeof row->title,"%s",[job->title UTF8String]);
+        }
+        count++;
+    }
+    return count;
 }

@@ -24,7 +24,9 @@ product. Storage does not import Application or shell headers. Application uses
 the Support records without importing Storage. The shell connects those layers.
 Structured encoding uses `kits/support/tiku_msg.h`; it does not add a dependency
 on Translation Kit. Public companion APIs use opaque handles and copied values.
-Names and declarations are assigned when those APIs are implemented.
+The native application extension is declared in `tiku_app_resources.h`.
+The provider transport client is declared in `tiku_resource_provider_client.h`.
+Application models retain their native controllers and private structures.
 
 The layout of `tiku_backend_ops_t` in `kits/storage/tiku_model.h` and
 `TIKU_APP_ABI` value 5 are preserved. Capability negotiation gates the new

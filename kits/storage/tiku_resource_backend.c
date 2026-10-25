@@ -99,15 +99,25 @@ static int resource_write(tiku_backend_t *backend, const char *path, const void 
     return -1;
 }
 
-/** @brief Report catalog changes as requiring a complete caller-filtered relist. */
+/** @brief Invalidate the registry subtree when its catalog or values change. */
 static int resource_changes(tiku_backend_t *backend, tiku_model_change_t *out, int max, int *complete)
 {
     resource_backend_t *view = backend->impl;
-    (void)out; (void)max;
+    tiku_resource_entry_t root;
     if (!tiku_resource_registry_thread(view->registry)) return -1;
-    if (complete) *complete = view->epoch == view->registry->epoch;
+    if (complete)
+        *complete = 1;
+    if (view->epoch == view->registry->epoch)
+        return 0;
+    if (!out || max < 1 ||
+        tiku_resource_entry(view->registry, &view->caller, "/", &root)) {
+        if (complete)
+            *complete = 0;
+        return 0;
+    }
+    out[0] = (tiku_model_change_t){root.node_id, TIKU_CH_SUBTREE};
     view->epoch = view->registry->epoch;
-    return 0;
+    return 1;
 }
 
 /** @brief Resolve a currently visible identity without reusing retired nodes. */

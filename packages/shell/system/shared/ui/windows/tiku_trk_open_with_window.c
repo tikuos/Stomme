@@ -90,7 +90,9 @@ enables(const tiku_trk_open_with_window_t *c, int *can_open,
         char preferred[TIKU_TRK_APP_NAME_MAX];
         for (i = 0; i < c->type_count; i++) {
             types[i] = c->types[i];
-            if (strcmp(tiku_trk_launch_preferred(c->store, types[i], preferred, sizeof preferred), c->cand[sel].app->name))
+            if (strcmp(tiku_trk_launch_preferred(c->store, types[i], preferred,
+                                                 sizeof preferred),
+                       c->cand[sel].app->name))
                 all_preferred = 0;
         }
         *can_prefer = !all_preferred &&
@@ -101,7 +103,9 @@ enables(const tiku_trk_open_with_window_t *c, int *can_open,
     }
 }
 
-/** @brief Refresh candidate preference marks from the current owner-thread cache. */
+/** @brief Refresh candidate preference marks from the current owner-thread
+ * cache.
+ */
 static void refresh_preferred(tiku_trk_open_with_window_t *c)
 {
     int i, j;
@@ -109,7 +113,9 @@ static void refresh_preferred(tiku_trk_open_with_window_t *c)
     for (i = 0; i < c->count; i++) {
         c->cand[i].preferred = 0;
         for (j = 0; j < c->type_count; j++)
-            if (!strcmp(tiku_trk_launch_preferred(c->store, c->types[j], preferred, sizeof preferred), c->cand[i].app->name))
+            if (!strcmp(tiku_trk_launch_preferred(c->store, c->types[j],
+                                                  preferred, sizeof preferred),
+                        c->cand[i].app->name))
                 c->cand[i].preferred = 1;
     }
 }
@@ -173,7 +179,9 @@ draw(tiku_window_t *window, tiku_surface_t *surface,
                         (tiku_press_held(&c->press, 1) ? TIKU_S_PRESSED : 0u));
 }
 
-/** @brief Drop the chooser's launch completion while retaining an accepted store update. */
+/** @brief Drop the chooser's launch completion while retaining an accepted
+ * store update.
+ */
 static void detach_save(tiku_trk_open_with_window_t *c)
 {
     if (c->pending) tiku_trk_catalog_settings_detach(c->settings, c);
@@ -203,22 +211,30 @@ close_window(tiku_trk_open_with_window_t *c)
     mark_dirty(c);
 }
 
-/** @brief Launch the captured choice after saving, or retain the chooser with its error. */
+/** @brief Launch the captured choice after saving, or retain the chooser with
+ * its error.
+ */
 static void preferred_saved(void *context, tiku_resource_error_t error)
 {
     tiku_trk_open_with_window_t *c = context;
     if (!c->pending) return;
     c->pending = 0;
-    if (!c->window || !c->window->open || c->window->generation != c->pending_generation) return;
+    if (!c->window || !c->window->open ||
+        c->window->generation != c->pending_generation)
+        return;
     if (error) {
-        snprintf(c->status, sizeof c->status, "%s", error == TIKU_RESOURCE_STALE ?
-            "Associations changed. Reopen and retry." : error == TIKU_RESOURCE_UNKNOWN_OUTCOME ?
-            "Save outcome unknown. Reopen to check." : "Could not save preferred app. Retry.");
+        snprintf(c->status, sizeof c->status, "%s",
+                 error == TIKU_RESOURCE_STALE
+                     ? "Associations changed. Reopen and retry."
+                 : error == TIKU_RESOURCE_UNKNOWN_OUTCOME
+                     ? "Save outcome unknown. Reopen to check."
+                     : "Could not save preferred app. Retry.");
         mark_dirty(c);
         return;
     }
     close_window(c);
-    if (c->open) c->open(c->open_context, &c->pending_app, c->path_ptr, c->path_count);
+    if (c->open)
+        c->open(c->open_context, &c->pending_app, c->path_ptr, c->path_count);
 }
 
 /** @brief Open with the selected application, asking first if it must. */
@@ -238,13 +254,17 @@ do_open(tiku_trk_open_with_window_t *c, int make_preferred)
         tiku_resource_error_t error;
         int i;
         for (i = 0; i < c->type_count; i++) types[i] = c->types[i];
-        error = tiku_trk_catalog_settings_prefer(c->settings, types, c->type_count,
-            pick->app->name, preferred_saved, c);
+        error = tiku_trk_catalog_settings_prefer(
+            c->settings, types, c->type_count, pick->app->name,
+            preferred_saved, c);
         if (!error) {
             c->pending_app = *pick->app; c->pending = 1;
             c->pending_generation = c->window->generation;
-            snprintf(c->status, sizeof c->status, "Saving preferred application...");
-        } else snprintf(c->status, sizeof c->status, "Could not start saving. Retry.");
+            snprintf(c->status, sizeof c->status,
+                     "Saving preferred application...");
+        } else
+            snprintf(c->status, sizeof c->status,
+                     "Could not start saving. Retry.");
         mark_dirty(c);
         return;
     }

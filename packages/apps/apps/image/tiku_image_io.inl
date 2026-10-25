@@ -85,6 +85,7 @@ static void image_job_done(void *ctx)
             c->fit = 1; c->rotation = 0; c->pan_x = c->pan_y = 0;
         }
         tiku_image_free(&c->image); c->image = j->image;
+        c->resource_document++;
         memset(&j->image, 0, sizeof j->image);
         snprintf(c->path, sizeof c->path, "%s", j->path);
         snprintf(c->label, sizeof c->label, "%s", j->label);

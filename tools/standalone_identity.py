@@ -8,7 +8,7 @@ import hashlib
 import json
 import platform
 from build_config import configure
-from product_bridge import digest_files, source_files, write_changed
+from product_bridge import digest_files, source_files, write_changed, identity_header
 
 
 def generate(root, output, provider, host, flags):
@@ -24,7 +24,7 @@ def generate(root, output, provider, host, flags):
                 machine=platform.machine(), host=host, abi=5, flags=flags)
     data['sdk_identity'] = hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
     write_changed(output / 'identity.json', (json.dumps(data, indent=2) + '\n').encode())
-    write_changed(output / 'tiku_sdk_identity.h', ('#define TIKU_SDK_IDENTITY "' + data['sdk_identity'] + '"\n').encode())
+    write_changed(output / 'tiku_sdk_identity.h', identity_header(data))
     return data['sdk_identity']
 
 

@@ -23,16 +23,22 @@ tiku_trk_foreign_offer_parse(tiku_trk_foreign_offer_t *o, const char *actions,
     if (o == NULL) return -1;
     memset(o, 0, sizeof *o);
     o->promise = promise != 0;
-    if (actions == NULL || actions[0] == '\0') o->actions = TIKU_TRK_DROP_ACTION_COPY;
+    if (actions == NULL || actions[0] == '\0')
+        o->actions = TIKU_TRK_DROP_ACTION_COPY;
     else {
-        if (strstr(actions, "copy") != NULL) o->actions |= TIKU_TRK_DROP_ACTION_COPY;
-        if (strstr(actions, "move") != NULL) o->actions |= TIKU_TRK_DROP_ACTION_MOVE;
-        if (strstr(actions, "link") != NULL) o->actions |= TIKU_TRK_DROP_ACTION_LINK;
-        if (strstr(actions, "trash") != NULL) o->actions |= TIKU_TRK_DROP_ACTION_TRASH;
+        if (strstr(actions, "copy") != NULL)
+            o->actions |= TIKU_TRK_DROP_ACTION_COPY;
+        if (strstr(actions, "move") != NULL)
+            o->actions |= TIKU_TRK_DROP_ACTION_MOVE;
+        if (strstr(actions, "link") != NULL)
+            o->actions |= TIKU_TRK_DROP_ACTION_LINK;
+        if (strstr(actions, "trash") != NULL)
+            o->actions |= TIKU_TRK_DROP_ACTION_TRASH;
     }
     if (types != NULL) {
-        o->has_refs = strstr(types, "application/x-vnd.Be-directory-ref") != NULL ||
-                      strstr(types, "text/uri-list") != NULL;
+        o->has_refs =
+            strstr(types, "application/x-vnd.Be-directory-ref") != NULL ||
+            strstr(types, "text/uri-list") != NULL;
         o->has_text = strstr(types, "text/plain") != NULL;
         o->has_bitmap = strstr(types, "image/") != NULL;
     }

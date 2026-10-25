@@ -1308,3 +1308,16 @@ tiku_host_print_cancel(tiku_host_t *host, uint64_t request)
     if (host)
         tiku_print_native_cancel(host->printing, request);
 }
+
+void tiku_host_observe(const tiku_host_t *host,tiku_host_observation_t *out)
+{
+    if(!out)return;
+    memset(out,0,sizeof *out);snprintf(out->backend,sizeof out->backend,"x11");if(!host)return;
+    out->available=1;out->scale=host->scale;out->logical_width=host->logical_width;out->logical_height=host->logical_height;
+    out->native_width=host->native_width;out->native_height=host->native_height;out->fullscreen=host->fullscreen;out->mapped=host->mapped;
+    out->accessibility_endpoint=host->access!=NULL;out->print_endpoint=host->printing!=NULL;
+}
+size_t tiku_host_print_observe(tiku_host_t *host,tiku_print_job_observation_t *out,size_t capacity)
+{
+    return host?tiku_print_native_observe(host->printing,out,capacity):0;
+}

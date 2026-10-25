@@ -200,3 +200,20 @@ tiku_print_rpc_close(tiku_print_rpc_t *rpc)
         for (unsigned i = 0; i < TIKU_PRINT_SLOTS; i++)
             clear(rpc, rpc->slots + i);
 }
+
+int tiku_print_rpc_control(tiku_print_rpc_t *rpc,uint64_t ticket,uint64_t connection,
+    uint64_t incarnation,const void *pdf,size_t bytes,int cancel_request,int64_t now)
+{
+    if(!rpc||!ticket)return 0;
+    tiku_print_slot_t *slot=NULL;
+    for(unsigned i=0;i<TIKU_PRINT_SLOTS;i++)if(rpc->slots[i].ticket==ticket){slot=&rpc->slots[i];break;}
+    if(!slot||!live(slot)||slot->connection!=connection||slot->incarnation!=incarnation)return 0;
+    if(!cancel_request&&(slot->active||now>=slot->deadline||!pdf||bytes<5||bytes>TIKU_PRINT_PDF_MAX||memcmp(pdf,"%PDF-",5)))return 0;
+    tiku_msg_t *message=tiku_msg_new(cancel_request?TIKU_MSG_PRINT_CANCEL:TIKU_MSG_PRINT_PDF);
+    int ready=message&&tiku_msg_add_int32(message,"window",slot->window_id)&&tiku_msg_add_int64(message,"request",slot->request)&&
+        (cancel_request||tiku_msg_add_blob(message,"pdf",pdf,bytes));
+    if(!ready){tiku_msg_free(message);return 0;}
+    (void)tiku_print_rpc_message(rpc,slot->session,message,now);tiku_msg_free(message);
+    if(cancel_request)return 1;
+    return slot->ticket==ticket&&slot->active?1:-1;
+}

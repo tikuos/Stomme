@@ -27,7 +27,8 @@ tiku_trk_springmenu_enter(tiku_trk_springmenu_t *m, int x, int y, int w, int h,
 int
 tiku_trk_springmenu_pulse(tiku_trk_springmenu_t *m, int64_t now)
 {
-    if (m == NULL || !m->armed || m->open || now - m->entered < TIKU_TRK_SPRING_DELAY_US)
+    if (m == NULL || !m->armed || m->open ||
+        now - m->entered < TIKU_TRK_SPRING_DELAY_US)
         return 0;
     m->open = 1;
     return 1;

@@ -87,6 +87,7 @@ static inline tiku_rect_t cv_intersect(tiku_rect_t a, tiku_rect_t b)
 
 /** @brief The window's state; only the UI thread touches it. */
 struct tiku_circuitview {
+    uint64_t resource_document; /**< successful source adoption counter */
     tiku_workspace_t *workspace;    /**< borrowed until destroy */
     tiku_window_t *window;          /**< NULL once the window has closed */
     int *dirty;                     /**< the application's redraw flag */
@@ -332,4 +333,8 @@ void tiku_circuitview_draw(tiku_window_t *w, tiku_surface_t *s,
  *         and the canvas.  @return 1 when the window took @p event */
 int tiku_circuitview_event(tiku_window_t *w, const tiku_event_t *event,
                            void *ctx);
+/** @brief Replace one checked native layer appearance without opening source files. */
+int cv_layer_replace(tiku_circuitview_t *, size_t, uint64_t, uint32_t,
+                     unsigned, int);
+
 #endif

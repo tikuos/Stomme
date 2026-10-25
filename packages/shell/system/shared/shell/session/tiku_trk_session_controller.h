@@ -52,7 +52,8 @@ void tiku_trk_session_restore_folders(
     tiku_trk_session_controller_t *controller, const char *const *paths,
     int path_count, int safe_mode, int device_backend, int fallback);
 /** @brief Copy the current restorable folder entries without filesystem I/O.
- *  @return Count, or -1 when the supplied array cannot hold the complete set. */
+ *  @return Count, or -1 when the supplied array cannot hold the complete set.
+ * */
 int tiku_trk_session_controller_entries(const tiku_trk_session_controller_t *,
     tiku_trk_session_entry_t *entries, int capacity);
 /**

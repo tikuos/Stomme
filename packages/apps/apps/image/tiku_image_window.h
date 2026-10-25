@@ -6,6 +6,7 @@
 #define TIKU_IMAGE_WINDOW_H_
 
 #include "tiku_window.h"
+#include "tiku_viewer_resources.h"
 #include <stddef.h>
 
 /** @brief The viewer: its window, the image shown, the view and the
@@ -49,5 +50,8 @@ const char *tiku_image_window_path(tiku_image_window_t *c);
 /** @brief Whether @p path ends in .png, .jpg, .jpeg or .bmp, in any case;
  *         the decoder checks the content itself. */
 int tiku_image_file_supported(const char *path);
+
+/** @brief Borrow current native document facts for the owning application provider. */
+vr_document_t tiku_image_window_resource_document(tiku_image_window_t *);
 
 #endif

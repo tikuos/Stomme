@@ -112,7 +112,8 @@ static int path_for(char *path, size_t cap, int create)
     if (create && mkdir(dir, 0700) != 0 && errno != EEXIST) {
         return 0;
     }
-    return snprintf(path, cap, TIKU_PRODUCT_EDITOR_PREFERENCES_PATH, dir) < (int)cap;
+    return snprintf(path, cap, TIKU_PRODUCT_EDITOR_PREFERENCES_PATH, dir) <
+           (int)cap;
 }
 
 /** The colour preset @p preset gives @p role on the live theme: the
@@ -313,6 +314,14 @@ static int save(editor_preferences_t *p)
         return SAVE_UNSYNCED;
     }
     return SAVE_FAILED;
+}
+
+int tiku_editor_preferences_replace(edit_state_t *st,
+                                    const editor_preferences_t *prefs)
+{
+    editor_preferences_t next=*prefs;int result=save(&next);
+    if(result==SAVE_FAILED)return -1;
+    tiku_editor_preferences_apply(st,&next);return result==SAVE_UNSYNCED;
 }
 
 /** Show the Preferences window with the saved defaults to edit, or

@@ -118,6 +118,14 @@ main(void)
     assert(tiku_print_rpc_message(&rpc, &session, pdf, 602));
     tiku_print_rpc_close(&rpc);
     assert(cancelled == 3);
+    session.win[0].link_gesture=700;
+    assert(tiku_print_rpc_message(&rpc,&session,prepare,701));ticket=rpc.slots[3].ticket;
+    unsigned old_dispatched=dispatched;
+    assert(!tiku_print_rpc_control(&rpc,ticket,session.generation+1,session.win[0].generation,"%PDF-x",6,0,702)&&dispatched==old_dispatched);
+    assert(!tiku_print_rpc_control(&rpc,ticket,session.generation,session.win[0].generation+1,NULL,0,1,702)&&rpc.slots[3].ticket==ticket);
+    assert(tiku_print_rpc_control(&rpc,ticket,session.generation,session.win[0].generation,"%PDF-x",6,0,702)==1&&dispatched==old_dispatched+1&&!session.win[0].link_gesture);
+    assert(tiku_print_rpc_control(&rpc,ticket,session.generation,session.win[0].generation,NULL,0,1,703)==1&&!rpc.slots[3].ticket);
+    assert(!tiku_print_rpc_control(&rpc,ticket,session.generation,session.win[0].generation,NULL,0,1,704));
     tiku_msg_free(prepare);
     tiku_msg_free(pdf);
     tiku_msg_free(replay);

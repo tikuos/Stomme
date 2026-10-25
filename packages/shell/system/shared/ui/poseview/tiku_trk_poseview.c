@@ -301,7 +301,8 @@ tiku_trk_poseview_cell_text(tiku_trk_poseview_t *v, const tiku_trk_pose_t *p,
     /* State-store text can change without a model notification. */
     if (field == TIKU_TRK_COL_ORIGINAL || field >= TIKU_TRK_COL_ATTR_BASE) {
         v->cell_cache_misses++;
-        return pv_cell_text_at(v, p, field, column_width_of(v, field), buf, max);
+        return pv_cell_text_at(v, p, field, column_width_of(v, field), buf,
+                               max);
     }
     /* Model facts and width determine the remaining cached cells. */
 #define MIX_CELL(value) do { \
@@ -326,13 +327,16 @@ tiku_trk_poseview_cell_text(tiku_trk_poseview_t *v, const tiku_trk_pose_t *p,
     for (i = 0; i < (int)sizeof p->value && p->value[i] != '\0'; i++) {
         MIX_CELL((unsigned char)p->value[i]);
     }
-    for (i = 0; i < (int)sizeof p->model.path && p->model.path[i] != '\0'; i++) {
+    for (i = 0; i < (int)sizeof p->model.path && p->model.path[i] != '\0';
+         i++) {
         MIX_CELL((unsigned char)p->model.path[i]);
     }
-    for (i = 0; i < (int)sizeof p->model.name && p->model.name[i] != '\0'; i++) {
+    for (i = 0; i < (int)sizeof p->model.name && p->model.name[i] != '\0';
+         i++) {
         MIX_CELL((unsigned char)p->model.name[i]);
     }
-    for (i = 0; i < (int)sizeof p->model.type && p->model.type[i] != '\0'; i++) {
+    for (i = 0; i < (int)sizeof p->model.type && p->model.type[i] != '\0';
+         i++) {
         MIX_CELL((unsigned char)p->model.type[i]);
     }
 #undef MIX_CELL
@@ -357,9 +361,9 @@ tiku_trk_poseview_cell_text(tiku_trk_poseview_t *v, const tiku_trk_pose_t *p,
         if (i < 0) { i = 0; }
     }
     {
-        const char *text = pv_cell_text_at(v, p, field, width,
-                                        mutable_pose->cell_cache[i].text,
-                                        sizeof mutable_pose->cell_cache[i].text);
+        const char *text = pv_cell_text_at(
+            v, p, field, width, mutable_pose->cell_cache[i].text,
+            sizeof mutable_pose->cell_cache[i].text);
 
         if (text != mutable_pose->cell_cache[i].text) {
             snprintf(mutable_pose->cell_cache[i].text,
@@ -391,5 +395,6 @@ tiku_trk_poseview_total_count(const tiku_trk_poseview_t *view)
 const tiku_trk_pose_t *
 tiku_trk_poseview_entry(const tiku_trk_poseview_t *view, int index)
 {
-    return view && index >= 0 && index < view->count ? &view->poses[index] : NULL;
+    return view && index >= 0 && index < view->count ? &view->poses[index]
+                                                     : NULL;
 }

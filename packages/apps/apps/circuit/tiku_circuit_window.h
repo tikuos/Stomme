@@ -6,6 +6,7 @@
 #define TIKU_CIRCUIT_WINDOW_H_
 
 #include "tiku_window.h"
+#include "tiku_viewer_resources.h"
 
 /** @brief The viewer: its window, the document shown and its jobs. */
 typedef struct tiku_circuitview tiku_circuitview_t;
@@ -52,7 +53,8 @@ int tiku_circuitview_picking_export(const tiku_circuitview_t *viewer);
 /** @brief Keep per-document view settings in @p directory, an absolute
  *         path the caller owns; NULL, or a path that is not absolute or
  *         too long, turns them off.  It opens nothing and makes no file. */
-void tiku_circuitview_settings(tiku_circuitview_t *viewer, const char *directory);
+void tiku_circuitview_settings(tiku_circuitview_t *viewer,
+                               const char *directory);
 /**
  * @brief Open @p path read-only on a worker.
  *
@@ -74,5 +76,8 @@ void tiku_circuitview_file(tiku_circuitview_t *viewer,
  */
 void tiku_circuitview_picked(tiku_circuitview_t *viewer,
                              const char *path);
+
+/** @brief Borrow native drawing facts and owner-thread view settings. */
+vr_document_t tiku_circuitview_resource_document(tiku_circuitview_t *);
 
 #endif

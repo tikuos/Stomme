@@ -113,7 +113,8 @@ int tiku_trk_prefs_read(tiku_trk_prefs_t *p, FILE *stream);
 /** @brief Serialize settings to a stream; return -1 on an output error. */
 int tiku_trk_prefs_write(FILE *stream, const tiku_trk_prefs_t *p);
 /** @brief Submit GUI edits to a bound controller, or save synchronously.
- *  @return 0 when accepted, -1 when rejected; acceptance may be asynchronous. */
+ *  @return 0 when accepted, -1 when rejected; acceptance may be asynchronous.
+ * */
 int tiku_trk_prefs_submit(tiku_trk_prefs_t *p, const char *path);
 
 /** @brief Take the current values as the revert baseline (TS-059). */
@@ -153,9 +154,12 @@ void tiku_trk_prefs_revert(tiku_trk_prefs_t *p, tiku_trk_page_t page);
 /** @brief The name a page shows in the list. */
 const char *tiku_trk_prefs_page_name(tiku_trk_page_t page);
 
-/*---------------------------------------------------------------------------*/
-/* The window's layout (TS-058, TS-059, TS-060)                              */
-/*---------------------------------------------------------------------------*/
+/* --------------------------------------------------------------------------
+ */
+/* The window's layout (TS-058, TS-059, TS-060)
+ */
+/* --------------------------------------------------------------------------
+ */
 
 /** @brief What a click in the window landed on. */
 typedef enum {

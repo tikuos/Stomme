@@ -33,7 +33,8 @@ tiku_trk_addons_register(tiku_trk_addons_t *a, const char *name,
     x = &a->item[a->count++];
     memset(x, 0, sizeof *x);
     snprintf(x->name, sizeof x->name, "%s", name);
-    snprintf(x->command, sizeof x->command, "%s", command != NULL ? command : "");
+    snprintf(x->command, sizeof x->command, "%s",
+             command != NULL ? command : "");
     snprintf(x->type, sizeof x->type, "%s", type != NULL ? type : "*");
     x->generic = strcmp(x->type, "*") == 0;
     x->key = key;
@@ -141,7 +142,9 @@ tiku_trk_addons_build_menu(const tiku_trk_addons_t *a, const char *const *types,
     for (i = 0; i < a->count; i++) order[i] = i;
     for (i = 1; i < a->count; i++) {
         int hold = order[i];
-        for (j = i; j > 0 && before(&a->item[hold], &a->item[order[j-1]], types, ntypes); j--)
+        for (j = i; j > 0 && before(&a->item[hold], &a->item[order[j - 1]],
+                                    types, ntypes);
+             j--)
             order[j] = order[j-1];
         order[j] = hold;
     }

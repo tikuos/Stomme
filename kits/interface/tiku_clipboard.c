@@ -227,3 +227,10 @@ tiku_clipboard_stamp(void)
 {
     return stamp;
 }
+
+int tiku_clipboard_format_at(size_t index,tiku_clipboard_format_t *out)
+{
+    if(out)memset(out,0,sizeof *out);
+    if(!out||index>=TIKU_CLIPBOARD_FORMATS||!held_formats[index].data)return 0;
+    out->mime=held_formats[index].mime;out->data=held_formats[index].data;out->bytes=held_formats[index].bytes;return 1;
+}

@@ -60,10 +60,15 @@ def run(args):
 
         def call(operation,path,*arguments,success=True):
             """Retain independent SDK request outcomes and literal arguments."""
-            result=subprocess.run([str(work/'client'),str(control),operation,str(path),*map(str,arguments)],capture_output=True,text=True,timeout=20)
-            history.append(dict(operation=operation,path=str(path),arguments=arguments,exit=result.returncode,stdout=result.stdout,stderr=result.stderr))
-            assert (result.returncode==0)==success,history[-1]
-            return result.stdout.strip()
+            for attempt in range(12):
+                result=subprocess.run([str(work/'client'),str(control),operation,str(path),*map(str,arguments)],capture_output=True,text=True,timeout=20)
+                history.append(dict(operation=operation,path=str(path),arguments=arguments,exit=result.returncode,stdout=result.stdout,stderr=result.stderr))
+                if success and operation=='record' and result.returncode and result.stderr.strip() in ['stale_revision','busy','settings job: failed busy none','settings job: failed stale_revision none']:
+                    time.sleep(.1)
+                    continue
+                assert (result.returncode==0)==success,history[-1]
+                return result.stdout.strip()
+            raise AssertionError(('record owner remained busy',path,history[-1]))
 
         def read(path):
             """Read one copied public observation."""
@@ -213,10 +218,16 @@ def run(args):
             script('SET','selection','index',success=False)
             script('CREATE','selection','path','path',str(destination))
             script('DELETE','selection')
-            script('SET','selection','path','path',str(source))
+            selected=script('SET','selection','path','path',str(source))
+            action('/windows/'+selected['window']+'/actions/focus')
+            gui.wait_for(lambda:read('/input/focus')['window'],selected['window'])
+            assert source.is_file() and destination.is_dir()
             gui.key(peer,ord('c'),2)
             script('EXECUTE','entry','path','path',str(destination))
             gui.wait_for(lambda:read('/desktop/file-manager/state').get('path'),str(destination))
+            destination_window=read('/desktop/file-manager/state')['window']
+            action('/windows/'+destination_window+'/actions/focus')
+            gui.wait_for(lambda:read('/input/focus')['window'],destination_window)
             gui.key(peer,ord('v'),2)
             def file_job():
                 """Find the native file engine's current generation."""

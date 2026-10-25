@@ -167,6 +167,77 @@ static const tiku_backend_ops_t SLOW_OPS = {
 
 static tiku_backend_t slow_backend;
 
+/** @brief Count directory reads while reporting one selected subtree identity. */
+static int scoped_lists;
+static const char *scoped_path;
+
+/** @brief Describe a virtual directory in the scoped-change fixture. */
+static int scoped_stat(tiku_backend_t *backend, const char *path,
+                       tiku_model_t *out)
+{
+    memset(out, 0, sizeof *out);
+    snprintf(out->path, sizeof out->path, "%s", path);
+    out->kind = TIKU_KIND_VIRTUAL_DIR;
+    out->backend = backend;
+    return 0;
+}
+
+/** @brief Return an empty directory and count its reads. */
+static int scoped_list(tiku_backend_t *backend, const char *path,
+                       tiku_entry_fn fn, void *ctx)
+{
+    (void)backend;
+    (void)path;
+    (void)fn;
+    (void)ctx;
+    scoped_lists++;
+    return 0;
+}
+
+/** @brief Resolve the fixture's subtree identity. */
+static int scoped_identity(tiku_backend_t *backend, uint64_t id, char *out,
+                           size_t max)
+{
+    (void)backend;
+    (void)id;
+    return snprintf(out, max, "%s", scoped_path) < (int)max ? 0 : -1;
+}
+
+/** @brief Subtree invalidation respects directory-component boundaries. */
+static void scoped_changes_test(void)
+{
+    static const tiku_backend_ops_t ops = {.name = "scoped",
+                                           .stat = scoped_stat,
+                                           .list = scoped_list,
+                                           .path_of_id = scoped_identity};
+    tiku_backend_t backend = {.ops = &ops};
+    tiku_trk_poseview_t *view = tiku_trk_poseview_new(&backend, "/files/sub");
+    tiku_model_change_t change = {1, TIKU_CH_SUBTREE};
+    check(view != NULL, "subtree", "the fixture view opens");
+    if (!view)
+        return;
+    scoped_lists = 0;
+    scoped_path = "/.stomme";
+    (void)tiku_trk_poseview_poll(view, 1000000, &change, 1, 1);
+    check(scoped_lists == 0, "subtree",
+          "an unrelated subtree leaves the listing intact");
+    scoped_path = "/file";
+    (void)tiku_trk_poseview_poll(view, 2000000, &change, 1, 1);
+    check(scoped_lists == 0, "subtree",
+          "a partial directory name does not match");
+    scoped_path = "/files/sub";
+    (void)tiku_trk_poseview_poll(view, 3000000, &change, 1, 1);
+    check(scoped_lists == 1, "subtree", "the named directory is read again");
+    scoped_path = "/files";
+    (void)tiku_trk_poseview_poll(view, 4000000, &change, 1, 1);
+    check(scoped_lists == 2, "subtree",
+          "a descendant directory is read again");
+    scoped_path = "/";
+    (void)tiku_trk_poseview_poll(view, 5000000, &change, 1, 1);
+    check(scoped_lists == 3, "subtree", "the namespace root covers the view");
+    tiku_trk_poseview_free(view);
+}
+
 int
 main(void)
 {
@@ -174,6 +245,7 @@ main(void)
     tiku_backend_t *b;
     tiku_trk_poseview_t *v;
 
+    scoped_changes_test();
     make_tree(dir);
     b = tiku_backend_posix_open();
     real_backend = b;

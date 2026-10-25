@@ -9,6 +9,7 @@
 #define _GNU_SOURCE 1
 #endif
 #include "tiku_resource_channel.h"
+#include "tiku_resource_endpoint.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
@@ -394,6 +395,23 @@ int tiku_resource_channel_receive(tiku_resource_channel_t *channel, tiku_msg_t *
     if (out) *out = NULL;
     if (!usable(channel) || !channel->ready || channel->active) return -1;
     return receive_message(channel, out, timeout);
+}
+int tiku_resource_channel_wait(tiku_resource_channel_t *channel, int timeout)
+{
+    if (!usable(channel) || !channel->ready || timeout < 0 || timeout > 30000)
+        return -1;
+    struct pollfd fd = {.fd = channel->fd, .events = POLLIN};
+    int n;
+    do {
+        n = poll(&fd, 1, timeout);
+    } while (n < 0 && errno == EINTR);
+    if (n < 0)
+        return fail(channel);
+    if (!n)
+        return 0;
+    int ready =
+        tiku_resource_endpoint_ready(channel->fd, channel->limits.frame_bytes);
+    return ready < 0 ? fail(channel) : ready;
 }
 
 uint64_t tiku_resource_channel_features(const tiku_resource_channel_t *channel)

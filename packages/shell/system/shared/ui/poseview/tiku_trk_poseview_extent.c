@@ -416,10 +416,10 @@ pv_insert_sorted(tiku_trk_poseview_t *v, const tiku_trk_pose_t *p)
         pv_resort(v);
     }
     at = pv_sorted_slot(v, p);
-    tiku_trk_repaint_insert(&v->repaint,
-                            (tiku_trk_repaint_rect_t){0, 0, v->view_w, v->view_h},
-                            v->row_h > 0 ? v->row_h : 1,
-                            (at - v->scroll) * (v->row_h > 0 ? v->row_h : 1));
+    tiku_trk_repaint_insert(
+        &v->repaint, (tiku_trk_repaint_rect_t){0, 0, v->view_w, v->view_h},
+        v->row_h > 0 ? v->row_h : 1,
+        (at - v->scroll) * (v->row_h > 0 ? v->row_h : 1));
     for (i = v->count; i > at; i--) {
         v->poses[i] = v->poses[i - 1];
     }
@@ -456,10 +456,10 @@ pv_remove_pose(tiku_trk_poseview_t *v, int at)
     if (at < 0 || at >= v->count) {
         return;
     }
-    tiku_trk_repaint_remove(&v->repaint,
-                            (tiku_trk_repaint_rect_t){0, 0, v->view_w, v->view_h},
-                            v->row_h > 0 ? v->row_h : 1,
-                            (at - v->scroll) * (v->row_h > 0 ? v->row_h : 1));
+    tiku_trk_repaint_remove(
+        &v->repaint, (tiku_trk_repaint_rect_t){0, 0, v->view_w, v->view_h},
+        v->row_h > 0 ? v->row_h : 1,
+        (at - v->scroll) * (v->row_h > 0 ? v->row_h : 1));
     for (i = at; i < v->count - 1; i++) {
         v->poses[i] = v->poses[i + 1];
     }
@@ -1225,6 +1225,22 @@ pv_poll_ring(tiku_trk_poseview_t *v, int64_t now, const tiku_model_change_t *ch,
 
             for (i = 0; i < nch; i++) {
                 int held = 0;
+
+                if (ch[i].op == TIKU_CH_SUBTREE) {
+                    char path[TIKU_PATH_MAX];
+                    if (tiku_trk_poseview_path_of_id(v, ch[i].id, path,
+                                                     sizeof path)) {
+                        relist = 1;
+                    } else {
+                        size_t length = strlen(path);
+                        if (!strcmp(path, "/") ||
+                            (!strncmp(v->path, path, length) &&
+                             (v->path[length] == '\0' ||
+                              v->path[length] == '/')))
+                            relist = 1;
+                    }
+                    continue;
+                }
 
                 for (k = 0; k < v->count; k++) {
                     if (v->poses[k].model.node_id != 0 &&

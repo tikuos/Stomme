@@ -133,6 +133,8 @@ typedef struct {
 #define TIKU_CH_CREATED 1
 #define TIKU_CH_REMOVED 2
 #define TIKU_CH_MOVED   3
+/** @brief The named directory and its descendants require a fresh listing. */
+#define TIKU_CH_SUBTREE 4
 
 /** @brief One entry, whatever backend it came from. */
 typedef struct {

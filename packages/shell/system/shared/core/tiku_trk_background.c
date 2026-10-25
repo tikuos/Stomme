@@ -34,9 +34,13 @@ tiku_trk_bg_parse(const char *rec, tiku_trk_bg_t *out)
             (*end && !isspace((unsigned char)*end))) return 0;
         at = end; while (isspace((unsigned char)*at)) at++;
     }
-    if (fields[0] < TIKU_TRK_BG_AT_OFFSET || fields[0] > TIKU_TRK_BG_TILED || strlen(at) >= sizeof parsed.path ||
-        fields[1] < -32768 || fields[1] > 32768 || fields[2] < -32768 || fields[2] > 32768) return 0;
-    parsed.mode = (tiku_trk_bg_mode_t)fields[0]; parsed.x = (int)fields[1]; parsed.y = (int)fields[2];
+    if (fields[0] < TIKU_TRK_BG_AT_OFFSET || fields[0] > TIKU_TRK_BG_TILED ||
+        strlen(at) >= sizeof parsed.path || fields[1] < -32768 ||
+        fields[1] > 32768 || fields[2] < -32768 || fields[2] > 32768)
+        return 0;
+    parsed.mode = (tiku_trk_bg_mode_t)fields[0];
+    parsed.x = (int)fields[1];
+    parsed.y = (int)fields[2];
     strcpy(parsed.path,at); *out = parsed; return 1;
 }
 

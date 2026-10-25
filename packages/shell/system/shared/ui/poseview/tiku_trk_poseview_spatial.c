@@ -92,10 +92,14 @@ tiku_trk_poseview_restore_state(tiku_trk_poseview_t *v)
             /* An unrecognised mode word discards the whole view-state
              * record, size and sort keys included (MA-063); the entries'
              * own records are still read below. */
-            if (strncmp(rec, "icon", 4) == 0) { v->mode = TIKU_TRK_MODE_ICON; }
-            else if (strncmp(rec, "mini", 4) == 0) { v->mode = TIKU_TRK_MODE_MINI; }
-            else if (strncmp(rec, "list", 4) == 0) { v->mode = TIKU_TRK_MODE_LIST; }
-            else { len = 0; }
+            if (strncmp(rec, "icon", 4) == 0) { v->mode = TIKU_TRK_MODE_ICON;
+            } else if (strncmp(rec, "mini", 4) == 0) {
+                v->mode = TIKU_TRK_MODE_MINI;
+            } else if (strncmp(rec, "list", 4) == 0) {
+                v->mode = TIKU_TRK_MODE_LIST;
+            } else {
+                len = 0;
+            }
         }
         if (len > 0) {
             int px = 0;
@@ -169,8 +173,10 @@ tiku_trk_poseview_restore_state(tiku_trk_poseview_t *v)
         }
         /* A position beyond TIKU_TRK_SANE_LOCATION is ignored and the icon
          * auto-placed instead. */
-        if (info.x > TIKU_TRK_SANE_LOCATION || info.x < -TIKU_TRK_SANE_LOCATION ||
-            info.y > TIKU_TRK_SANE_LOCATION || info.y < -TIKU_TRK_SANE_LOCATION) {
+        if (info.x > TIKU_TRK_SANE_LOCATION ||
+            info.x < -TIKU_TRK_SANE_LOCATION ||
+            info.y > TIKU_TRK_SANE_LOCATION ||
+            info.y < -TIKU_TRK_SANE_LOCATION) {
             continue;
         }
         v->poses[i].invisible = (info.flags & POSE_INFO_INVISIBLE) ? 1 : 0;
@@ -190,13 +196,19 @@ tiku_trk_poseview_restore_state(tiku_trk_poseview_t *v)
     return n;
 }
 
+/** @brief Serialize the current native view mode, offsets and sorting fields.
+ */
 int
 pv_view_record(const tiku_trk_poseview_t *view, char *out, size_t capacity)
 {
-    const char *mode = view->mode == TIKU_TRK_MODE_ICON ? "icon" : view->mode == TIKU_TRK_MODE_MINI ? "mini" : "list";
-    int length = snprintf(out,capacity,"%s %d %d %d %d %d %d %d %d %d %d",mode,
-        view->icon_size,view->scroll,view->icon_x,view->icon_y,view->mini_x,view->mini_y,
-        view->sort_field,view->sort2_field,view->sort_reverse,view->last_icon == TIKU_TRK_MODE_MINI ? 1 : 0);
+    const char *mode = view->mode == TIKU_TRK_MODE_ICON   ? "icon"
+                       : view->mode == TIKU_TRK_MODE_MINI ? "mini"
+                                                          : "list";
+    int length = snprintf(
+        out, capacity, "%s %d %d %d %d %d %d %d %d %d %d", mode,
+        view->icon_size, view->scroll, view->icon_x, view->icon_y,
+        view->mini_x, view->mini_y, view->sort_field, view->sort2_field,
+        view->sort_reverse, view->last_icon == TIKU_TRK_MODE_MINI ? 1 : 0);
     return length < 0 || (size_t)length >= capacity ? -1 : length;
 }
 
@@ -219,7 +231,8 @@ tiku_trk_poseview_save_state(tiku_trk_poseview_t *v)
         int length = pv_view_record(v,rec,sizeof rec);
         if (length >= 0 && (!v->view_cleared || strcmp(rec,v->cleared_view))) {
             v->view_cleared = 0;
-            (void)tiku_state_write(store,pv_state_node(v,node,sizeof node),state_attr(v),rec,(size_t)length);
+            (void)tiku_state_write(store, pv_state_node(v, node, sizeof node),
+                                   state_attr(v), rec, (size_t)length);
         }
     }
 

@@ -597,9 +597,9 @@ system_invoke(desktop_t *app, int command)
         /* Shut down asks first (DB-006), with the question the
          * Deskbar's leaf menu asks. */
         tiku_sound_play(TIKU_SOUND_BEEP);
-        tiku_alert_open(alert_model(app), TIKU_ALERT_WARN,
-                            TIKU_TRK_ALERT_TAG_SHUTDOWN,
-                            tiku_str("alert.msg.shut_down"), tiku_str("alert.btn.shut_down"));
+        tiku_alert_open(
+            alert_model(app), TIKU_ALERT_WARN, TIKU_TRK_ALERT_TAG_SHUTDOWN,
+            tiku_str("alert.msg.shut_down"), tiku_str("alert.btn.shut_down"));
         return 1;
     default:
         break;

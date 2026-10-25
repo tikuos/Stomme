@@ -5,13 +5,15 @@
  * SPDX-License-Identifier: Apache-2.0 */
 #include "tiku_reader_private.h"
 
-static int reader_reserve(struct help_reader *r, size_t text, int runs, int blocks);
+static int reader_reserve(struct help_reader *r, size_t text, int runs,
+                          int blocks);
 static void reader_reveal(tiku_reader_help_window_t *c, int offset);
 
 /** @brief Make the flattened text, run starts and outline folds at least
  *         the sizes given; the old buffers stay when new ones cannot be
  *         had.  @return 1 when they are big enough. */
-static int reader_reserve(struct help_reader *r, size_t text, int runs, int blocks)
+static int reader_reserve(struct help_reader *r, size_t text, int runs,
+                          int blocks)
 {
     if (!r) return 1;
     if (r->text_cap >= text && r->starts_cap >= runs && r->folded_cap >= blocks)
@@ -36,17 +38,23 @@ int tiku_reader_replace(tiku_reader_help_window_t *c, const char *name,
 {
     tiku_doc_t *doc = tiku_reader_document(name, source);
     if (!doc) {
-        tiku_reader_say(c, "Document exceeds the rendering memory/complexity budget, or memory is unavailable.");
+        tiku_reader_say(
+            c,
+            "Document exceeds the rendering memory/complexity budget, or memory is unavailable.");
         return 0;
     }
     size_t text = (size_t)doc->ntext + doc->nblock + 1;
     if (text < TIKU_DOC_TEXT_MAX * 2u) text = TIKU_DOC_TEXT_MAX * 2u;
     int runs = doc->nrun > TIKU_DOC_RUNS_MAX ? doc->nrun : TIKU_DOC_RUNS_MAX;
-    int blocks = doc->nblock + 1 > TIKU_DOC_BLOCKS_MAX ? doc->nblock + 1 : TIKU_DOC_BLOCKS_MAX;
+    int blocks = doc->nblock + 1 > TIKU_DOC_BLOCKS_MAX ? doc->nblock + 1
+                                                       : TIKU_DOC_BLOCKS_MAX;
     if (!reader_reserve(c->reader, text, runs, blocks)) {
-        tiku_reader_doc_free(doc); tiku_reader_say(c, "Not enough memory for document reading tools."); return 0;
+        tiku_reader_doc_free(doc);
+        tiku_reader_say(c, "Not enough memory for document reading tools.");
+        return 0;
     }
     tiku_reader_doc_free(c->doc); c->doc = doc;
+    c->resource_document++;
     return 1;
 }
 
@@ -90,7 +98,8 @@ void tiku_reader_images_clear(struct help_reader *r)
         tiku_image_free(&r->images[i].image); free(r->images[i].src);
     }
     free(r->images); r->images = NULL;
-    r->nimages = r->image_cap = 0; r->image_bytes = r->image_clock = r->image_sources = 0;
+    r->nimages = r->image_cap = 0;
+    r->image_bytes = r->image_clock = r->image_sources = 0;
 }
 
 /** @brief Flatten @p d's text into @p out, a newline after each block,
@@ -137,7 +146,8 @@ static void reader_reveal(tiku_reader_help_window_t *c, int offset)
     }
 }
 
-int tiku_reader_help_window_find(tiku_reader_help_window_t *c, const char *query, int backwards)
+int tiku_reader_help_window_find(tiku_reader_help_window_t *c,
+                                 const char *query, int backwards)
 {
     struct help_reader *r = c->reader;
     if (!r || !c->doc || !query || strlen(query) >= TIKU_FIELD_MAX) return 0;
@@ -156,7 +166,9 @@ int tiku_reader_help_window_find(tiku_reader_help_window_t *c, const char *query
     for (int i = 0; chosen >= 0 && i <= chosen; i++)
         if (tiku_reader_match(r->text + i, copy)) ordinal++;
     if (chosen >= 0) reader_reveal(c, chosen);
-    snprintf(c->status, sizeof c->status, chosen < 0 ? "No matches." : "Match %d of %d", ordinal, r->matches);
+    snprintf(c->status, sizeof c->status,
+             chosen < 0 ? "No matches." : "Match %d of %d", ordinal,
+             r->matches);
     if (c->dirty) *c->dirty = 1;
     return chosen >= 0;
 }
@@ -172,15 +184,27 @@ int tiku_reader_help_window_copy(tiku_reader_help_window_t *c, int code)
             for (int i = 0; i < c->doc->nblock; i++)
                 if (c->doc->block[i].kind == TIKU_DOC_BLOCK_PRE &&
                     c->doc->block[i].y + c->doc->block[i].h >= c->bar.value &&
-                    c->doc->block[i].y < c->bar.value + c->page_h) { block = i; break; }
+                    c->doc->block[i].y < c->bar.value + c->page_h) {
+                    block = i;
+                    break;
+                }
         }
-        if (block < 0 || !c->doc->block[block].nrun) { tiku_reader_say(c, "No code block selected or visible."); return 0; }
+        if (block < 0 || !c->doc->block[block].nrun) {
+            tiku_reader_say(c, "No code block selected or visible.");
+            return 0;
+        }
         const tiku_doc_block_t *blk = &c->doc->block[block];
         int last = blk->run0 + blk->nrun - 1;
         a = r->starts[blk->run0]; b = r->starts[last] + c->doc->run[last].len;
     }
-    if (a == b) { tiku_reader_say(c, "Select text to copy, or use Copy code."); return 0; }
+    if (a == b) {
+        tiku_reader_say(c, "Select text to copy, or use Copy code.");
+        return 0;
+    }
     int ok = tiku_clipboard_import(r->text + a, (size_t)(b - a));
-    tiku_reader_say(c, ok ? "Copied to clipboard." : "Selection is too large for the clipboard; nothing was replaced.");
+    tiku_reader_say(
+        c,
+        ok ? "Copied to clipboard."
+           : "Selection is too large for the clipboard; nothing was replaced.");
     return ok;
 }

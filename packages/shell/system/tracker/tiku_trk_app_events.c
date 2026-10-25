@@ -698,7 +698,10 @@ browser_press_icons(app_t *app, const tiku_event_t *ev, browser_loop_t *lp)
             int idx = -1, k, cnt = tiku_trk_poseview_count(app->view);
             int twice;
             for (k = 0; k < cnt; k++) {
-                if (tiku_trk_poseview_at(app->view, k) == hit) { idx = k; break; }
+                if (tiku_trk_poseview_at(app->view, k) == hit) {
+                    idx = k;
+                    break;
+                }
             }
             if (ev->button == 3u) {
                 tiku_trk_poseview_cancel_edit_wait(app->view);

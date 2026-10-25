@@ -374,6 +374,7 @@ static void backend_test(void)
     char text[512], error[64];
     uint64_t id;
     int complete;
+    tiku_model_change_t changes[1];
     open_fixture(&fixture);
     backend = tiku_resource_backend_open(fixture.registry, NULL);
     CHECK(backend && !backend->ops->stat(backend, "/settings/theme", &model));
@@ -386,6 +387,13 @@ static void backend_test(void)
     CHECK(!change(&fixture, &fixture.stamp, 1, "dark", &out));
     fixture.stamp = out.stamp; tiku_resource_snapshot_clear(&out);
     CHECK(!backend->ops->changes(backend, NULL, 0, &complete) && !complete);
+    CHECK(backend->ops->changes(backend, changes, 1, &complete) == 1 &&
+          complete);
+    CHECK(changes[0].op == TIKU_CH_SUBTREE);
+    CHECK(
+        !backend->ops->path_of_id(backend, changes[0].id, text, sizeof text) &&
+        !strcmp(text, "/"));
+    CHECK(!backend->ops->changes(backend, changes, 1, &complete) && complete);
     CHECK(!tiku_resource_unregister(fixture.registry, &fixture.stamp));
     CHECK(!register_fixture(&fixture, "settings", "/settings"));
     CHECK(backend->ops->path_of_id(backend, id, text, sizeof text) == -1);

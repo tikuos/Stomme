@@ -192,6 +192,8 @@ struct tiku_editdoc {
     int64_t exec_line;          /**< where a runtime stopped, -1 none   */
     uint64_t exec_state;        /**< the history state it was set for   */
     tiku_ed_piece_t loaded;     /**< the one span a load reports        */
+    uint64_t
+        resource_identity; /**< process-local lifetime, renewed on import */
 };
 
 /* Allocation, counted and hookable for tests (tiku_editdoc_alloc.c). */

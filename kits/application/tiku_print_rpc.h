@@ -47,4 +47,10 @@ void tiku_print_rpc_done(tiku_print_rpc_t *rpc, uint64_t ticket, int status,
                          const char *reason);
 /** @brief Cancel outstanding native jobs and clear borrowed ownership. */
 void tiku_print_rpc_close(tiku_print_rpc_t *rpc);
+/** @brief Dispatch final PDF or cancellation through an exact existing print grant.
+ *  @return 1 on acceptance, 0 for stale/invalid ownership or preparation, -1 when
+ *          native dispatch refuses. No user gesture or new grant is created. */
+int tiku_print_rpc_control(tiku_print_rpc_t *,uint64_t ticket,uint64_t connection,
+    uint64_t incarnation,const void *pdf,size_t bytes,int cancel,int64_t now);
+
 #endif

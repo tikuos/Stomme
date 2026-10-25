@@ -102,4 +102,8 @@ typedef int (*tiku_access_action_fn)(void *context, uint32_t node,
                                      uint64_t document, uint64_t generation,
                                      unsigned action, int first, int last,
                                      const char *text);
+/** @brief Encode within a caller byte budget, refusing before packet allocation.
+ *  @return The encoding result; -3 when the complete packet exceeds maximum. */
+int tiku_access_encode_limited(const tiku_access_tree_t *,size_t maximum,void **bytes,size_t *size);
+
 #endif

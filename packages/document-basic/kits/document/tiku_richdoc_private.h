@@ -65,7 +65,7 @@ typedef struct {
     tiku_rd_style_t *styles;    /**< owned styles */
     tiku_rich_page_setup_t page; /**< normalized single-section paper */
     tiku_rd_blocks_t *blocks;  /**< NULL is an ordered paragraph-only body */
-    size_t footprint;          /**< cached unique byte charge; owner thread only */
+    size_t footprint; /**< cached unique byte charge; owner thread only */
     tiku_rd_bookmarks_t *bookmarks; /**< NULL when no named locations exist */
 } tiku_rd_root_t;
 
@@ -162,8 +162,8 @@ typedef struct {
 typedef struct tiku_rd_history {
     struct tiku_rd_history *next; /**< next older history group */
     tiku_rd_root_t *root;       /**< retained other side of the change */
-    size_t planned_bytes;     /**< prepared peak history reserve for publication */
-    size_t planned_total;     /**< prepared union of current and history storage */
+    size_t planned_bytes; /**< prepared peak history reserve for publication */
+    size_t planned_total; /**< prepared union of current and history storage */
     struct tiku_rd_history *discard; /**< first old undo group to evict */
     tiku_rd_map_t *maps;       /**< ordered forward transformations */
     size_t map_count;         /**< initialized transformations */
@@ -187,7 +187,7 @@ struct tiku_richdoc {
     tiku_rd_history_t *undo;    /**< newest undo group */
     tiku_rd_history_t *redo;    /**< next redo group */
     size_t history_bytes;      /**< maximum extra bytes at any retained state */
-    size_t history_total;      /**< unique current/history storage plus records */
+    size_t history_total; /**< unique current/history storage plus records */
     tiku_richanchor_t *anchors; /**< non-owning list in descending ID order */
     size_t anchor_count;       /**< registered positions */
     uint64_t next_anchor;      /**< next anchor identity; zero at exhaustion */
@@ -197,6 +197,8 @@ struct tiku_richdoc {
     tiku_richwatch_t *watches;  /**< non-owning subscription list */
     size_t watch_count;        /**< live subscriptions */
     int notifying;            /**< callback mutation guard */
+    uint64_t
+        resource_identity; /**< process-local lifetime, renewed on import */
 };
 
 /** @brief Directional selection and pending character format for one host. */
@@ -207,7 +209,8 @@ struct tiku_richsession {
     tiku_rs_pending_t pending; /**< session-local typing attributes */
     tiku_rich_selection_fn selection_changed; /**< optional owner-thread hook */
     void *selection_context;  /**< borrowed until observer replacement */
-    tiku_rich_pos_t observed_anchor, observed_caret; /**< last reported values */
+    tiku_rich_pos_t observed_anchor,
+        observed_caret;       /**< last reported values */
     int read_only;            /**< additional host restriction */
     int collapse;             /**< current command collapses its selection */
     int typing;               /**< current command uses pending attributes */

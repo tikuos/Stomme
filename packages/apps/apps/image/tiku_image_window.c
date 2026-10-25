@@ -29,6 +29,7 @@ enum { IV_OPEN = 1, IV_RELOAD, IV_FIT, IV_ACTUAL, IV_OUT, IV_IN,
 typedef struct image_job image_job_t;
 /** @brief The viewer's state; only the loop touches it. */
 struct tiku_image_window {
+    uint64_t resource_document; /**< successful document adoption counter */
     tiku_workspace_t *workspace;
     tiku_window_t *window;
     int *dirty, refs, busy, generation, fit, rotation, watching;
@@ -327,4 +328,48 @@ void tiku_image_window_tick(tiku_image_window_t *c, int64_t now)
         c->busy || now < c->next || !c->path[0]) return;
     c->next = now + 2000000;
     (void)image_request(c, c->path, NULL, 0, 1);
+}
+
+/** @brief Copy current image dimensions, view options and selection support. */
+static tiku_resource_error_t resource_observe(void *state, const char *field,
+                                              tiku_msg_t **out)
+{
+    tiku_image_window_t *c = state;
+    tiku_msg_t *value = tiku_app_resource_object(0);
+    int bad = 0;
+    if (!strcmp(field, "selection"))
+        bad |= VR_BOOL(value, "supported", 0);
+    else if (!strcmp(field, "view")) {
+        bad |= VR_NUMBER(value, "zoom", c->zoom);
+        bad |= VR_NUMBER(value, "pan_x", c->pan_x);
+        bad |= VR_NUMBER(value, "pan_y", c->pan_y);
+        bad |= VR_INT(value, "rotation", c->rotation);
+        bad |= VR_BOOL(value, "fit", c->fit);
+        bad |= VR_BOOL(value, "watching", c->watching);
+    } else if (!strcmp(field, "objects")) {
+        bad |= VR_INT(value, "count", c->image.w ? 1 : 0);
+        bad |= VR_INT(value, "width", c->image.w);
+        bad |= VR_INT(value, "height", c->image.h);
+    } else {
+        tiku_msg_free(value);
+        return TIKU_RESOURCE_UNSUPPORTED;
+    }
+    if (bad) {
+        tiku_msg_free(value);
+        return TIKU_RESOURCE_NO_MEMORY;
+    }
+    *out = value;
+    return 0;
+}
+vr_document_t tiku_image_window_resource_document(tiku_image_window_t *c)
+{
+    return (vr_document_t){.identity = c->resource_document + 1,
+                           .generation = c->resource_document + 1,
+                           .path = c->path,
+                           .type = "image",
+                           .available = c->image.w > 0,
+                           .busy = c->busy,
+                           .read_only = 1,
+                           .controller = c,
+                           .observe = resource_observe};
 }

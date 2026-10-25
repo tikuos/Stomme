@@ -9,16 +9,27 @@
 #define TIKU_TRK_RESOURCE_SESSION_H_
 #include "tiku_model.h"
 #include "tiku_resource_registry.h"
-/** @brief Resource registry, namespace mount and local interactive connections. */
+/** @brief Resource registry, namespace mount and local interactive
+ * connections.
+ */
 typedef struct tiku_trk_resource_session tiku_trk_resource_session_t;
 /** @brief Start on the desktop thread; reject socket/mount collisions.
- *  @note test_provider enables synthetic resources under /test and /test-work. */
+ *  @note test_provider enables synthetic resources under /test and
+ * /test-work. */
 tiku_trk_resource_session_t *tiku_trk_resource_session_open(tiku_backend_t *namespace_backend,
-    const char *directory,const char *mount_prefix,const char *product,int test_provider);
-/** @brief Service bounded buffered requests/jobs/events; return requested test stop. */
+                               const char *directory, const char *mount_prefix,
+                               const char *product, int test_provider);
+/** @brief Service bounded buffered requests/jobs/events; return requested
+ * test stop.
+ */
 int tiku_trk_resource_session_pump(tiku_trk_resource_session_t *);
 /** @brief Close peers, detach the read mount, then release the registry. */
 void tiku_trk_resource_session_close(tiku_trk_resource_session_t *);
-/** @brief The borrowed owner-thread registry, or NULL when the service is disabled. */
+/** @brief The borrowed owner-thread registry, or NULL when the service is
+ * disabled.
+ */
 tiku_resource_registry_t *tiku_trk_resource_session_registry(tiku_trk_resource_session_t *);
+/** @brief Count current local control transports on the owner thread. */
+unsigned tiku_trk_resource_session_connections(const tiku_trk_resource_session_t *);
+
 #endif

@@ -180,7 +180,7 @@ tiku_resource_registry_t *tiku_resource_registry_new(const tiku_resource_limits_
         if (requested->events_per_watch) limits.events_per_watch = requested->events_per_watch;
         if (requested->receipts) limits.receipts = requested->receipts;
     }
-    if (limits.providers > 256 || limits.resources > 16384 || limits.watches > 256 ||
+    if (limits.providers > 512 || limits.resources > 16384 || limits.watches > 256 ||
         limits.events_per_watch > 256 || limits.receipts > 16) { free(registry); return NULL; }
     registry->thread = pthread_self();
     registry->limits = limits;
@@ -404,4 +404,44 @@ tiku_resource_error_t tiku_resource_registry_clock(tiku_resource_registry_t *reg
         registry->jobs || registry->next_watch || registry->dispatching) return TIKU_RESOURCE_INVALID;
     registry->clock = clock; registry->clock_context = context;
     return TIKU_RESOURCE_OK;
+}
+
+int tiku_resource_registry_observe(const tiku_resource_registry_t *registry,tiku_resource_registry_observation_t *out)
+{
+    if(!out)return 0;
+    memset(out,0,sizeof *out);if(!tiku_resource_registry_thread(registry))return 0;
+    out->provider_capacity=registry->limits.providers;out->node_capacity=registry->limits.resources;
+    out->nodes=registry->count;out->services=registry->services;out->retained_stream_bytes=registry->stream_bytes;
+    for(unsigned i=0;i<registry->limits.providers;i++)out->providers+=registry->providers[i].live!=0;
+    for(unsigned i=0;i<registry->limits.watches;i++)if(registry->watches[i].id&&!registry->watches[i].retired) {
+        out->watches++;out->paused_watches+=registry->watches[i].paused!=0;
+    }
+    if(registry->jobs)for(unsigned i=0;i<RESOURCE_JOBS_MAX;i++)if(registry->jobs[i].info.id[0]) {
+        out->retained_jobs++;
+        if(registry->jobs[i].info.state==TIKU_RESOURCE_JOB_QUEUED||registry->jobs[i].info.state==TIKU_RESOURCE_JOB_RUNNING)out->active_jobs++;
+    }
+    return 1;
+}
+
+int tiku_resource_events_observe(const tiku_resource_registry_t *registry,
+                                 const char *exclude_provider,
+                                 tiku_resource_event_observation_t *out)
+{
+    if (!out)
+        return 0;
+    memset(out, 0, sizeof *out);
+    if (!tiku_resource_registry_thread(registry))
+        return 0;
+    for (unsigned i = 0; i < registry->limits.watches; i++) {
+        const resource_watch_t *watch = &registry->watches[i];
+        if (!watch->id || watch->retired ||
+            (exclude_provider && !strcmp(exclude_provider, watch->provider)))
+            continue;
+        out->subscriptions++;
+        out->paused += watch->paused != 0;
+        out->queued += watch->count;
+        if (watch->sequence > out->maximum_sequence)
+            out->maximum_sequence = watch->sequence;
+    }
+    return 1;
 }

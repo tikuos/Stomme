@@ -977,6 +977,7 @@ tiku_volume_unmount(const tiku_volumes_t *vs, const char *path,
 static pthread_mutex_t cache_lock = PTHREAD_MUTEX_INITIALIZER;
 static tiku_volumes_t  cache;
 static int             cache_count = -1;
+static uint64_t cache_revision;
 
 void
 tiku_volumes_cache_set(const tiku_volumes_t *vs, int count)
@@ -986,6 +987,7 @@ tiku_volumes_cache_set(const tiku_volumes_t *vs, int count)
         cache = *vs;
     }
     cache_count = count;
+    if(cache_revision<UINT64_MAX)cache_revision++;
     pthread_mutex_unlock(&cache_lock);
 }
 
@@ -1049,4 +1051,12 @@ tiku_volume_umount_now(const char *mount, const char *name, char *why,
                                 : TIKU_UNMOUNT_FAILED;
     }
     return TIKU_UNMOUNT_OK;
+}
+
+int tiku_volumes_cached(tiku_volumes_t *out,uint64_t *revision)
+{
+    int count;pthread_mutex_lock(&cache_lock);count=cache_count;
+    if(out){memset(out,0,sizeof *out);if(count>=0)*out=cache;}
+    if(revision)*revision=cache_revision;
+    pthread_mutex_unlock(&cache_lock);return count;
 }

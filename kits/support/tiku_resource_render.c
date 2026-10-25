@@ -6,6 +6,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #include "tiku_resource.h"
+#include "tiku_resource_literal.h"
+#include "tiku_resource_literal_private.h"
+#include <errno.h>
+#include <math.h>
 #include <locale.h>
 #ifdef __APPLE__
 #include <xlocale.h>
@@ -54,13 +58,23 @@ static void quote(output_t *out, const char *text)
 }
 
 /** @brief Render a validated value recursively as diagnostic JSON. */
-static void render(output_t *out, const tiku_msg_t *value, int scalar)
+static void render(output_t *out, const tiku_msg_t *value, int scalar,
+                   int lossless)
 {
     const char *type = tiku_msg_find_string(value, "type", 0);
     int64_t integer;
     int boolean, i, count;
     double number;
     char text[64];
+    if (lossless && (!strcmp(type, "counter") || !strcmp(type, "enum") ||
+                     !strcmp(type, "color"))) {
+        string(out, "{\"$type\":");
+        quote(out, type);
+        string(out, ",\"$value\":");
+        render(out, value, 0, 0);
+        string(out, "}");
+        return;
+    }
     if (!strcmp(type, "object") || !strcmp(type, "array")) {
         int object = !strcmp(type, "object");
         const char *field = object ? "member" : "item";
@@ -75,7 +89,8 @@ static void render(output_t *out, const tiku_msg_t *value, int scalar)
                 string(out, ":");
                 child = tiku_msg_find_message(member, "value", 0);
             } else child = member;
-            if (child) render(out, child, 0);
+            if (child)
+                render(out, child, 0, lossless);
             else out->failed = 1;
             if (child != member) tiku_msg_free(child);
             tiku_msg_free(member);
@@ -100,7 +115,9 @@ static void render(output_t *out, const tiku_msg_t *value, int scalar)
     }
 }
 
-int tiku_resource_value_render(const tiku_msg_t *value, void *out, size_t max)
+/** @brief Stage one complete bounded representation under a C numeric locale. */
+static int format(const tiku_msg_t *value, void *out, size_t max, int scalar,
+                  int lossless)
 {
     output_t staged = {0};
     locale_t numeric, previous;
@@ -111,11 +128,40 @@ int tiku_resource_value_render(const tiku_msg_t *value, void *out, size_t max)
     numeric = newlocale(LC_NUMERIC_MASK, "C", (locale_t)0);
     if (!numeric) { free(staged.bytes); return -1; }
     previous = uselocale(numeric);
-    render(&staged, value, 1);
+    render(&staged, value, scalar, lossless);
     uselocale(previous);
     freelocale(numeric);
     string(&staged, "\n");
     if (!staged.failed) memcpy(out, staged.bytes, staged.used);
     free(staged.bytes);
     return staged.failed ? -1 : (int)staged.used;
+}
+int tiku_resource_value_render(const tiku_msg_t *value, void *out, size_t max)
+{
+    return format(value, out, max, 1, 0);
+}
+int tiku_resource_literal_format(const tiku_msg_t *value, void *out,
+                                 size_t max)
+{
+    return format(value, out, max, 0, 1);
+}
+int tiku_resource_value_json(const tiku_msg_t *value, void *out, size_t max)
+{
+    return format(value, out, max, 0, 0);
+}
+int tiku_resource_number_decode(const char *text, double *out)
+{
+    locale_t numeric = newlocale(LC_NUMERIC_MASK, "C", (locale_t)0);
+    if (!numeric)
+        return 0;
+    locale_t previous = uselocale(numeric);
+    char *end;
+    errno = 0;
+    double value = strtod(text, &end);
+    int valid = end != text && !*end && !errno && isfinite(value);
+    uselocale(previous);
+    freelocale(numeric);
+    if (valid)
+        *out = value;
+    return valid;
 }

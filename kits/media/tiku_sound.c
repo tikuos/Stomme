@@ -11,6 +11,7 @@
 #include "tiku_sound.h"
 
 #include <string.h>
+#include <stdio.h>
 #include <time.h>
 
 #define CHUNK_FRAMES   2205u        /* fifty milliseconds at 44.1 kHz */
@@ -24,6 +25,7 @@ typedef struct {
 static struct {
     const tiku_sound_backend_t *backend;
     int      opened;
+    int last_open_known, last_open_ok;
     clip_t   clip[TIKU_SOUND_EVENTS];
     int      enabled[TIKU_SOUND_EVENTS];
     unsigned count[TIKU_SOUND_EVENTS];
@@ -58,6 +60,7 @@ void
 tiku_sound_opened(int ok)
 {
     opening = 0;
+    sound.last_open_known=1;sound.last_open_ok=ok!=0;
     if (ok) {
         sound.opened = 1;
     } else {
@@ -148,8 +151,10 @@ ensure_open(void)
         }
         return 0;
     }
+    sound.last_open_known=1;sound.last_open_ok=1;
     if (sound.backend->open != NULL &&
         sound.backend->open(sound.backend->ctx, TIKU_SOUND_RATE) != 0) {
+        sound.last_open_ok=0;
         sound.playing = NULL;
         return 0;
     }
@@ -255,4 +260,14 @@ tiku_sound_free(void)
     memset(&sound, 0, sizeof sound);
     sound.volume = 100;
     opening = 0;
+}
+
+void tiku_sound_observe(tiku_sound_observation_t *out)
+{
+    if(!out)return;
+    memset(out,0,sizeof *out);out->configured=sound.backend!=NULL;
+    snprintf(out->backend,sizeof out->backend,"%s",sound.backend&&sound.backend->name?sound.backend->name:"");
+    out->opened=sound.opened;out->opening=opening;out->volume=sound.volume;
+    out->last_open_known=sound.last_open_known;out->last_open_ok=sound.last_open_ok;out->event=-1;
+    if(sound.playing){out->event=(int)(sound.playing-sound.clip);out->written=sound.at;out->frames=sound.playing->frames;}
 }

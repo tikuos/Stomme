@@ -230,6 +230,8 @@ tiku_edit_pos_t tiku_editdoc_next(const tiku_editdoc_t *doc,
 tiku_edit_pos_t tiku_editdoc_prev(const tiku_editdoc_t *doc,
                                   tiku_edit_pos_t pos);
 
+/** @brief Process-local nonzero document identity; changes on whole replacement. */
+uint64_t tiku_editdoc_identity(const tiku_editdoc_t *doc);
 /** @brief The document's generation, raised by every committed change,
  *         undo, redo and load. */
 uint64_t tiku_editdoc_generation(const tiku_editdoc_t *doc);

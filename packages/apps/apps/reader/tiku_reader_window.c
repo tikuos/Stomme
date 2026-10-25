@@ -48,6 +48,7 @@ void tiku_reader_help_window_init(tiku_reader_help_window_t *c,
                                int *dirty)
 {
     memset(c, 0, sizeof *c);
+    c->resource_document=1;
     c->profile = &reader_profile;
     c->workspace = workspace;
     c->screen_w = screen_w;
@@ -204,7 +205,8 @@ void tiku_reader_document_window_init_profile(tiku_reader_help_window_t *c,
     }
 }
 
-int tiku_reader_document_window_zoom(tiku_reader_help_window_t *c, tiku_rect_t area)
+int tiku_reader_document_window_zoom(tiku_reader_help_window_t *c,
+                                     tiku_rect_t area)
 {
     if (!c || !c->document_mode || !c->reader || !c->window ||
         !c->window->open || area.w < 180 || area.h < 120) return 0;
@@ -223,7 +225,8 @@ int tiku_reader_document_window_zoom(tiku_reader_help_window_t *c, tiku_rect_t a
     return 1;
 }
 
-int tiku_reader_document_window_file(tiku_reader_help_window_t *c, const char *path)
+int tiku_reader_document_window_file(tiku_reader_help_window_t *c,
+                                     const char *path)
 {
     if (!c || !c->document_mode) return 0;
     char from[TIKU_PATH_MAX];
@@ -231,7 +234,10 @@ int tiku_reader_document_window_file(tiku_reader_help_window_t *c, const char *p
     tiku_reader_help_position_t at = tiku_reader_position(c);
     c->status[0] = 0;
     if (!tiku_reader_page_read(c, path)) {
-        if (!c->status[0]) tiku_reader_say(c, "Cannot read document. Choose an existing local .md, .markdown, .html or .htm file.");
+        if (!c->status[0])
+            tiku_reader_say(
+                c,
+                "Cannot read document. Choose an existing local .md, .markdown, .html or .htm file.");
         if (c->dirty) *c->dirty = 1;
         return 0;
     }
@@ -250,7 +256,9 @@ int tiku_reader_document_window_reload(tiku_reader_help_window_t *c)
     tiku_reader_help_position_t at = tiku_reader_position(c);
     c->status[0] = 0;
     if (!tiku_reader_page_read(c, path)) {
-        if (!c->status[0]) tiku_reader_say(c, "Reload failed; the displayed document has been kept.");
+        if (!c->status[0])
+            tiku_reader_say(
+                c, "Reload failed; the displayed document has been kept.");
         if (c->dirty) *c->dirty = 1;
         return 0;
     }
@@ -265,25 +273,40 @@ static void reader_title(char *out, size_t cap, const char *title)
 {
     size_t n = 0;
     for (const char *s = title ? title : "Report"; *s && n + 7 < cap; s++) {
-        const char *entity = *s == '&' ? "&amp;" : *s == '<' ? "&lt;" : *s == '>' ? "&gt;" : NULL;
-        if (entity) { size_t len = strlen(entity); memcpy(out+n, entity, len); n += len; }
-        else if ((unsigned char)*s >= 32) out[n++] = *s;
+        const char *entity = *s == '&'   ? "&amp;"
+                             : *s == '<' ? "&lt;"
+                             : *s == '>' ? "&gt;"
+                                         : NULL;
+        if (entity) {
+            size_t len = strlen(entity);
+            memcpy(out + n, entity, len);
+            n += len;
+        } else if ((unsigned char)*s >= 32)
+            out[n++] = *s;
     }
     out[n] = 0;
 }
 
-int tiku_reader_help_window_html(tiku_reader_help_window_t *c, const char *title, const char *html)
+int tiku_reader_help_window_html(tiku_reader_help_window_t *c,
+                                 const char *title, const char *html)
 {
     if (!c || !c->reader || !html) return 0;
     char escaped[768]; reader_title(escaped, sizeof escaped, title);
     size_t n = strnlen(html, TIKU_READER_HELP_PAGE_MAX) + strlen(escaped) + 16;
-    if (n >= TIKU_READER_HELP_PAGE_MAX) { tiku_reader_say(c, "Report exceeds the document size limit."); return 0; }
+    if (n >= TIKU_READER_HELP_PAGE_MAX) {
+        tiku_reader_say(c, "Report exceeds the document size limit.");
+        return 0;
+    }
     char *copy = malloc(n); if (!copy) return 0;
-    strcpy(copy, "<h1>"); strcat(copy, escaped); strcat(copy, "</h1>"); strcat(copy, html);
+    strcpy(copy, "<h1>");
+    strcat(copy, escaped);
+    strcat(copy, "</h1>");
+    strcat(copy, html);
     struct help_reader *r = c->reader;
     int slot = r->report_id++ % HELP_REPORTS;
     free(r->reports[slot].html); r->reports[slot].html = copy;
-    snprintf(r->reports[slot].name, sizeof r->reports[slot].name, "@report%d", r->report_id);
+    snprintf(r->reports[slot].name, sizeof r->reports[slot].name, "@report%d",
+             r->report_id);
     tiku_reader_help_window_open_page(c, r->reports[slot].name);
     return c->window != NULL && !strcmp(c->page, r->reports[slot].name);
 }

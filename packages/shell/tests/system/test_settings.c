@@ -136,6 +136,33 @@ int main(void)
     tiku_trk_prefs_init(&prefs); CHECK(!tiku_trk_prefs_load(&prefs, path));
     owner = tiku_trk_settings_open(&prefs, path, registry, changed, &calls); CHECK(owner);
     drain(); CHECK(calls == 1 && !tiku_trk_settings_error(owner));
+    {
+        const char *device_path = "/settings/tracker/currentdevice";
+        tiku_resource_snapshot_t observed = {0};
+        tiku_resource_caller_t reader = {
+            .authenticated = 1,
+            .scopes = 63,
+            .principal = "00000000000000000000000000000001"};
+        tiku_trk_settings_observe_devices(owner, "sensor", "simulated-port",
+                                          1);
+        if (tiku_trk_prefs_find(&prefs, "CurrentDevice")) {
+            observed = read_value(registry, device_path);
+            CHECK(!strcmp(tiku_msg_find_string(observed.applied, "value", 0),
+                          "sensor"));
+            CHECK(!strcmp(tiku_msg_find_string(observed.persisted, "value", 0),
+                          ""));
+            CHECK(!strcmp(observed.apply_state, "native_device_owner"));
+            tiku_resource_snapshot_clear(&observed);
+            CHECK(!strcmp(tiku_trk_prefs_text(&prefs, "CurrentDevice"), ""));
+            tiku_trk_settings_observe_devices(owner, "", "", 1);
+            observed = read_value(registry, device_path);
+            CHECK(!strcmp(tiku_msg_find_string(observed.applied, "value", 0),
+                          ""));
+            tiku_resource_snapshot_clear(&observed);
+        } else
+            CHECK(tiku_resource_read(registry, &reader, device_path,
+                                     &observed) == TIKU_RESOURCE_NOT_FOUND);
+    }
     CHECK(tiku_trk_settings_count(owner) == (size_t)prefs.n + 1);
     CHECK(!tiku_trk_prefs_submit(&prefs, path) && !tiku_work_busy());
     value = read_value(registry, "/settings/ui/theme");

@@ -218,17 +218,31 @@ typedef struct desktop {
     tiku_workspace_t     *desk;         /**< the windows and their stacking */
     tiku_trk_deskbar_t  *deskbar;       /**< the bar, drawn last */
     tiku_backend_t  *backend;           /**< the namespace: files and mounts */
-    tiku_trk_resource_session_t *resource_session;
-    tiku_trk_settings_t *settings;
-    tiku_trk_catalog_settings_t *catalog_settings;
-    tiku_trk_record_settings_t *record_settings;
-    tiku_trk_desktop_settings_t *desktop_settings;
-    tiku_trk_native_settings_t *native_settings;
-    tiku_trk_resource_observer_t *shell_observers[10];
-    struct desktop_lifecycle_vfs *lifecycle_vfs;
-    tiku_trk_window_resources_t *window_resources;
+    tiku_trk_resource_session_t
+        *resource_session;         /**< control transport and its registry */
+    tiku_trk_settings_t *settings; /**< settings provider owner */
+    tiku_trk_catalog_settings_t
+        *catalog_settings; /**< settings provider owner */
+    tiku_trk_record_settings_t *record_settings; /**< settings provider owner */
+    tiku_trk_desktop_settings_t
+        *desktop_settings; /**< settings provider owner */
+    tiku_trk_native_settings_t *native_settings; /**< settings provider owner */
+    tiku_trk_resource_observer_t
+        *shell_observers[10]; /**< shell observation provider owners */
+    struct desktop_lifecycle_vfs
+        *lifecycle_vfs; /**< application and job provider owners */
+    struct desktop_app_vfs
+        *app_vfs; /**< native application provider brokers */
+    struct desktop_devices_vfs *devices_vfs; /**< board control resources */
+    char resource_temporary
+        [64]; /**< automatically allocated control directory */
+    struct desktop_host_vfs *host_vfs; /**< native service provider owners */
+    uint64_t input_drops; /**< conductor events refused by the bounded ring */
+    tiku_trk_window_resources_t
+        *window_resources; /**< window and workspace provider owners */
     int resource_safe_mode, resource_boot_restore, resource_boot_fallback;
-    uint64_t resource_next_native_scan;
+    uint64_t
+        resource_next_native_scan; /**< next native record scan time in milliseconds */
     tiku_fs_t       *fs;                /**< file operations over it */
     folder_t             folders[TIKU_WINDOW_MAX]; /**< the folder windows */
     tiku_trk_services_t  services;      /**< what the views ask the desktop */
@@ -289,6 +303,8 @@ typedef struct desktop {
                                          *   opened the popup */
     int                  bar_open;      /**< the open menu title, or -1 */
     char                 status[200];   /**< the status line's text */
+    char preferred_file[TIKU_NAME_MAX]; /**< file label for save feedback */
+    char preferred_handler[TIKU_TRK_APP_NAME_MAX]; /**< chosen handler name */
     uint32_t             backdrop_color; /**< the desktop's background
                                           *   colour, as RGB */
     int                  finding;       /**< the one-line Find entry is up */
@@ -865,36 +881,31 @@ int  channel_attach(desktop_t *app, int slot);
 int desktop_remote_document(const char *path);
 
 /** @brief The Tracker preferences, kept by the preferences window. */
-static inline tiku_trk_prefs_t *
-prefs_model(desktop_t *app)
+static inline tiku_trk_prefs_t *prefs_model(desktop_t *app)
 {
     return tiku_trk_prefs_window_model(&app->prefs_window);
 }
 
 /** @brief The Select by pattern state, kept by its window. */
-static inline tiku_trk_select_t *
-select_model(desktop_t *app)
+static inline tiku_trk_select_t *select_model(desktop_t *app)
 {
     return tiku_trk_select_window_model(&app->select_window);
 }
 
 /** @brief The Find state, kept by the Find window. */
-static inline tiku_trk_find_t *
-find_model(desktop_t *app)
+static inline tiku_trk_find_t *find_model(desktop_t *app)
 {
     return tiku_trk_find_window_model(&app->find_window);
 }
 
 /** @brief The alert, kept by the status overlay. */
-static inline tiku_alert_t *
-alert_model(desktop_t *app)
+static inline tiku_alert_t *alert_model(desktop_t *app)
 {
     return tiku_trk_status_overlay_alert(&app->status_overlay);
 }
 
 /** @brief The progress window's state, kept by the status overlay. */
-static inline tiku_trk_progress_win_t *
-progress_model(desktop_t *app)
+static inline tiku_trk_progress_win_t *progress_model(desktop_t *app)
 {
     return tiku_trk_status_overlay_progress(&app->status_overlay);
 }
@@ -907,8 +918,7 @@ menu_ctx(desktop_t *app, folder_t *fl, unsigned mods)
 }
 
 /** @brief The folder behind a window, or NULL. */
-static inline folder_t *
-folder_of(desktop_t *app, tiku_window_t *w)
+static inline folder_t *folder_of(desktop_t *app, tiku_window_t *w)
 {
     return tiku_trk_folder_lifecycle_find(&app->folder_lifecycle, w);
 }
@@ -924,8 +934,7 @@ panel_asks_desktop(desktop_t *app)
 }
 
 /** @brief The folder behind the desktop's own icons. */
-static inline folder_t *
-desktop_folder(desktop_t *app)
+static inline folder_t *desktop_folder(desktop_t *app)
 {
     return tiku_trk_desktop_view_folder(&app->desktop_view);
 }
@@ -1369,7 +1378,9 @@ void desktop_startup_offer_id(desktop_t *app, const char *path,
                               const char *label, const char *id,
                               const char *legacy);
 void desktop_startup_open(desktop_t *app);
-/** @brief Copy saved restore choices and installed startup entries without draft values. */
+/** @brief Copy saved restore choices and installed startup entries without
+ * draft values.
+ */
 tiku_msg_t *desktop_startup_observe(desktop_t *app, int index);
 /** @brief Number of installed startup application rows. */
 int desktop_startup_count(const desktop_t *app);
@@ -1401,23 +1412,78 @@ void desktop_vfs_request(desktop_t *app, int session,
 /* tiku_trk_desktop_windows.c */
 void desktop_windows_attach(desktop_t *app);
 
-/** @brief Capture the inherited supervisor channel before application launches. */
+/** @brief Capture the inherited supervisor channel before application
+ * launches.
+ */
 void desktop_lifecycle_vfs_prepare(desktop_t *);
-/** @brief Whether the authenticated supervisor supplied a preceding child exit. */
+/** @brief Whether the authenticated supervisor supplied a preceding child
+ * exit.
+ */
 int desktop_lifecycle_vfs_restarting(desktop_t *);
 /** @brief Register native application, service and job owners after boot. */
 int desktop_lifecycle_vfs_open(desktop_t *);
-/** @brief Refresh native lifecycle caches before servicing resource requests. */
+/** @brief Refresh native lifecycle caches before servicing resource requests.
+ */
 void desktop_lifecycle_vfs_poll(desktop_t *,uint64_t);
-/** @brief Retire lifecycle providers and release their native observation caches. */
+/** @brief Retire lifecycle providers and release their native observation
+ * caches.
+ */
 void desktop_lifecycle_vfs_close(desktop_t *);
-/** @brief Run a parsed native scripting request against a lifetime-checked folder. */
-void desktop_script_request(desktop_t *,folder_t *,const tiku_trk_req_t *,tiku_trk_rep_t *);
+/** @brief Run a parsed native scripting request against a lifetime-checked
+ * folder.
+ */
+void desktop_script_request(desktop_t *, folder_t *, const tiku_trk_req_t *,
+                            tiku_trk_rep_t *);
 
 /* End of the shared declarations. */
 
-/** @brief Route resource commands through native window and application owners. */
+/** @brief Route resource commands through native window and application
+ * owners.
+ */
 tiku_resource_error_t desktop_window_resource_perform(void *, tiku_window_t *,
     tiku_trk_window_action_t, int, int);
+
+/** @brief Register native host observations and existing service controls. */
+int desktop_host_vfs_open(desktop_t *);
+/** @brief Refresh cached native service facts on the desktop thread. */
+void desktop_host_vfs_poll(desktop_t *,uint64_t now);
+/** @brief Retire native host providers before their underlying owners. */
+void desktop_host_vfs_close(desktop_t *);
+/** @brief Observe normalized input metadata without retaining key content. */
+void desktop_host_vfs_event(desktop_t *,const tiku_event_t *);
+/** @brief Copy a native print completion before its application grant
+ * retires.
+ */
+void desktop_host_vfs_print_done(desktop_t *, uint64_t ticket, int status,
+                                 const char *reason);
+/** @brief Save native positions and queue unmount for an exact cached record.
+ */
+int desktop_request_unmount(void *, const tiku_volume_t *, char *why,
+                            size_t capacity);
+/** @brief Route a current semantic action; native_gesture is reserved for
+ * native input.
+ */
+int desktop_access_perform(desktop_t *, tiku_remote_window_t *, uint32_t node,
+                           uint64_t document, uint64_t generation,
+                           unsigned action, int first, int last,
+                           const char *text, int native_gesture);
+
+/** @brief Register native application provider transport on the resource registry. */
+int desktop_app_vfs_open(desktop_t *);
+/** @brief Retire connection-owned app providers before registry destruction. */
+void desktop_app_vfs_close(desktop_t *);
+/** @brief Dispatch one authenticated native application provider message. */
+int desktop_app_vfs_message(desktop_t *,int,const tiku_msg_t *);
+/** @brief Deliver app-owner dispatches and retire disconnected assignments. */
+void desktop_app_vfs_poll(desktop_t *);
+/** @brief Resolve an assigned resource namespace by native connection generation. */
+int desktop_app_vfs_prefix(desktop_t *,uint64_t,char *,size_t);
+
+/** @brief Open product policy and optional native device resources. */
+int desktop_devices_vfs_open(desktop_t *);
+/** @brief Publish device observations and dispatch native keyed work. */
+void desktop_devices_vfs_poll(desktop_t *, uint64_t);
+/** @brief Retire device resources and return whether borrowed backend work drained. */
+int desktop_devices_vfs_close(desktop_t *);
 
 #endif /* TIKU_TRK_DESKTOP_PRIVATE_H_ */

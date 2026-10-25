@@ -36,7 +36,11 @@ static int mode_y(void)  { return list_y() + LIST_ROWS * row_h() +
                                   row_h() + 12; }
 static int icon_y(void)  { return mode_y() + 4 * row_h() + row_h() + 4; }
 static int motion_y(void){ return icon_y() + tiku_ui_button_h() + 12; }
-static int button_y(void){ return motion_y() + row_h() + 18 + 2 * tiku_font_plain()->height; }
+/** @brief Return the vertical position of the preferences action buttons. */
+static int button_y(void)
+{
+    return motion_y() + row_h() + 18 + 2 * tiku_font_plain()->height;
+}
 
 /** @brief The Reduce motion tick box's row, in @p content's space. */
 static tiku_rect_t
@@ -91,7 +95,8 @@ plus_rect(tiku_rect_t content)
     return r;
 }
 
-/** @brief Room for the widest size the stepper shows, in the face in force. */
+/** @brief Room for the widest size the stepper shows, in the face in force.
+ */
 static int
 number_w(void)
 {
@@ -200,7 +205,8 @@ apply(tiku_trk_desktop_prefs_window_t *controller)
     if (controller->submit_save) {
         (void)controller->submit_save(controller->save_context);
     } else {
-        (void)tiku_trk_deskprefs_save(&controller->model, controller->store, controller->node);
+        (void)tiku_trk_deskprefs_save(&controller->model, controller->store,
+                                      controller->node);
         (void)tiku_store_flush(controller->store);
     }
     /* Only a change to Reduce motion writes the settings file, which every
@@ -214,7 +220,8 @@ apply(tiku_trk_desktop_prefs_window_t *controller)
             (void)tiku_trk_prefs_submit(controller->shared_prefs,
                                       controller->shared_prefs_path);
             controller->model.value.reduce_motion =
-                tiku_trk_prefs_get(controller->shared_prefs, "ReduceMotion") != 0;
+                tiku_trk_prefs_get(controller->shared_prefs, "ReduceMotion") !=
+                0;
         }
     }
     if (!controller->submit_save && desk != NULL && desk->view != NULL) {
@@ -348,8 +355,12 @@ draw(tiku_window_t *window, tiku_surface_t *surface,
 
     if (controller->save_status) {
         const char *status = controller->save_status(controller->save_context);
-        tiku_text_block_draw(surface, (tiku_rect_t){content.x + PAD, content.y + motion_y() + row_h() + 6,
-            content.w - 2 * PAD, 2 * font->height}, TIKU_MEASURE_PLAIN, status ? status : "", TIKU_C_TEXT, 2);
+        tiku_text_block_draw(
+            surface,
+            (tiku_rect_t){content.x + PAD,
+                          content.y + motion_y() + row_h() + 6,
+                          content.w - 2 * PAD, 2 * font->height},
+            TIKU_MEASURE_PLAIN, status ? status : "", TIKU_C_TEXT, 2);
     }
 
     tiku_ui_button(surface, defaults_rect(content),

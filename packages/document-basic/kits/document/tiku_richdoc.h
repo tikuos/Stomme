@@ -63,7 +63,7 @@ typedef struct {
     size_t runs;                /**< formatting runs across the document */
     size_t styles;              /**< named paragraph and character styles */
     size_t memory_bytes;        /**< live allocations including overhead */
-    size_t history_bytes;       /**< peak extra storage across undo/redo states */
+    size_t history_bytes; /**< peak extra storage across undo/redo states */
     size_t anchors;             /**< live tracked positions */
     tiku_rich_allocator_t allocator;
 } tiku_rich_limits_t;
@@ -495,6 +495,8 @@ int tiku_richdoc_read_only(const tiku_richdoc_t *doc);
 /** @brief Enable or disable mutation refusal without changing the content.
  *  @note During change notification this does nothing. */
 void tiku_richdoc_set_read_only(tiku_richdoc_t *doc, int read_only);
+/** @brief Process-local nonzero document identity; changes on whole replacement. */
+uint64_t tiku_richdoc_identity(const tiku_richdoc_t *doc);
 /** @brief Current content generation, or 0 for NULL. */
 uint64_t tiku_richdoc_generation(const tiku_richdoc_t *doc);
 /** @brief Bytes charged to this owner, including snapshots and fragments. */

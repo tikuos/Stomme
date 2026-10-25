@@ -25,12 +25,13 @@ typedef struct {
 
 struct tiku_resource_provider_client {
     pthread_t thread;
-    char session[TIKU_RESOURCE_ID_MAX], key[TIKU_RESOURCE_KEY_MAX], prefix[TIKU_RESOURCE_PATH_MAX];
+    char session[TIKU_RESOURCE_ID_MAX], key[TIKU_RESOURCE_KEY_MAX],
+        prefix[TIKU_RESOURCE_PATH_MAX];
     char pending[TIKU_RESOURCE_ID_MAX], completing[TIKU_RESOURCE_ID_MAX];
     tiku_resource_stamp_t stamp;
     client_dispatch_t dispatches[CLIENT_DISPATCHES];
     int registered;
-    uint64_t sequence;
+    uint64_t sequence,features;
 };
 
 /** @brief Whether the creating application thread owns this state. */
@@ -40,7 +41,8 @@ static int owned(const tiku_resource_provider_client_t *client)
 }
 
 /** @brief Require singular fields from an exact set. */
-static int fields(const tiku_msg_t *message, const char *const *allowed, size_t length)
+static int fields(const tiku_msg_t *message, const char *const *allowed,
+                  size_t length)
 {
     int i;
     for (i = 0; i < tiku_msg_field_count(message); i++) {
@@ -55,9 +57,14 @@ static int fields(const tiku_msg_t *message, const char *const *allowed, size_t 
 /** @brief Read a canonical provider stamp into fixed storage. */
 static int stamp_read(const tiku_msg_t *message, tiku_resource_stamp_t *out)
 {
-    const char *key = tiku_msg_find_string(message, "provider", 0), *incarnation = tiku_msg_find_string(message, "incarnation", 0);
-    if (!key || !key[0] || strlen(key) >= sizeof out->provider || strchr(key, '/') || !tiku_resource_id_valid(incarnation) ||
-        tiku_resource_counter_parse(tiku_msg_find_string(message, "revision", 0), &out->revision) || !out->revision) return 0;
+    const char *key = tiku_msg_find_string(message, "provider", 0),
+               *incarnation = tiku_msg_find_string(message, "incarnation", 0);
+    if (!key || !key[0] || strlen(key) >= sizeof out->provider ||
+        strchr(key, '/') || !tiku_resource_id_valid(incarnation) ||
+        tiku_resource_counter_parse(
+            tiku_msg_find_string(message, "revision", 0), &out->revision) ||
+        !out->revision)
+        return 0;
     strcpy(out->provider, key); strcpy(out->incarnation, incarnation); return 1;
 }
 
@@ -67,54 +74,76 @@ static int expected_add(tiku_msg_t *message, const tiku_resource_stamp_t *stamp)
     char revision[21];
     tiku_msg_t *expected = tiku_msg_new(0);
     int ok;
-    snprintf(revision, sizeof revision, "%llu", (unsigned long long)stamp->revision);
-    ok = expected && tiku_msg_add_string(expected, "provider", stamp->provider) &&
-        tiku_msg_add_string(expected, "incarnation", stamp->incarnation) && tiku_msg_add_string(expected, "revision", revision) &&
-        tiku_msg_add_message(message, "expected", expected);
+    snprintf(revision, sizeof revision, "%llu",
+             (unsigned long long)stamp->revision);
+    ok = expected &&
+         tiku_msg_add_string(expected, "provider", stamp->provider) &&
+         tiku_msg_add_string(expected, "incarnation", stamp->incarnation) &&
+         tiku_msg_add_string(expected, "revision", revision) &&
+         tiku_msg_add_message(message, "expected", expected);
     tiku_msg_free(expected); return ok;
 }
 
 /** @brief Preflight the complete outbound frame before tracking a pending reply. */
-static tiku_msg_t *finish(tiku_resource_provider_client_t *client, tiku_msg_t *message, int ok)
+static tiku_msg_t *finish(tiku_resource_provider_client_t *client,
+                          tiku_msg_t *message, int ok)
 {
     size_t size = tiku_msg_flat_size(message);
     void *bytes = size && size <= TIKU_RESOURCE_FRAME_MAX ? malloc(size) : NULL;
-    ok = ok && bytes && tiku_msg_flatten(message, bytes, size, NULL) && !tiku_resource_message_check(bytes, size) &&
-        !tiku_resource_request_check(message, TIKU_RESOURCE_FEATURE_PROVIDER);
+    ok = ok && bytes && tiku_msg_flatten(message, bytes, size, NULL) &&
+         !tiku_resource_message_check(bytes, size) &&
+         !tiku_resource_request_check(message, client->features);
     free(bytes);
-    if (ok) { strcpy(client->pending, tiku_msg_find_string(message, "request_id", 0)); return message; }
+    if (ok) {
+        strcpy(client->pending,
+               tiku_msg_find_string(message, "request_id", 0));
+        return message;
+    }
     tiku_msg_free(message); return NULL;
 }
 
 /** @brief Build a correlated envelope while no prior request awaits its reply. */
-static tiku_msg_t *request(tiku_resource_provider_client_t *client, const char *op)
+static tiku_msg_t *request(tiku_resource_provider_client_t *client,
+                           const char *op)
 {
     char id[TIKU_RESOURCE_ID_MAX];
     tiku_msg_t *message;
-    if (!owned(client) || client->pending[0] || tiku_resource_new_id(id)) return NULL;
+    if (!owned(client) || client->pending[0] || tiku_resource_new_id(id))
+        return NULL;
     message = tiku_msg_new(TIKU_RESOURCE_MESSAGE_CODE);
-    if (message && tiku_msg_add_string(message, "op", op) && tiku_msg_add_string(message, "session", client->session) &&
-        tiku_msg_add_string(message, "request_id", id)) return message;
+    if (message && tiku_msg_add_string(message, "op", op) &&
+        tiku_msg_add_string(message, "session", client->session) &&
+        tiku_msg_add_string(message, "request_id", id))
+        return message;
     tiku_msg_free(message); return NULL;
 }
 
 /** @brief Whether a canonical resource is below this client's assigned namespace. */
-static int below(const tiku_resource_provider_client_t *client, const char *path)
+static int below(const tiku_resource_provider_client_t *client,
+                 const char *path)
 {
     size_t length = strlen(client->prefix);
-    return tiku_resource_path_valid(path) && !strncmp(path, client->prefix, length) && path[length] == '/';
+    return tiku_resource_path_valid(path) &&
+           !strncmp(path, client->prefix, length) && path[length] == '/';
 }
 
-tiku_resource_provider_client_t *tiku_resource_provider_client_new(const tiku_resource_channel_t *channel)
+tiku_resource_provider_client_t *
+tiku_resource_provider_client_new(const tiku_resource_channel_t *channel)
 {
     tiku_resource_caller_t caller;
     tiku_resource_provider_client_t *client;
-    if (!(tiku_resource_channel_features(channel) & TIKU_RESOURCE_FEATURE_PROVIDER) ||
-        tiku_resource_channel_caller(channel, &caller) || !(caller.scopes & TIKU_RESOURCE_PROVIDER)) return NULL;
+    if (!(tiku_resource_channel_features(channel) &
+          TIKU_RESOURCE_FEATURE_PROVIDER) ||
+        tiku_resource_channel_caller(channel, &caller) ||
+        !(caller.scopes & TIKU_RESOURCE_PROVIDER))
+        return NULL;
     client = calloc(1, sizeof *client);
     if (!client) return NULL;
-    client->thread = pthread_self(); strcpy(client->session, tiku_resource_channel_session(channel));
-    snprintf(client->prefix, sizeof client->prefix, "/apps/%s", caller.principal);
+    client->features=tiku_resource_channel_features(channel);
+    client->thread = pthread_self();
+    strcpy(client->session, tiku_resource_channel_session(channel));
+    snprintf(client->prefix, sizeof client->prefix, "/apps/%s",
+             caller.principal);
     snprintf(client->key, sizeof client->key, "app.%s", caller.principal);
     return client;
 }
@@ -124,49 +153,65 @@ void tiku_resource_provider_client_free(tiku_resource_provider_client_t *client)
     if (owned(client)) free(client);
 }
 
-const char *tiku_resource_provider_client_prefix(const tiku_resource_provider_client_t *client)
+const char *tiku_resource_provider_client_prefix(
+    const tiku_resource_provider_client_t *client)
 {
     return owned(client) ? client->prefix : NULL;
 }
 
-tiku_msg_t *tiku_resource_provider_client_register(tiku_resource_provider_client_t *client,
-    const tiku_resource_initial_t *initial, size_t count)
+tiku_msg_t *
+tiku_resource_provider_client_register(tiku_resource_provider_client_t *client,
+                                       const tiku_resource_initial_t *initial,
+                                       size_t count)
 {
     tiku_msg_t *message, *resources;
     size_t i;
     int ok;
-    if (!owned(client) || client->registered || !initial || !count || count > TIKU_RESOURCE_PROVIDER_RESOURCES_MAX) return NULL;
-    message = request(client, "provider-register"); resources = tiku_msg_new(0); ok = message && resources;
+    if (!owned(client) || client->registered || !initial || !count ||
+        count > TIKU_RESOURCE_PROVIDER_RESOURCES_MAX)
+        return NULL;
+    message = request(client, "provider-register");
+    resources = tiku_msg_new(0);
+    ok = message && resources;
     for (i = 0; ok && i < count; i++) {
         tiku_msg_t *entry = tiku_resource_initial_message(&initial[i]);
-        ok = below(client, initial[i].spec.path) && entry && tiku_msg_add_message(resources, "entry", entry);
+        ok = below(client, initial[i].spec.path) && entry &&
+             tiku_msg_add_message(resources, "entry", entry);
         tiku_msg_free(entry);
     }
     ok = ok && tiku_msg_add_message(message, "resources", resources);
     tiku_msg_free(resources); return finish(client, message, ok);
 }
 
-tiku_msg_t *tiku_resource_provider_client_publish(tiku_resource_provider_client_t *client,
-    const char *path, const tiku_resource_snapshot_t *snapshot)
+tiku_msg_t *
+tiku_resource_provider_client_publish(tiku_resource_provider_client_t *client,
+                                      const char *path,
+                                      const tiku_resource_snapshot_t *snapshot)
 {
     tiku_msg_t *message, *value;
     int ok;
-    if (!owned(client) || !client->registered || !below(client, path)) return NULL;
-    message = request(client, "provider-publish"); value = tiku_resource_snapshot_message(snapshot);
-    ok = message && value && expected_add(message, &client->stamp) && tiku_msg_add_string(message, "path", path) &&
-        tiku_msg_add_message(message, "snapshot", value);
+    if (!owned(client) || !client->registered || !below(client, path))
+        return NULL;
+    message = request(client, "provider-publish");
+    value = tiku_resource_snapshot_message(snapshot);
+    ok = message && value && expected_add(message, &client->stamp) &&
+         tiku_msg_add_string(message, "path", path) &&
+         tiku_msg_add_message(message, "snapshot", value);
     tiku_msg_free(value); return finish(client, message, ok);
 }
 
-tiku_msg_t *tiku_resource_provider_client_unregister(tiku_resource_provider_client_t *client)
+tiku_msg_t *tiku_resource_provider_client_unregister(
+    tiku_resource_provider_client_t *client)
 {
     tiku_msg_t *message;
     if (!owned(client) || !client->registered) return NULL;
     message = request(client, "provider-unregister");
-    return finish(client, message, message && expected_add(message, &client->stamp));
+    return finish(client, message,
+                  message && expected_add(message, &client->stamp));
 }
 
-tiku_msg_t *tiku_resource_provider_client_status(tiku_resource_provider_client_t *client)
+tiku_msg_t *
+tiku_resource_provider_client_status(tiku_resource_provider_client_t *client)
 {
     tiku_msg_t *message = request(client, "provider-status");
     return finish(client, message, message != NULL);
@@ -176,59 +221,91 @@ tiku_msg_t *tiku_resource_provider_client_status(tiku_resource_provider_client_t
 static tiku_resource_error_t error_read(const char *code)
 {
     int i;
-    if (code) for (i = TIKU_RESOURCE_OK; i <= TIKU_RESOURCE_ATOMIC_UNSUPPORTED; i++)
-        if (!strcmp(code, tiku_resource_error_name(i))) return i;
+    if (code)
+        for (i = TIKU_RESOURCE_OK; i <= TIKU_RESOURCE_ATOMIC_UNSUPPORTED; i++)
+            if (!strcmp(code, tiku_resource_error_name(i)))
+                return i;
     return TIKU_RESOURCE_INVALID;
 }
 
-tiku_resource_error_t tiku_resource_provider_client_reply(tiku_resource_provider_client_t *client, const tiku_msg_t *reply)
+tiku_resource_error_t
+tiku_resource_provider_client_reply(tiku_resource_provider_client_t *client,
+                                    const tiku_msg_t *reply)
 {
-    static const char *const allowed[] = {"session", "request_id", "result", "error"};
-    static const char *const status_fields[] = {"prefix", "registered", "provider", "incarnation", "revision"};
+    static const char *const allowed[] = {"session", "request_id", "result",
+                                          "error"};
+    static const char *const status_fields[] = {
+        "prefix", "registered", "provider", "incarnation", "revision"};
     const char *id, *session, *prefix;
     tiku_msg_t *result;
     tiku_resource_stamp_t stamp = {0};
     tiku_resource_error_t error = TIKU_RESOURCE_INVALID;
     int registered, i, valid = 0;
-    if (!owned(client) || !client->pending[0] || tiku_msg_what(reply) != TIKU_RESOURCE_MESSAGE_CODE) return error;
-    id = tiku_msg_find_string(reply, "request_id", 0); session = tiku_msg_find_string(reply, "session", 0);
-    if (!id || strcmp(id, client->pending) || !session || strcmp(session, client->session) ||
+    if (!owned(client) || !client->pending[0] ||
+        tiku_msg_what(reply) != TIKU_RESOURCE_MESSAGE_CODE)
+        return error;
+    id = tiku_msg_find_string(reply, "request_id", 0);
+    session = tiku_msg_find_string(reply, "session", 0);
+    if (!id || strcmp(id, client->pending) || !session ||
+        strcmp(session, client->session) ||
         !fields(reply, allowed, sizeof allowed / sizeof allowed[0]) ||
-        (!!tiku_msg_count(reply, "error") == !!tiku_msg_count(reply, "result"))) return error;
+        (!!tiku_msg_count(reply, "error") ==
+         !!tiku_msg_count(reply, "result")))
+        return error;
     result = tiku_msg_find_message(reply, "result", 0);
     if (result) {
         prefix = tiku_msg_find_string(result, "prefix", 0);
-        valid = prefix && !strcmp(prefix, client->prefix) && fields(result, status_fields, sizeof status_fields / sizeof status_fields[0]) &&
-            tiku_msg_find_bool(result, "registered", 0, &registered);
-        if (valid && registered) valid = stamp_read(result, &stamp) && !strcmp(stamp.provider, client->key);
+        valid = prefix && !strcmp(prefix, client->prefix) &&
+                fields(result, status_fields,
+                       sizeof status_fields / sizeof status_fields[0]) &&
+                tiku_msg_find_bool(result, "registered", 0, &registered);
+        if (valid && registered)
+            valid = stamp_read(result, &stamp) &&
+                    !strcmp(stamp.provider, client->key);
         if (valid && !registered) {
             const char *key = tiku_msg_find_string(result, "provider", 0);
-            valid = key && !strcmp(key, client->key) && !tiku_msg_count(result, "incarnation") && !tiku_msg_count(result, "revision");
+            valid = key && !strcmp(key, client->key) &&
+                    !tiku_msg_count(result, "incarnation") &&
+                    !tiku_msg_count(result, "revision");
         }
         if (valid) {
-            if (!registered || strcmp(stamp.incarnation, client->stamp.incarnation)) memset(client->dispatches, 0, sizeof client->dispatches);
-            client->registered = registered; client->stamp = stamp; error = TIKU_RESOURCE_OK;
+            if (!registered ||
+                strcmp(stamp.incarnation, client->stamp.incarnation))
+                memset(client->dispatches, 0, sizeof client->dispatches);
+            client->registered = registered;
+            client->stamp = stamp;
+            error = TIKU_RESOURCE_OK;
         }
     } else {
         tiku_msg_t *details = tiku_msg_find_message(reply, "error", 0);
         const char *code = tiku_msg_find_string(details, "code", 0);
-        error = error_read(code); valid = details && code && error != TIKU_RESOURCE_OK;
+        error = error_read(code);
+        valid = details && code && error != TIKU_RESOURCE_OK;
         tiku_msg_free(details);
     }
     tiku_msg_free(result);
     if (!valid) return TIKU_RESOURCE_INVALID;
-    if (client->completing[0] && (!error || error == TIKU_RESOURCE_OWNER_LOST || error == TIKU_RESOURCE_STALE ||
-        error == TIKU_RESOURCE_DEADLINE || error == TIKU_RESOURCE_UNKNOWN_OUTCOME)) {
+    if (client->completing[0] &&
+        (!error || error == TIKU_RESOURCE_OWNER_LOST ||
+         error == TIKU_RESOURCE_STALE || error == TIKU_RESOURCE_DEADLINE ||
+         error == TIKU_RESOURCE_UNKNOWN_OUTCOME)) {
         int count = 0, oldest = -1;
         for (i = 0; i < CLIENT_DISPATCHES; i++) {
             client_dispatch_t *dispatch = &client->dispatches[i];
-            if (!strcmp(dispatch->id, client->completing)) { dispatch->completed = 1; dispatch->sequence = ++client->sequence; }
+            if (!strcmp(dispatch->id, client->completing)) {
+                dispatch->completed = 1;
+                dispatch->sequence = ++client->sequence;
+            }
             if (dispatch->completed) {
                 count++;
-                if (oldest < 0 || dispatch->sequence < client->dispatches[oldest].sequence) oldest = i;
+                if (oldest < 0 ||
+                    dispatch->sequence < client->dispatches[oldest].sequence)
+                    oldest = i;
             }
         }
-        if (count > CLIENT_DONE_MAX) memset(&client->dispatches[oldest], 0, sizeof client->dispatches[oldest]);
+        if (count > CLIENT_DONE_MAX)
+            memset(&client->dispatches[oldest], 0,
+                   sizeof client->dispatches[oldest]);
     }
     client->pending[0] = client->completing[0] = 0;
     return error;
@@ -239,12 +316,19 @@ void tiku_resource_provider_call_clear(tiku_resource_provider_call_t *call)
     if (call) { tiku_msg_free(call->value); memset(call, 0, sizeof *call); }
 }
 
-tiku_resource_error_t tiku_resource_provider_client_event(tiku_resource_provider_client_t *client,
-    const tiku_msg_t *event, tiku_resource_provider_call_t *out)
+tiku_resource_error_t
+tiku_resource_provider_client_event(tiku_resource_provider_client_t *client,
+                                    const tiku_msg_t *event,
+                                    tiku_resource_provider_call_t *out)
 {
-    static const char *const allowed[] = {"kind", "session", "dispatch", "job", "expected", "path", "invoke", "value", "deadline_ms", "origin_request_id", "origin"};
-    static const char *const cancel_fields[] = {"kind", "session", "dispatch", "job", "expected"};
-    static const char *const expected_fields[] = {"provider", "incarnation", "revision"};
+    static const char *const allowed[] = {
+        "kind",  "session", "dispatch", "job",         "expected",
+        "path",  "invoke",  "value",    "deadline_ms", "origin_request_id",
+        "origin"};
+    static const char *const cancel_fields[] = {"kind", "session", "dispatch",
+                                                "job", "expected"};
+    static const char *const expected_fields[] = {"provider", "incarnation",
+                                                  "revision"};
     static const char *const origin_fields[] = {"principal", "scopes"};
     const char *kind, *session, *id, *job, *path, *request_id, *principal;
     tiku_msg_t *expected, *origin;
@@ -253,84 +337,267 @@ tiku_resource_error_t tiku_resource_provider_client_event(tiku_resource_provider
     int32_t deadline;
     int64_t scopes;
     if (out) memset(out, 0, sizeof *out);
-    if (!owned(client) || !out || !client->registered || tiku_msg_what(event) != TIKU_RESOURCE_MESSAGE_CODE) return TIKU_RESOURCE_INVALID;
-    kind = tiku_msg_find_string(event, "kind", 0); session = tiku_msg_find_string(event, "session", 0);
-    id = tiku_msg_find_string(event, "dispatch", 0); job = tiku_msg_find_string(event, "job", 0);
-    if (!kind || (strcmp(kind, "provider-dispatch") && strcmp(kind, "provider-cancel")) ||
-        !session || strcmp(session, client->session) || !tiku_resource_id_valid(id) || !tiku_resource_id_valid(job)) return TIKU_RESOURCE_INVALID;
+    if (!owned(client) || !out || !client->registered ||
+        tiku_msg_what(event) != TIKU_RESOURCE_MESSAGE_CODE)
+        return TIKU_RESOURCE_INVALID;
+    kind = tiku_msg_find_string(event, "kind", 0);
+    session = tiku_msg_find_string(event, "session", 0);
+    id = tiku_msg_find_string(event, "dispatch", 0);
+    job = tiku_msg_find_string(event, "job", 0);
+    if (!kind ||
+        (strcmp(kind, "provider-dispatch") &&
+         strcmp(kind, "provider-cancel")) ||
+        !session || strcmp(session, client->session) ||
+        !tiku_resource_id_valid(id) || !tiku_resource_id_valid(job))
+        return TIKU_RESOURCE_INVALID;
     cancel_event = !strcmp(kind, "provider-cancel");
     if (!fields(event, cancel_event ? cancel_fields : allowed,
-        cancel_event ? sizeof cancel_fields / sizeof cancel_fields[0] : sizeof allowed / sizeof allowed[0])) return TIKU_RESOURCE_INVALID;
+                cancel_event ? sizeof cancel_fields / sizeof cancel_fields[0]
+                             : sizeof allowed / sizeof allowed[0]))
+        return TIKU_RESOURCE_INVALID;
     expected = tiku_msg_find_message(event, "expected", 0);
-    valid = fields(expected, expected_fields, sizeof expected_fields / sizeof expected_fields[0]) && stamp_read(expected, &out->expected) &&
-        !strcmp(out->expected.provider, client->key) && !strcmp(out->expected.incarnation, client->stamp.incarnation);
+    valid = fields(expected, expected_fields,
+                   sizeof expected_fields / sizeof expected_fields[0]) &&
+            stamp_read(expected, &out->expected) &&
+            !strcmp(out->expected.provider, client->key) &&
+            !strcmp(out->expected.incarnation, client->stamp.incarnation);
     tiku_msg_free(expected);
     if (!valid) return TIKU_RESOURCE_OWNER_LOST;
-    for (i = 0; i < CLIENT_DISPATCHES; i++) if (!strcmp(client->dispatches[i].id, id)) { slot = &client->dispatches[i]; break; }
+    for (i = 0; i < CLIENT_DISPATCHES; i++)
+        if (!strcmp(client->dispatches[i].id, id)) {
+            slot = &client->dispatches[i];
+            break;
+        }
     if (cancel_event) {
-        if (!slot || slot->completed || strcmp(slot->job, job) || strcmp(slot->expected.incarnation, out->expected.incarnation) ||
-            slot->expected.revision != out->expected.revision) return TIKU_RESOURCE_OWNER_LOST;
+        if (!slot || slot->completed || strcmp(slot->job, job) ||
+            strcmp(slot->expected.incarnation, out->expected.incarnation) ||
+            slot->expected.revision != out->expected.revision)
+            return TIKU_RESOURCE_OWNER_LOST;
         if (slot->cancelled) return TIKU_RESOURCE_ID_REUSED;
-        slot->cancelled = out->cancel = 1; strcpy(out->dispatch, id); strcpy(out->job, job); return TIKU_RESOURCE_OK;
+        slot->cancelled = out->cancel = 1;
+        strcpy(out->dispatch, id);
+        strcpy(out->job, job);
+        return TIKU_RESOURCE_OK;
     }
     if (slot) return TIKU_RESOURCE_ID_REUSED;
-    for (i = 0; i < CLIENT_DISPATCHES; i++) if (client->dispatches[i].id[0] && !client->dispatches[i].completed) active++;
+    for (i = 0; i < CLIENT_DISPATCHES; i++)
+        if (client->dispatches[i].id[0] && !client->dispatches[i].completed)
+            active++;
     if (active >= CLIENT_ACTIVE_MAX) return TIKU_RESOURCE_LIMIT;
-    for (i = 0; i < CLIENT_DISPATCHES; i++) if (!client->dispatches[i].id[0]) { slot = &client->dispatches[i]; break; }
+    for (i = 0; i < CLIENT_DISPATCHES; i++)
+        if (!client->dispatches[i].id[0]) {
+            slot = &client->dispatches[i];
+            break;
+        }
     if (!slot) return TIKU_RESOURCE_LIMIT;
-    path = tiku_msg_find_string(event, "path", 0); request_id = tiku_msg_find_string(event, "origin_request_id", 0);
-    origin = tiku_msg_find_message(event, "origin", 0); principal = tiku_msg_find_string(origin, "principal", 0);
-    valid = below(client, path) && tiku_resource_id_valid(request_id) && tiku_resource_id_valid(principal) &&
-        fields(origin, origin_fields, sizeof origin_fields / sizeof origin_fields[0]) &&
-        tiku_msg_find_int64(origin, "scopes", 0, &scopes) && scopes >= 0 && !((uint64_t)scopes & ~UINT64_C(15)) &&
-        tiku_msg_find_int32(event, "deadline_ms", 0, &deadline) && deadline > 0 && deadline <= 300000 &&
-        tiku_msg_find_bool(event, "invoke", 0, &out->invoke);
-    if (valid) { strcpy(out->origin.principal, principal); out->origin.scopes = (uint64_t)scopes; }
+    path = tiku_msg_find_string(event, "path", 0);
+    request_id = tiku_msg_find_string(event, "origin_request_id", 0);
+    origin = tiku_msg_find_message(event, "origin", 0);
+    principal = tiku_msg_find_string(origin, "principal", 0);
+    valid = below(client, path) && tiku_resource_id_valid(request_id) &&
+            tiku_resource_id_valid(principal) &&
+            fields(origin, origin_fields,
+                   sizeof origin_fields / sizeof origin_fields[0]) &&
+            tiku_msg_find_int64(origin, "scopes", 0, &scopes) && scopes >= 0 &&
+            !((uint64_t)scopes & ~UINT64_C(15)) &&
+            tiku_msg_find_int32(event, "deadline_ms", 0, &deadline) &&
+            deadline > 0 && deadline <= 300000 &&
+            tiku_msg_find_bool(event, "invoke", 0, &out->invoke);
+    if (valid) {
+        strcpy(out->origin.principal, principal);
+        out->origin.scopes = (uint64_t)scopes;
+    }
     tiku_msg_free(origin);
     out->value = tiku_msg_find_message(event, "value", 0);
-    if (!valid || tiku_resource_value_check(out->value)) { tiku_resource_provider_call_clear(out); return TIKU_RESOURCE_INVALID; }
-    strcpy(out->path, path); strcpy(out->request_id, request_id); strcpy(out->dispatch, id); strcpy(out->job, job);
+    if (!valid || tiku_resource_value_check(out->value)) {
+        tiku_resource_provider_call_clear(out);
+        return TIKU_RESOURCE_INVALID;
+    }
+    strcpy(out->path, path);
+    strcpy(out->request_id, request_id);
+    strcpy(out->dispatch, id);
+    strcpy(out->job, job);
     out->deadline_ms = (unsigned)deadline;
-    strcpy(slot->id, id); strcpy(slot->job, job); slot->expected = out->expected;
+    strcpy(slot->id, id);
+    strcpy(slot->job, job);
+    slot->expected = out->expected;
     return TIKU_RESOURCE_OK;
 }
 
 /** @brief Find a previously delivered application dispatch. */
-static client_dispatch_t *dispatch_find(tiku_resource_provider_client_t *client, const char *id)
+static client_dispatch_t *
+dispatch_find(tiku_resource_provider_client_t *client, const char *id)
 {
     int i;
     if (!owned(client) || !tiku_resource_id_valid(id)) return NULL;
-    for (i = 0; i < CLIENT_DISPATCHES; i++) if (!client->dispatches[i].completed && !strcmp(client->dispatches[i].id, id)) return &client->dispatches[i];
+    for (i = 0; i < CLIENT_DISPATCHES; i++)
+        if (!client->dispatches[i].completed &&
+            !strcmp(client->dispatches[i].id, id))
+            return &client->dispatches[i];
     return NULL;
 }
 
-tiku_msg_t *tiku_resource_provider_client_complete(tiku_resource_provider_client_t *client, const char *id,
-    const tiku_resource_snapshot_t *snapshot, tiku_resource_error_t error, tiku_resource_effect_t effect)
+tiku_msg_t *tiku_resource_provider_client_complete(
+    tiku_resource_provider_client_t *client, const char *id,
+    const tiku_resource_snapshot_t *snapshot, tiku_resource_error_t error,
+    tiku_resource_effect_t effect)
 {
     client_dispatch_t *dispatch = dispatch_find(client, id);
     tiku_msg_t *message, *value = NULL;
     int ok;
-    if (!dispatch || error < TIKU_RESOURCE_OK || error > TIKU_RESOURCE_ATOMIC_UNSUPPORTED || error == TIKU_RESOURCE_PENDING ||
-        effect < TIKU_RESOURCE_EFFECT_NONE || effect > TIKU_RESOURCE_EFFECT_UNKNOWN || (!snapshot && !error)) return NULL;
+    if (!dispatch || error < TIKU_RESOURCE_OK ||
+        error > TIKU_RESOURCE_ATOMIC_UNSUPPORTED ||
+        error == TIKU_RESOURCE_PENDING || effect < TIKU_RESOURCE_EFFECT_NONE ||
+        effect > TIKU_RESOURCE_EFFECT_UNKNOWN || (!snapshot && !error))
+        return NULL;
     message = request(client, "provider-complete");
     if (snapshot) value = tiku_resource_snapshot_message(snapshot);
-    ok = message && expected_add(message, &dispatch->expected) && tiku_msg_add_string(message, "dispatch", id) &&
-        tiku_msg_add_string(message, "code", tiku_resource_error_name(error)) &&
-        tiku_msg_add_string(message, "effect", effect == TIKU_RESOURCE_EFFECT_NONE ? "none" : effect == TIKU_RESOURCE_EFFECT_PARTIAL ? "partial" : "unknown") &&
-        (!snapshot || (value && tiku_msg_add_message(message, "snapshot", value)));
+    ok = message && expected_add(message, &dispatch->expected) &&
+         tiku_msg_add_string(message, "dispatch", id) &&
+         tiku_msg_add_string(message, "code",
+                             tiku_resource_error_name(error)) &&
+         tiku_msg_add_string(message, "effect",
+                             effect == TIKU_RESOURCE_EFFECT_NONE ? "none"
+                             : effect == TIKU_RESOURCE_EFFECT_PARTIAL
+                                 ? "partial"
+                                 : "unknown") &&
+         (!snapshot ||
+          (value && tiku_msg_add_message(message, "snapshot", value)));
     tiku_msg_free(value); message = finish(client, message, ok);
     if (message) strcpy(client->completing, id);
     return message;
 }
 
-tiku_msg_t *tiku_resource_provider_client_progress(tiku_resource_provider_client_t *client,
-    const char *id, unsigned progress, int awaiting)
+tiku_msg_t *
+tiku_resource_provider_client_progress(tiku_resource_provider_client_t *client,
+                                       const char *id, unsigned progress,
+                                       int awaiting)
 {
     client_dispatch_t *dispatch = dispatch_find(client, id);
     tiku_msg_t *message;
-    if (!dispatch || progress > 1000 || (awaiting != 0 && awaiting != 1)) return NULL;
+    if (!dispatch || progress > 1000 || (awaiting != 0 && awaiting != 1))
+        return NULL;
     message = request(client, "provider-progress");
-    return finish(client, message, message && expected_add(message, &dispatch->expected) &&
-        tiku_msg_add_string(message, "dispatch", id) && tiku_msg_add_int32(message, "progress", (int32_t)progress) &&
-        tiku_msg_add_bool(message, "awaiting_confirmation", awaiting));
+    return finish(
+        client, message,
+        message && expected_add(message, &dispatch->expected) &&
+            tiku_msg_add_string(message, "dispatch", id) &&
+            tiku_msg_add_int32(message, "progress", (int32_t)progress) &&
+            tiku_msg_add_bool(message, "awaiting_confirmation", awaiting));
+}
+
+tiku_resource_provider_client_t *tiku_resource_provider_client_assigned(
+    const char *session, const char *principal, uint64_t features)
+{
+    if (!tiku_resource_id_valid(session) ||
+        !tiku_resource_id_valid(principal) ||
+        !(features & TIKU_RESOURCE_FEATURE_PROVIDER) ||
+        (features & ~TIKU_RESOURCE_FEATURES))
+        return NULL;
+    tiku_resource_provider_client_t *client = calloc(1, sizeof *client);
+    if (!client)
+        return NULL;
+    client->thread = pthread_self();
+    client->features = features;
+    strcpy(client->session, session);
+    snprintf(client->prefix, sizeof client->prefix, "/apps/%s", principal);
+    snprintf(client->key, sizeof client->key, "app.%s", principal);
+    return client;
+}
+int tiku_resource_provider_client_ready(
+    const tiku_resource_provider_client_t *client)
+{
+    return owned(client) && !client->pending[0];
+}
+tiku_msg_t *tiku_resource_provider_client_stage(
+    tiku_resource_provider_client_t *client, const char *catalog,
+    size_t offset, size_t total, const tiku_resource_initial_t *initial,
+    size_t count)
+{
+    if (!owned(client) || client->registered ||
+        !(client->features & TIKU_RESOURCE_FEATURE_PROVIDER_CATALOG) ||
+        !tiku_resource_id_valid(catalog) || !initial || !count ||
+        count > TIKU_RESOURCE_PROVIDER_RESOURCES_MAX || !total ||
+        total > TIKU_RESOURCE_PROVIDER_CATALOG_MAX || offset >= total ||
+        count > total - offset)
+        return NULL;
+    tiku_msg_t *message = request(client, "provider-stage"),
+               *resources = tiku_msg_new(0);
+    int ok = message && resources;
+    for(size_t i=0;i<count&&ok;i++) {
+        tiku_msg_t *entry = tiku_resource_initial_message(&initial[i]);
+        ok = below(client, initial[i].spec.path) && entry &&
+             tiku_msg_add_message(resources, "entry", entry);
+        tiku_msg_free(entry);
+    }
+    ok = ok && tiku_msg_add_string(message, "catalog", catalog) &&
+         tiku_msg_add_int32(message, "offset", (int32_t)offset) &&
+         tiku_msg_add_int32(message, "total", (int32_t)total) &&
+         tiku_msg_add_message(message, "resources", resources);
+    tiku_msg_free(resources);return finish(client,message,ok);
+}
+/** @brief Build one exact catalog lifecycle request without a live provider stamp. */
+static tiku_msg_t *catalog_end(tiku_resource_provider_client_t *client,
+                               const char *catalog, const char *op)
+{
+    if (!owned(client) || client->registered ||
+        !(client->features & TIKU_RESOURCE_FEATURE_PROVIDER_CATALOG) ||
+        !tiku_resource_id_valid(catalog))
+        return NULL;
+    tiku_msg_t *message = request(client, op);
+    return finish(client, message,
+                  message && tiku_msg_add_string(message, "catalog", catalog));
+}
+tiku_msg_t *
+tiku_resource_provider_client_commit(tiku_resource_provider_client_t *client,
+                                     const char *catalog)
+{
+    return catalog_end(client, catalog, "provider-commit");
+}
+tiku_msg_t *
+tiku_resource_provider_client_abort(tiku_resource_provider_client_t *client,
+                                    const char *catalog)
+{
+    return catalog_end(client, catalog, "provider-abort");
+}
+
+tiku_msg_t *
+tiku_resource_provider_client_stream(tiku_resource_provider_client_t *client,
+                                     const char *path, const char *transfer,
+                                     size_t offset, size_t total,
+                                     const void *data, size_t count)
+{
+    if (!owned(client) || !client->registered ||
+        !(client->features & TIKU_RESOURCE_FEATURE_STREAM) ||
+        !(client->features & TIKU_RESOURCE_FEATURE_PROVIDER_CATALOG) ||
+        !below(client, path) || !tiku_resource_id_valid(transfer) ||
+        total > TIKU_RESOURCE_STREAM_BYTES || offset > total ||
+        count > total - offset || count > TIKU_RESOURCE_STREAM_CHUNK ||
+        (!count && total) || (!data && count))
+        return NULL;
+    char at[32], length[32];
+    snprintf(at, sizeof at, "%zu", offset);
+    snprintf(length, sizeof length, "%zu", total);
+    tiku_msg_t *message=request(client,"provider-stream");
+    int ok = message && expected_add(message, &client->stamp) &&
+             tiku_msg_add_string(message, "path", path) &&
+             tiku_msg_add_string(message, "transfer", transfer) &&
+             tiku_msg_add_string(message, "offset", at) &&
+             tiku_msg_add_string(message, "total", length) &&
+             tiku_msg_add_blob(message, "data", data ? data : "", count);
+    return finish(client,message,ok);
+}
+
+tiku_msg_t *tiku_resource_provider_client_availability(
+    tiku_resource_provider_client_t *client, const char *path, int available)
+{
+    if (!owned(client) || !client->registered ||
+        !(client->features & TIKU_RESOURCE_FEATURE_PROVIDER_CATALOG) ||
+        !below(client, path))
+        return NULL;
+    tiku_msg_t *message = request(client, "provider-availability");
+    int ok = message && expected_add(message, &client->stamp) &&
+             tiku_msg_add_string(message, "path", path) &&
+             tiku_msg_add_bool(message, "available", available != 0);
+    return finish(client, message, ok);
 }

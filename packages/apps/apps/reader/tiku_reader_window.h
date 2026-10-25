@@ -83,6 +83,7 @@ typedef struct {
      * The page and its tables are on the heap, outside this structure,
      * which the app holds by value.
      */
+    uint64_t resource_document; /**< owner-local page lifetime counter */
     tiku_doc_t       *doc;
     tiku_scroll_t     bar;
     tiku_dialog_t     dialog;
@@ -124,14 +125,16 @@ void tiku_reader_document_window_init_profile(tiku_reader_help_window_t *c,
 /** @brief Read the local file @p path into the window and open it; a
  *         failed read keeps the page shown and the history as they were,
  *         and says why.  @return 1 when it was read. */
-int tiku_reader_document_window_file(tiku_reader_help_window_t *c, const char *path);
+int tiku_reader_document_window_file(tiku_reader_help_window_t *c,
+                                     const char *path);
 /** @brief Read the shown document again, back at the place it was read
  *         to and without a history entry; a failed read keeps what is
  *         shown.  @return 1 when reloaded. */
 int tiku_reader_document_window_reload(tiku_reader_help_window_t *c);
 /** @brief Maximize the window within @p area, the desk's usable area, or
  *         restore the frame it had before.  @return 1 when it changed. */
-int tiku_reader_document_window_zoom(tiku_reader_help_window_t *c, tiku_rect_t area);
+int tiku_reader_document_window_zoom(tiku_reader_help_window_t *c,
+                                     tiku_rect_t area);
 /** @brief Whether @p path's suffix, in any case, is one Open and document
  *         links accept: .md, .markdown, .html or .htm. */
 int tiku_reader_document_file_supported(const char *path);
@@ -188,8 +191,8 @@ int tiku_reader_help_window_ready(const tiku_reader_help_window_t *c);
  * HTML file opens it here; anything else is refused.  A refusal is said in
  * the status line.
  */
-tiku_reader_help_where_t tiku_reader_help_window_go(tiku_reader_help_window_t *c,
-                                              const char *href);
+tiku_reader_help_where_t
+tiku_reader_help_window_go(tiku_reader_help_window_t *c, const char *href);
 
 /** @brief Step back to the page before, at the place it was left.
  *  @return 1 when it moved. */
