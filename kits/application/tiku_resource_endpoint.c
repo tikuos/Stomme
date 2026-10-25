@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/file.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
@@ -54,6 +55,7 @@ tiku_resource_endpoint_t *tiku_resource_endpoint_open(const char *directory)
     if(!directory || directory[0]!='/' || strlen(directory)>=sizeof address.sun_path-14)return NULL;
     if(!mkdir(directory,0700))created=1;else if(errno!=EEXIST)return NULL;
     dirfd=private_directory(directory);if(dirfd<0)return NULL;
+    if(flock(dirfd,LOCK_EX|LOCK_NB)){close(dirfd);return NULL;}
     if(!fstatat(dirfd,"control.sock",&state,AT_SYMLINK_NOFOLLOW) || errno!=ENOENT){close(dirfd);return NULL;}
     fd=socket(AF_UNIX,SOCK_STREAM,0);if(fd<0 || socket_flags(fd)){if(fd>=0)close(fd);close(dirfd);return NULL;}
     address.sun_family=AF_UNIX;snprintf(address.sun_path,sizeof address.sun_path,"%s/control.sock",directory);
@@ -65,6 +67,28 @@ tiku_resource_endpoint_t *tiku_resource_endpoint_open(const char *directory)
     if(!endpoint){close(fd);unlinkat(dirfd,"control.sock",0);close(dirfd);return NULL;}
     endpoint->fd=fd;endpoint->directory_fd=dirfd;endpoint->created=created;endpoint->thread=pthread_self();
     endpoint->device=state.st_dev;endpoint->inode=state.st_ino;strcpy(endpoint->directory,directory);return endpoint;
+}
+
+int tiku_resource_endpoint_recover(const char *directory)
+{
+    struct sockaddr_un address={0};struct stat before,after;int directory_fd,fd,error,result=-1;
+    if(!directory||directory[0]!='/'||strlen(directory)>=sizeof address.sun_path-14){errno=EINVAL;return -1;}
+    directory_fd=private_directory(directory);
+    if(directory_fd<0)return errno==ENOENT?0:-1;
+    if(flock(directory_fd,LOCK_EX|LOCK_NB))goto done;
+    if(fstatat(directory_fd,"control.sock",&before,AT_SYMLINK_NOFOLLOW)) {
+        if(errno==ENOENT)result=0;
+        goto done;
+    }
+    if(!S_ISSOCK(before.st_mode)||before.st_uid!=geteuid()||(before.st_mode&0777)!=0600)goto done;
+    fd=socket(AF_UNIX,SOCK_STREAM,0);if(fd<0)goto done;
+    if(socket_flags(fd)){close(fd);goto done;}
+    address.sun_family=AF_UNIX;snprintf(address.sun_path,sizeof address.sun_path,"%s/control.sock",directory);
+    error=connect(fd,(struct sockaddr *)&address,sizeof address)?errno:0;close(fd);
+    if(error!=ECONNREFUSED)goto done;
+    if(fstatat(directory_fd,"control.sock",&after,AT_SYMLINK_NOFOLLOW)||before.st_dev!=after.st_dev||before.st_ino!=after.st_ino)goto done;
+    result=unlinkat(directory_fd,"control.sock",0);
+done:close(directory_fd);return result;
 }
 
 int tiku_resource_endpoint_accept(tiku_resource_endpoint_t *endpoint)

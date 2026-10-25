@@ -193,9 +193,15 @@ tracker_run(int argc, char **argv)
     if (code >= 0) {
         return code;
     }
+    desktop_lifecycle_vfs_prepare(&app);
     code = desktop_boot(&app, &opt, &lp);
     if (code >= 0) {
+        desktop_lifecycle_vfs_close(&app);
         if(app.fs != NULL)tiku_trk_session_drain_filesystem(app.fs);
+        tiku_trk_open_with_window_destroy(&app.open_with_window);
+        tiku_trk_record_settings_close(app.record_settings);
+        tiku_trk_catalog_settings_close(app.catalog_settings);
+        tiku_trk_settings_close(app.settings);
         tiku_trk_resource_session_close(app.resource_session);
         return code;
     }

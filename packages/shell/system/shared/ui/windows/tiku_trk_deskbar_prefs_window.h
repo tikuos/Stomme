@@ -35,6 +35,9 @@ typedef struct {
     int screen_w;
     int screen_h;
     int *dirty;                       /**< set when a redraw is owed */
+    void *save_context;
+    int (*submit_save)(void *);
+    const char *(*save_status)(void *);
     char menu_dir[TIKU_PATH_MAX];     /**< the Deskbar's menu folder */
     tiku_trk_deskbar_prefs_open_fn open_path;  /**< opens menu_dir */
     void *open_context;

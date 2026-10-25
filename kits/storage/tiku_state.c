@@ -15,6 +15,8 @@
  */
 
 #include "tiku_state.h"
+#include "tiku_state_private.h"
+#include "tiku_state_update.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -30,31 +32,6 @@
 #endif
 
 #include <stdint.h>
-
-#define STATE_NODE_MAX 256
-/* The longest attribute name a record keeps, with its terminator; the
- * xattr store's "user." prefix has room of its own. */
-#define STATE_ATTR_MAX 64
-#define STATE_VAL_MAX  4096
-#define SIDECAR_MAGIC  "TRKSTATE1"
-
-enum store_kind { STORE_XATTR, STORE_SIDECAR, STORE_MEMORY };
-
-typedef struct state_rec {
-    char              node[STATE_NODE_MAX];
-    char              attr[STATE_ATTR_MAX];
-    unsigned char    *val;
-    size_t            len;
-    struct state_rec *next;
-} state_rec_t;
-
-struct tiku_store {
-    enum store_kind kind;
-    state_rec_t    *recs;
-    char            path[512];      /* sidecar file */
-    int             dirty;
-    int             writable;
-};
 
 /*---------------------------------------------------------------------------*/
 /* record list (sidecar + memory)                                            */
@@ -241,6 +218,8 @@ sidecar_save(tiku_store_t *s)
         (void)unlink(tmp);
         return -1;
     }
+    tiku_store_free(s->persisted);
+    s->persisted = tiku_state_private_copy(s);
     s->dirty = 0;
     return 0;
 }
@@ -307,6 +286,7 @@ tiku_store_sidecar_open(const char *devid)
         memcpy(s->path + dl + 1u + il, ".state", 7u);
     }
     (void)sidecar_load(s);
+    s->persisted = tiku_state_private_copy(s);
     return s;
 }
 
@@ -318,9 +298,12 @@ tiku_store_free(tiku_store_t *s)
     if (s == NULL) {
         return;
     }
-    if (s->kind == STORE_SIDECAR && s->dirty && s->writable) {
+    if (s->update) {
+        tiku_store_update_detach(s->update);
+    } else if (s->kind == STORE_SIDECAR && s->dirty && s->writable && !s->needs_reload) {
         (void)sidecar_save(s);
     }
+    tiku_store_free(s->persisted);
     r = s->recs;
     while (r != NULL) {
         state_rec_t *next = r->next;
@@ -559,7 +542,10 @@ tiku_store_flush(tiku_store_t *s)
     if (s == NULL) {
         return -1;
     }
-    if (s->kind == STORE_SIDECAR && s->dirty && s->writable) {
+    if (s->update || s->needs_reload) {
+        errno = EBUSY;
+        return -1;
+    } else if (s->kind == STORE_SIDECAR && s->dirty && s->writable) {
         return sidecar_save(s);
     }
     return 0;
@@ -672,4 +658,24 @@ tiku_state_mkparents(const char *path)
         }
     }
     return make_parent(dir);
+}
+
+int
+tiku_store_native_attributes(const tiku_store_t *s)
+{
+    return s != NULL && s->kind == STORE_XATTR;
+}
+
+int
+tiku_state_cached_each(const tiku_store_t *store,
+    int (*visitor)(const char *, const char *, const void *, size_t, void *), void *context)
+{
+    state_rec_t *record; int count = 0;
+    if (!store || !visitor) { errno = EINVAL; return -1; }
+    if (store->kind == STORE_XATTR) { errno = ENOTSUP; return -1; }
+    for (record = store->recs; record; record = record->next) {
+        count++;
+        if (visitor(record->node,record->attr,record->val,record->len,context)) break;
+    }
+    return count;
 }

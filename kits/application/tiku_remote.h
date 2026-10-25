@@ -279,6 +279,15 @@ void tiku_remote_event(tiku_remote_listener_t *listener,
                             struct tiku_window *window,
                             const tiku_event_t *event);
 
+/** @brief Queue a Cmd-W close request without issuing an input-gesture grant.
+ *  @return 1 when queued, 0 when the owner is disconnected or its queue refuses.
+ *  @note The application retains its close decision and dirty-document prompts. */
+int tiku_remote_request_close(tiku_remote_listener_t *, struct tiku_window *);
+/** @brief Queue Cmd-Q through the current app owner without an input-gesture grant.
+ *  @return 1 when queued; the application retains its quit decision. */
+int tiku_remote_request_quit(tiku_remote_listener_t *, struct tiku_window *);
+
+
 /** @brief Send a menu pick to the session owning @p window. */
 void tiku_remote_pick(tiku_remote_listener_t *listener,
                            struct tiku_window *window, int command);

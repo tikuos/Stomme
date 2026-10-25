@@ -167,10 +167,7 @@ deskbar_pick_clock(desktop_t *app, tiku_trk_db_pick_t *pick)
             (pick->what == TIKU_TRK_DB_CLOCK_SHOW);
         tiku_trk_deskbar_settings_normalize(
             &app->deskbar_prefs_window.model.value);
-        tiku_trk_deskbar_apply_settings(app->deskbar,
-            &app->deskbar_prefs_window.model.value);
-        (void)tiku_trk_deskbar_prefs_save(
-            &app->deskbar_prefs_window.model, app->store);
+        (void)tiku_trk_record_settings_submit(app->record_settings, 0);
         break;
     case TIKU_TRK_DB_CLOCK_SECONDS:
     case TIKU_TRK_DB_CLOCK_DAY:
@@ -187,10 +184,7 @@ deskbar_pick_clock(desktop_t *app, tiku_trk_db_pick_t *pick)
         }
         tiku_trk_deskbar_settings_normalize(
             &app->deskbar_prefs_window.model.value);
-        tiku_trk_deskbar_apply_settings(app->deskbar,
-            &app->deskbar_prefs_window.model.value);
-        (void)tiku_trk_deskbar_prefs_save(
-            &app->deskbar_prefs_window.model, app->store);
+        (void)tiku_trk_record_settings_submit(app->record_settings, 0);
         break;
     default:
         return 0;
@@ -419,7 +413,7 @@ deskbar_pick_system(desktop_t *app, tiku_trk_db_pick_t *pick)
          * wrapping round. */
         tiku_trk_prefs_set(prefs, "DarkMode",
                            (tiku_trk_prefs_get(prefs, "DarkMode") + 1) % 3);
-        (void)tiku_trk_prefs_save(prefs, app->prefs_window.path);
+        (void)tiku_trk_prefs_submit(prefs, app->prefs_window.path);
         sync_folder_preferences(app);
         desktop_damage_all(app);
         break;
@@ -429,8 +423,9 @@ deskbar_pick_system(desktop_t *app, tiku_trk_db_pick_t *pick)
          * rest of the Deskbar's. */
         app->deskbar_prefs_window.model.value.show_replicants =
             tiku_trk_deskbar_show_replicants(app->deskbar);
-        (void)tiku_trk_deskbar_prefs_save(
-            &app->deskbar_prefs_window.model, app->store);
+        (void)tiku_trk_record_settings_submit(app->record_settings, 0);
+        tiku_trk_deskbar_apply_settings(app->deskbar,
+            &app->deskbar_prefs_window.model.value);
         desktop_damage_all(app);
         break;
     case TIKU_TRK_DB_SHOW_ABOUT:

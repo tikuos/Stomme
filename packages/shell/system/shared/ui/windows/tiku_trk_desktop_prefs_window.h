@@ -29,6 +29,9 @@ typedef struct {
     tiku_store_t             *store;
     tiku_trk_prefs_t         *shared_prefs;   /**< where ReduceMotion lives */
     char                     shared_prefs_path[TIKU_PATH_MAX]; /**< its file */
+    void *save_context; /**< context for native persistence callbacks */
+    int (*submit_save)(void *); /**< enqueue background and icon proposals */
+    const char *(*save_status)(void *); /**< pending or failed save feedback */
     int                           screen_w;
     int                           screen_h;
     int                          *dirty;     /**< set when a redraw is owed */

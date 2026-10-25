@@ -605,6 +605,14 @@ fill_from(tiku_trk_poseview_t *v, const tiku_model_t *m, int n,
         return -1;
     }
     first_query = as_query && !v->is_query;
+    /* Explicit model replacement supersedes outstanding directory listings. */
+    v->load_gen++;
+    v->loading = 0;
+    v->awaiting = 0;
+    v->relisting = 0;
+    v->stage_count = 0;
+    v->stage_at = 0;
+    v->inserted_count = 0;
     free(v->model_dirs);
     v->model_dirs = NULL;
     v->model_dir_count = 0;
@@ -831,6 +839,7 @@ tiku_trk_poseview_switch_dir(tiku_trk_poseview_t *v, const char *path)
     tiku_park_clear(&v->park);
     v->zombie_count = 0;
     snprintf(v->path, sizeof v->path, "%s", path);
+    v->view_cleared = 0;
     v->scroll = 0;
     return tiku_trk_poseview_reload(v);
 }

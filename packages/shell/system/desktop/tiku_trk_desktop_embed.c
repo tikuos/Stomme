@@ -518,6 +518,7 @@ embed_stop(struct desktop_embed *slot)
 /**
  * @brief Hand @p ev to the application with the id of window @p ew; an
  *        application with no windowed handler gets its plain one.
+ * Stops the application when its handler returns nonzero.
  * @return nonzero when the application says it is done.
  */
 int
@@ -528,8 +529,9 @@ embed_deliver(struct embed_win *ew, const tiku_event_t *ev)
     if (slot == NULL || !slot->running) {
         return 0;
     }
-    return tiku_app_deliver_event(slot->descriptor, slot->state,
-                                       ew->id, ev);
+    int done=tiku_app_deliver_event(slot->descriptor, slot->state,ew->id,ev);
+    if(done)embed_stop(slot);
+    return done;
 }
 #if TIKU_SHELL_BOARD_SERVICES
 

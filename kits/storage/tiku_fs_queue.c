@@ -62,6 +62,8 @@ start(tiku_fs_t *fs, tiku_op_t op, const char *const *paths, int n,
                  "Too many paths in one operation (maximum %d)", FS_QUEUE_MAX);
         return -1;
     }
+    if(fs->operation_generation==UINT64_MAX)return -1;
+    fs->operation_generation++;
     fs->prog.error[0] = '\0';
     fs->prog.skipped = 0;
     fs->qcount = 0;

@@ -219,7 +219,7 @@ event(tiku_window_t *window, const tiku_event_t *event,
         }
     }
     if (controller->path[0] != '\0') {
-        (void)tiku_trk_prefs_save(&controller->model, controller->path);
+        (void)tiku_trk_prefs_submit(&controller->model, controller->path);
     }
     if (controller->dirty != NULL) {
         *controller->dirty = 1;

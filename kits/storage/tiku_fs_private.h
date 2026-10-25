@@ -90,6 +90,7 @@ struct tiku_fs {
                                        for a job without one            */
     tiku_conflict_t  policy;        /**< how the next collision is
                                        answered                         */
+    uint64_t        operation_generation; /**< native operation incarnation */
     tiku_progress_t  prog;          /**< the job's progress             */
 
     int              pending_ask;   /**< policy is a one-shot Replace,

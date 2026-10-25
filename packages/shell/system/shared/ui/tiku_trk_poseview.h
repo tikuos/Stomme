@@ -26,6 +26,9 @@
 #include "tiku_trk_view_defs.h"
 #include <stdint.h>
 
+/** @brief Maximum number of entries held by one pose view. */
+#define TIKU_TRK_POSES_MAX 4096
+
 /**
  * @brief The MIME type that names a copied column layout.
  *
@@ -312,6 +315,11 @@ int tiku_trk_poseview_count(const tiku_trk_poseview_t *v);
  *        @return NULL off the end.
  */
 tiku_trk_pose_t *tiku_trk_poseview_at(tiku_trk_poseview_t *v, int i);
+
+/** @brief Number of loaded poses, including filtered or invisible entries. */
+int tiku_trk_poseview_total_count(const tiku_trk_poseview_t *);
+/** @brief Borrow one loaded pose by storage index, or NULL out of range. */
+const tiku_trk_pose_t *tiku_trk_poseview_entry(const tiku_trk_poseview_t *, int index);
 
 /** @brief How many poses are selected, filtered out or not. */
 int tiku_trk_poseview_selection_count(const tiku_trk_poseview_t *v);
@@ -915,6 +923,13 @@ int tiku_trk_poseview_select_rect(tiku_trk_poseview_t *v, int x0, int y0,
  * @return poses placed.
  */
 int tiku_trk_poseview_restore_state(tiku_trk_poseview_t *v);
+
+/** @brief Apply a validated saved view, column or pose record without filesystem I/O.
+ *  @return 1 when the record belongs to this loaded view, 0 otherwise. */
+int tiku_trk_poseview_apply_record(tiku_trk_poseview_t *, const char *attribute,
+    const char *node, const void *bytes, size_t length);
+/** @brief Apply copied native column bytes through the normal layout validation. */
+int tiku_trk_poseview_apply_columns(tiku_trk_poseview_t *, const void *, size_t length);
 
 /**
  * @brief Persist positions and the view state for the current folder.

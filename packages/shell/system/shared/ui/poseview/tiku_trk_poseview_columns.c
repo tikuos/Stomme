@@ -146,7 +146,7 @@ tiku_trk_poseview_restore_columns(tiku_trk_poseview_t *v)
 {
     tiku_store_t *store;
     column_rec_t rec[TIKU_TRK_COLUMNS_MAX];
-    int n, kept = 0, i, j, order = -1;
+
     size_t got = 0;
 
     if (v == NULL) {
@@ -175,6 +175,16 @@ tiku_trk_poseview_restore_columns(tiku_trk_poseview_t *v)
         }
         got = (size_t)r;
     }
+    return tiku_trk_poseview_apply_columns(v,rec,got);
+}
+
+int
+tiku_trk_poseview_apply_columns(tiku_trk_poseview_t *v, const void *bytes, size_t got)
+{
+    column_rec_t rec[TIKU_TRK_COLUMNS_MAX];
+    int n, kept = 0, i, j, order = -1;
+    if (!v || !bytes || !got || got > sizeof rec) return 0;
+    memcpy(rec,bytes,got);
     /* A record that is not a whole number of columns, such as a truncated
      * write, is refused. */
     if (got % sizeof rec[0] != 0u) {
@@ -198,6 +208,7 @@ tiku_trk_poseview_restore_columns(tiku_trk_poseview_t *v)
             rec[i].width = swap32(rec[i].width);
             rec[i].alignment = swap32(rec[i].alignment);
         }
+        if (!memchr(rec[i].attr,0,sizeof rec[i].attr)) return 0;
         if (rec[i].attr[0] != '\0') {
             /* Registered again under this session's numbering, so a layout
              * saved with three attribute columns comes back with the same

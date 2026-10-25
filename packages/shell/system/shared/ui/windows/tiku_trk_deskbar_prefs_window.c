@@ -11,6 +11,7 @@
 
 #include "tiku_layout.h"
 #include "tiku_strings.h"
+#include "tiku_text_layout_paint.h"
 #include "tiku_trk_deskbar_prefs_window.h"
 #include "tiku_trk_gfx_dep.h"
 #include "tiku_ui.h"
@@ -88,6 +89,11 @@ row_value(tiku_trk_deskbar_settings_t *s, int row)
 static void
 apply(tiku_trk_deskbar_prefs_window_t *controller)
 {
+    if (controller->submit_save) {
+        (void)controller->submit_save(controller->save_context);
+        if (controller->dirty) *controller->dirty = 1;
+        return;
+    }
     tiku_trk_deskbar_settings_normalize(&controller->model.value);
     tiku_trk_deskbar_apply_settings(controller->deskbar,
                                     &controller->model.value);
@@ -212,6 +218,12 @@ draw(tiku_window_t *window, tiku_surface_t *surface,
         tiku_text(surface, font, content.x + 18, content.y + 432,
                        tiku_str("prefs.deskbar.dock_location"),
                        TIKU_C_TEXT);
+    }
+    if (controller->save_status) {
+        const char *status = controller->save_status(controller->save_context);
+        if (status && *status) tiku_text_line_draw(surface,
+            (tiku_rect_t){content.x + 18, content.y + 518, content.w - 36, 30},
+            TIKU_MEASURE_PLAIN, status, TIKU_C_TEXT);
     }
     button(surface, (tiku_rect_t){ content.x + 18, content.y + 488,
            112, 26 }, tiku_str("button.defaults"),

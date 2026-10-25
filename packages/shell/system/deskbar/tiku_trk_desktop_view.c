@@ -302,11 +302,15 @@ void
 tiku_trk_desktop_view_rebuild(tiku_trk_desktop_view_t *controller)
 {
     tiku_volumes_t volumes;
-    tiku_model_t models[64];
+    tiku_model_t *models;
     char trash[TIKU_PATH_MAX];
     int count = 0, have_volumes;
 
     if (controller == NULL || controller->folder.view == NULL) {
+        return;
+    }
+    models = calloc(TIKU_TRK_POSES_MAX, sizeof *models);
+    if (models == NULL) {
         return;
     }
     have_volumes = tiku_volumes_scan(&volumes) >= 0;
@@ -315,12 +319,14 @@ tiku_trk_desktop_view_rebuild(tiku_trk_desktop_view_t *controller)
             controller->folder.path, &controller->sources);
     }
     count = tiku_vdir_list(&controller->sources, controller->backend,
-        models, (int)(sizeof models / sizeof models[0]));
+        models, TIKU_TRK_POSES_MAX);
     if (count < 0) {
-        count = 0;
+        free(models);
+        return;
     }
     (void)tiku_trk_poseview_set_models(controller->folder.view, models,
                                        count);
+    free(models);
     (void)tiku_trk_poseview_restore_state(controller->folder.view);
     tiku_trk_poseview_set_mode(controller->folder.view,
         tiku_trk_deskicons_mode(
@@ -376,6 +382,9 @@ tiku_trk_desktop_view_init(tiku_trk_desktop_view_t *controller,
     controller->deskbar = deskbar;
     controller->screen_w = screen_w;
     controller->screen_h = screen_h;
+    /* Reserve the configured menu strip before restoring saved positions. */
+    controller->top_inset = tiku_trk_prefs_get(prefs,"GlobalMenuBar") && render->menus ? render->menus->bar.height : 0;
+    tiku_trk_deskbar_set_top_inset(deskbar,controller->top_inset);
     home = getenv("HOME");
     (void)home;
     (void)tiku_desktop_dir(controller->folder.path,

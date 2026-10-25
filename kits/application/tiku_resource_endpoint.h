@@ -12,6 +12,10 @@
 typedef struct tiku_resource_endpoint tiku_resource_endpoint_t;
 /** @brief Bind control.sock without replacing existing files or endpoints. */
 tiku_resource_endpoint_t *tiku_resource_endpoint_open(const char *directory);
+/** @brief Remove a same-user 0600 socket with no listener under its directory lock.
+ *  @return 0 when absent or removed; -1 for active, replaced or untrusted paths.
+ *  @note Explicit recovery; ordinary open preserves preexisting endpoint paths. */
+int tiku_resource_endpoint_recover(const char *directory);
 /** @brief Accept a nonblocking descriptor, or -1 when empty/error; caller closes. */
 int tiku_resource_endpoint_accept(tiku_resource_endpoint_t *);
 /** @brief Retire the owned socket; retain replaced paths and preexisting directories. */

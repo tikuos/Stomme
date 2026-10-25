@@ -197,49 +197,53 @@ tiku_trk_types_load(tiku_trk_types_t *db, const char *path)
     return n;
 }
 
-int
-tiku_trk_types_save(const tiku_trk_types_t *db, const char *path)
+const char *tiku_trk_types_column_name(int column)
 {
-    static const char *const kName[] = {
+    static const char *const names[] = {
         "name", "kind", "value", "size", "cap", "modified", "location",
         "permissions", "original_path"
     };
-    FILE *f;
-    int i, k;
+    return column >= 0 && (size_t)column < sizeof names / sizeof names[0]
+        ? names[column] : NULL;
+}
 
-    if (db == NULL || path == NULL) {
-        return -1;
+int tiku_trk_types_write_record(FILE *file, const tiku_trk_typerec_t *record)
+{
+    int i, count = 0;
+    if (!file || !record) return -1;
+    if (fprintf(file, "%s\t%s\t%s\t", record->type, record->desc, record->icon) < 0) return -1;
+    for (i = 0; i < record->ncol; i++) {
+        const char *name = tiku_trk_types_column_name(record->col[i]);
+        if (!name || fprintf(file, "%s%s", count++ ? "," : "", name) < 0) return -1;
     }
-    f = fopen(path, "w");
-    if (f == NULL) {
-        return -1;
-    }
-    (void)fputs("# type\tdescription\ticon\tcolumns\n", f);
-    for (i = 0; i < db->n; i++) {
-        (void)fprintf(f, "%s\t%s\t%s\t", db->rec[i].type, db->rec[i].desc,
-                      db->rec[i].icon);
-        for (k = 0; k < db->rec[i].ncol; k++) {
-            int c = db->rec[i].col[k];
+    for (i = 0; i < record->nattr; i++)
+        if (fprintf(file, "%sattr:%s", count++ ? "," : "", record->attr[i]) < 0) return -1;
+    if (record->document && fprintf(file, "%sdocument", count ? "," : "") < 0) return -1;
+    return ferror(file) ? -1 : 0;
+}
 
-            (void)fprintf(f, "%s%s", (k > 0) ? "," : "",
-                          (c >= 0 && c < (int)(sizeof kName /
-                                               sizeof kName[0]))
-                              ? kName[c] : "");
-        }
-        for (k = 0; k < db->rec[i].nattr; k++) {
-            (void)fprintf(f, "%sattr:%s",
-                          (k > 0 || db->rec[i].ncol > 0) ? "," : "",
-                          db->rec[i].attr[k]);
-        }
-        if (db->rec[i].document) {
-            (void)fprintf(f, "%sdocument",
-                          (db->rec[i].ncol > 0 || db->rec[i].nattr > 0)
-                              ? "," : "");
-        }
-        (void)fputc('\n', f);
-    }
-    (void)fclose(f);
-    return 0;
+int tiku_trk_types_save(const tiku_trk_types_t *db, const char *path)
+{
+    FILE *file;
+    int i, error = 0;
+    if (!db || !path || !(file = fopen(path, "w"))) return -1;
+    if (fputs("# type\tdescription\ticon\tcolumns\n", file) < 0) error = 1;
+    for (i = 0; i < db->n && !error; i++)
+        if (tiku_trk_types_write_record(file, &db->rec[i]) || fputc('\n', file) == EOF) error = 1;
+    if (fclose(file)) error = 1;
+    return error ? -1 : 0;
+}
+
+void tiku_trk_types_defaults(tiku_trk_types_t *db)
+{
+    static const struct {
+        const char *type, *description, *icon, *columns;
+    } defaults[] = TIKU_SHELL_TYPE_DEFAULTS;
+    if (!db) return;
+    tiku_trk_types_init(db);
+    for (size_t i = 0; i < sizeof defaults / sizeof defaults[0]; i++)
+        (void)tiku_trk_types_add(db, defaults[i].type, defaults[i].description,
+                               defaults[i].icon, defaults[i].columns);
 }
 
 int
@@ -252,14 +256,7 @@ tiku_trk_types_install(tiku_trk_types_t *db, const char *path)
         /* One is already there, and it is left alone (AW-013). */
         return 0;
     }
-    tiku_trk_types_init(db);
-    static const struct {
-        const char *type, *description, *icon, *columns;
-    } defaults[] = TIKU_SHELL_TYPE_DEFAULTS;
-    for (size_t i = 0; i < sizeof defaults / sizeof defaults[0]; i++) {
-        (void)tiku_trk_types_add(db, defaults[i].type, defaults[i].description,
-                                defaults[i].icon, defaults[i].columns);
-    }
+    tiku_trk_types_defaults(db);
     (void)tiku_trk_types_save(db, path);
     return 1;
 }

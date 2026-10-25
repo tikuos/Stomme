@@ -176,22 +176,17 @@ desktop_turn_begin(desktop_t *app, const desktop_options_t *o, desktop_loop_t *l
     /* Finished worker jobs are collected before the events are read, so
      * this turn's events are handled with their results applied. */
     (void)tiku_work_collect();
-    {   /* The settings file is reloaded into the live model when its
-         * time or size changes, whoever wrote it (TS-052, TS-047). */
-        static time_t settings_mtime;
-        static off_t settings_size;
-        struct stat sst;
-
-        if (app->prefs_window.path[0] != '\0' &&
-            stat(app->prefs_window.path, &sst) == 0 &&
-            (sst.st_mtime != settings_mtime ||
-             sst.st_size != settings_size)) {
-            settings_mtime = sst.st_mtime;
-            settings_size = sst.st_size;
-            (void)tiku_trk_prefs_load(prefs_model(app),
-                                      app->prefs_window.path);
-            tiku_trk_soundprefs_apply(prefs_model(app));
-            desktop_damage_all(app);
+    tiku_trk_catalog_settings_poll(app->catalog_settings);
+    {
+        struct timespec now;
+        if (!clock_gettime(CLOCK_MONOTONIC, &now)) {
+            desktop_resources_poll(app, (uint64_t)now.tv_sec * 1000 + (uint64_t)now.tv_nsec / 1000000);
+            tiku_trk_desktop_settings_poll(app->desktop_settings,
+                (uint64_t)now.tv_sec * 1000 + (uint64_t)now.tv_nsec / 1000000);
+            tiku_trk_record_settings_poll(app->record_settings,
+                (uint64_t)now.tv_sec * 1000 + (uint64_t)now.tv_nsec / 1000000);
+            tiku_trk_settings_poll(app->settings,
+                (uint64_t)now.tv_sec * 1000 + (uint64_t)now.tv_nsec / 1000000);
         }
     }
     {   /* The scripting transport (PVK-052): when
@@ -239,6 +234,8 @@ desktop_turn_begin(desktop_t *app, const desktop_options_t *o, desktop_loop_t *l
 
     pick_sweep(app);
     remote_sweep(app);
+    tiku_trk_window_resources_poll(app->window_resources);
+    {struct timespec now;if(!clock_gettime(CLOCK_MONOTONIC,&now))desktop_lifecycle_vfs_poll(app,(uint64_t)now.tv_sec*1000+(uint64_t)now.tv_nsec/1000000);}
     sync_folder_preferences(app);
     sync_addons(app, 0);
 }

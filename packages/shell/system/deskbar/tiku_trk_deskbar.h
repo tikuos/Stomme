@@ -660,6 +660,9 @@ int tiku_trk_deskbar_refresh(tiku_trk_deskbar_t *db);
 int tiku_trk_deskbar_refresh_except(tiku_trk_deskbar_t *db,
                                     const char *except);
 
+/** @brief Copy one live replicant by tray index; return 0 or -1 out of range. */
+int tiku_trk_deskbar_replicant_at(const tiku_trk_deskbar_t *, int, tiku_trk_replicant_t *);
+
 /** @brief The paths of the replicants, into @p out.
  *  @return how many were written, at most @p max. */
 int tiku_trk_deskbar_replicant_paths(const tiku_trk_deskbar_t *db,

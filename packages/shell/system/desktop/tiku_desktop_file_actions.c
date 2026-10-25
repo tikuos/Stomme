@@ -259,8 +259,8 @@ desktop_progress_tick(desktop_t *app)
 }
 
 /**
- * @brief Start each rename a slow second click armed, once its interval
- *        has passed (MA-043).
+ * @brief Start an armed rename in the focused folder after its click interval.
+ * @note Focus loss cancels a folder's pending rename.
  */
 void
 desktop_rename_pulse(desktop_t *app)
@@ -271,7 +271,9 @@ desktop_rename_pulse(desktop_t *app)
         folder_t *fl = &app->folders[i];
         int due;
 
-        if (fl->win == NULL || !fl->win->open) {
+        if (fl->win == NULL || !fl->win->open ||
+            fl->win != tiku_workspace_focused(app->desk)) {
+            tiku_trk_poseview_cancel_edit_wait(fl->view);
             continue;
         }
         due = tiku_trk_poseview_edit_due(fl->view, tiku_trk_now());

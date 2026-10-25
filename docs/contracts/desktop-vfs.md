@@ -2,9 +2,10 @@
 
 This document specifies version 1 of the desktop resource service. The
 [runtime API contract](desktop-vfs-runtime.md) describes the implemented registry,
-read adapter, connection broker, asynchronous jobs and local channel. Product services and settings providers are not
-connected. The existing filesystem backend layout, application ABI and
-preference formats retain their current behavior.
+read adapter, connection broker, asynchronous jobs, local channel and connected
+shared desktop providers. The path table defines the intended namespace; the
+runtime contract identifies implemented providers. The filesystem backend
+layout, application ABI and preference formats retain their current behavior.
 The [protocol contract](desktop-vfs-protocol.md) defines messages and limits.
 
 ## Ownership and dependencies

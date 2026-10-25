@@ -381,3 +381,15 @@ tiku_trk_poseview_cell_cache_stats(const tiku_trk_poseview_t *v,
     if (hits != NULL) { *hits = v != NULL ? v->cell_cache_hits : 0; }
     if (misses != NULL) { *misses = v != NULL ? v->cell_cache_misses : 0; }
 }
+
+int
+tiku_trk_poseview_total_count(const tiku_trk_poseview_t *view)
+{
+    return view ? view->count : 0;
+}
+
+const tiku_trk_pose_t *
+tiku_trk_poseview_entry(const tiku_trk_poseview_t *view, int index)
+{
+    return view && index >= 0 && index < view->count ? &view->poses[index] : NULL;
+}

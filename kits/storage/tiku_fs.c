@@ -555,3 +555,18 @@ tiku_fs_redo(tiku_fs_t *fs, char *err, size_t errmax)
     fop_fs_give((tiku_fs_t *)fs);
     return r;
 }
+
+int tiku_fs_observe(tiku_fs_t *fs,uint64_t *generation,tiku_progress_t *progress,int *busy)
+{
+    int available;if(!fs||!generation||!progress||!busy)return 0;
+    fop_fs_take(fs);*generation=fs->operation_generation;*progress=fs->prog;*busy=fop_fs_busy(fs);
+    available=fs->operation_generation!=0;fop_fs_give(fs);return available;
+}
+
+int tiku_fs_cancel_generation(tiku_fs_t *fs,uint64_t generation)
+{
+    int accepted=0;if(!fs||!generation)return 0;
+    fop_fs_take(fs);
+    if(fs->operation_generation==generation && fop_fs_busy(fs)){fop_fs_cancel(fs);accepted=1;}
+    fop_fs_give(fs);return accepted;
+}

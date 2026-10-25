@@ -119,25 +119,34 @@ tiku_trk_session_restore_folders(
     }
 }
 
+int
+tiku_trk_session_controller_entries(const tiku_trk_session_controller_t *controller,
+    tiku_trk_session_entry_t *entries, int capacity)
+{
+    int i, count = 0;
+    if (!controller || !controller->folders || !entries || capacity < 0) return -1;
+    for (i = 0; i < *controller->folders->count; i++) {
+        const tiku_trk_folder_window_t *folder = &controller->folders->folders[i];
+        if (folder->win && folder->win->open && !folder->gone && !tiku_trk_poseview_is_query(folder->view)) {
+            if (count == capacity) return -1;
+            snprintf(entries[count].path,sizeof entries[count].path,"%s",folder->path);
+            entries[count++].minimized = folder->win->minimized;
+        }
+    }
+    return count;
+}
+
 void
 tiku_trk_session_controller_save(tiku_trk_session_controller_t *controller)
 {
     tiku_trk_session_entry_t entries[TIKU_TRK_SESSION_MAX];
     int32_t dock[2];
-    int entry_count = 0;
+    int entry_count = tiku_trk_session_controller_entries(controller,entries,TIKU_TRK_SESSION_MAX);
     int i;
 
     for (i = 0; i < *controller->folders->count; i++) {
         tiku_trk_folder_window_t *folder = &controller->folders->folders[i];
 
-        if (folder->win != NULL && folder->win->open && !folder->gone &&
-            !tiku_trk_poseview_is_query(folder->view) &&
-            entry_count < TIKU_TRK_SESSION_MAX) {
-            snprintf(entries[entry_count].path, TIKU_PATH_MAX, "%s",
-                     folder->path);
-            entries[entry_count].minimized = folder->win->minimized;
-            entry_count++;
-        }
         if (!folder->gone) {
             (void)tiku_trk_poseview_save_state(folder->view);
             (void)tiku_trk_poseview_save_columns(folder->view);
@@ -145,8 +154,8 @@ tiku_trk_session_controller_save(tiku_trk_session_controller_t *controller)
                                                   folder);
         }
     }
-    (void)tiku_trk_session_save_entries(controller->store, entries,
-                                         entry_count);
+    if (!controller->preserve_restore)
+        (void)tiku_trk_session_save_entries(controller->store, entries, entry_count);
     dock[0] = (int32_t)tiku_trk_deskbar_dock(controller->deskbar);
     dock[1] = (int32_t)tiku_trk_deskbar_width(controller->deskbar);
     (void)tiku_state_write(controller->store, TIKU_KEY_SESSION,

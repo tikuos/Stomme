@@ -68,10 +68,10 @@ tiku_trk_frame_clamp(tiku_trk_frame_t *f, int sw, int sh)
     if (f->y > sh - TIKU_TRK_FRAME_TAB) {
         f->y = (int32_t)(sh - TIKU_TRK_FRAME_TAB);
     }
-    if (f->x + TIKU_TRK_FRAME_GRAB > sw) {
+    if ((int64_t)f->x + TIKU_TRK_FRAME_GRAB > sw) {
         f->x = (int32_t)(sw - TIKU_TRK_FRAME_GRAB);
     }
-    if (f->x + f->w < TIKU_TRK_FRAME_GRAB) {
+    if ((int64_t)f->x + f->w < TIKU_TRK_FRAME_GRAB) {
         f->x = (int32_t)(TIKU_TRK_FRAME_GRAB - f->w);
     }
 }

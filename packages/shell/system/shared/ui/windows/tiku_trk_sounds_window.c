@@ -224,7 +224,7 @@ static void
 apply(tiku_trk_sounds_window_t *controller)
 {
     if (controller->path[0] != '\0') {
-        (void)tiku_trk_prefs_save(controller->prefs, controller->path);
+        (void)tiku_trk_prefs_submit(controller->prefs, controller->path);
     }
     tiku_trk_soundprefs_apply(controller->prefs);
     if (controller->dirty != NULL) {

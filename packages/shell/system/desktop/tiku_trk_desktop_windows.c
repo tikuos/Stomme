@@ -15,6 +15,7 @@
  */
 #include "tiku_shell_product.h"
 #include "tiku_trk_desktop_private.h"
+#include <limits.h>
 
 /** @brief Send an embedded or remote application's window a resize event
  *         carrying its content size. */
@@ -104,6 +105,41 @@ tab_box_act(desktop_t *app, tiku_window_t *w, int hit, unsigned mods)
         }
     }
     close_window(app, w);
+}
+
+tiku_resource_error_t
+desktop_window_resource_perform(void *opaque, tiku_window_t *window,
+    tiku_trk_window_action_t action, int a, int b)
+{
+    desktop_t *app=opaque; struct embed_win *embedded=embed_win_of_window(app,window);
+    int remote=tiku_remote_owner(&app->remote,window)!=NULL;
+    if (action==TIKU_TRK_WINDOW_CLOSE) {
+        tiku_event_t event={.type=TIKU_EVENT_KEY_DOWN,.key='w',.modifiers=TIKU_MOD_CMD};
+        if (remote) return tiku_remote_request_close(&app->remote,window)?TIKU_RESOURCE_OK:TIKU_RESOURCE_BUSY;
+        if (embedded) { (void)embed_deliver(embedded,&event); return TIKU_RESOURCE_OK; }
+        uint64_t generation=window->generation;
+        if (window->close_requested && !window->close_requested(window,window->context)) return TIKU_RESOURCE_OK;
+        if (window->open && window->generation==generation) close_window(app,window);
+    } else if (action==TIKU_TRK_WINDOW_FOCUS) {
+        tiku_workspace_restore(app->desk,window); tiku_workspace_activate(app->desk,window);
+    } else if (action==TIKU_TRK_WINDOW_MINIMIZE) {
+        tiku_workspace_minimize(app->desk,window,tiku_trk_deskbar_frame(app->deskbar));
+        if (tiku_workspace_focused(app->desk)==window) tiku_workspace_deactivate(app->desk,window);
+    } else if (action==TIKU_TRK_WINDOW_RESTORE) {
+        if (window->zoom_valid) { window->frame=window->saved_zoom;window->zoom_valid=0;resize_deliver(app,window); }
+        tiku_workspace_restore(app->desk,window); tiku_workspace_activate(app->desk,window);
+    } else if (action==TIKU_TRK_WINDOW_MAXIMIZE) {
+        if (!window->zoom_valid) tab_box_act(app,window,TIKU_HIT_ZOOM,0);
+    } else {
+        int64_t dx=(int64_t)a-(action==TIKU_TRK_WINDOW_MOVE?window->frame.x:window->frame.w);
+        int64_t dy=(int64_t)b-(action==TIKU_TRK_WINDOW_MOVE?window->frame.y:window->frame.h);
+        if (dx<INT_MIN || dx>INT_MAX || dy<INT_MIN || dy>INT_MAX) return TIKU_RESOURCE_VALUE;
+        tiku_workspace_begin_track(app->desk,window,action==TIKU_TRK_WINDOW_MOVE?TIKU_HIT_TAB:TIKU_HIT_RESIZE,0,0);
+        (void)tiku_workspace_track(app->desk,(int)dx,(int)dy); tiku_workspace_end_track(app->desk);
+        window->zoom_valid=0;
+        if (action==TIKU_TRK_WINDOW_RESIZE) resize_deliver(app,window);
+    }
+    desktop_damage_all(app); return TIKU_RESOURCE_OK;
 }
 
 /** @brief Whether the pointer is over the box that was pressed. */
@@ -354,12 +390,14 @@ windows_press(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
     if (w == desktop_deviceprefs_handle(app) ||
         w == desktop_startup_handle(app) ||
         w == desktop_associations_handle(app) ||
+        w == tiku_trk_open_with_window_handle(&app->open_with_window) ||
         w == desktop_forcequit_handle(app) ||
         w == tiku_trk_fonts_window_handle(&app->fonts_window)) {
 #else
 
     if (w == desktop_startup_handle(app) ||
         w == desktop_associations_handle(app) ||
+        w == tiku_trk_open_with_window_handle(&app->open_with_window) ||
         w == desktop_forcequit_handle(app) ||
         w == tiku_trk_fonts_window_handle(&app->fonts_window)) {
 #endif

@@ -1165,6 +1165,27 @@ void tiku_remote_event(tiku_remote_listener_t *listener,
              sizeof payload);
 }
 
+/** @brief Queue a native close or quit shortcut without granting input authority. */
+static int request_shortcut(tiku_remote_listener_t *listener,struct tiku_window *window,unsigned key)
+{
+    tiku_remote_window_t *win = tiku_remote_window_of(listener, window);
+    tiku_event_t event = {.type=TIKU_EVENT_KEY_DOWN,.key=key,.modifiers=TIKU_MOD_CMD};
+    unsigned char payload[4 + sizeof event];
+    if (!win || !win->session || !win->session->used || win->session->fd < 0 || !win->opened) return 0;
+    memcpy(payload,&win->win_id,4); memcpy(payload+4,&event,sizeof event);
+    return session_send(win->session,TIKU_RMSG_EVENT,payload,sizeof payload);
+}
+
+int tiku_remote_request_close(tiku_remote_listener_t *listener,struct tiku_window *window)
+{
+    return request_shortcut(listener,window,'w');
+}
+
+int tiku_remote_request_quit(tiku_remote_listener_t *listener,struct tiku_window *window)
+{
+    return request_shortcut(listener,window,'q');
+}
+
 void tiku_remote_pick(tiku_remote_listener_t *listener,
                       struct tiku_window *window, int command)
 {

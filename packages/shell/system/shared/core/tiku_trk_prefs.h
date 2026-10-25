@@ -17,6 +17,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 
 /** @brief The four pages the window has (TS-058). */
 typedef enum {
@@ -61,6 +62,8 @@ typedef struct {
      * (TS-062). */
     char           **unknown;
     int              nunknown;
+    void            *save_context;
+    int            (*submit_save)(void *, const char *);
 } tiku_trk_prefs_t;
 
 /** @brief The table of settings, each at its default and opened at it. */
@@ -104,6 +107,14 @@ int tiku_trk_prefs_load(tiku_trk_prefs_t *p, const char *path);
  * @return 0, or -1 on failure.
  */
 int tiku_trk_prefs_save(tiku_trk_prefs_t *p, const char *path);
+
+/** @brief Parse settings from an open stream, preserving unknown lines. */
+int tiku_trk_prefs_read(tiku_trk_prefs_t *p, FILE *stream);
+/** @brief Serialize settings to a stream; return -1 on an output error. */
+int tiku_trk_prefs_write(FILE *stream, const tiku_trk_prefs_t *p);
+/** @brief Submit GUI edits to a bound controller, or save synchronously.
+ *  @return 0 when accepted, -1 when rejected; acceptance may be asynchronous. */
+int tiku_trk_prefs_submit(tiku_trk_prefs_t *p, const char *path);
 
 /** @brief Take the current values as the revert baseline (TS-059). */
 void tiku_trk_prefs_mark_opened(tiku_trk_prefs_t *p);

@@ -75,6 +75,35 @@ frame_saved_at(desktop_t *app, const char *path, int x)
     return tiku_trk_frame_load(app->store, path, &f) && f.x == x;
 }
 
+/** @brief One application's quit decision and delivered shortcut receipt. */
+typedef struct {int allow,events,stops;unsigned key;} embedded_fixture_t;
+/** @brief Retain the normal owner decision without closing its host window. */
+static int embedded_event(void *context,uint32_t id,const tiku_event_t *event)
+{
+    embedded_fixture_t *fixture=context;(void)id;fixture->events++;fixture->key=event->key;
+    return fixture->allow;
+}
+/** @brief Count releases requested by the embedded host after owner consent. */
+static void embedded_stopped(void *context){((embedded_fixture_t *)context)->stops++;}
+/** @brief Exercise the real embedded dispatcher and native resource-close controller. */
+static void embedded_decisions(desktop_t *app)
+{
+    const tiku_app_descriptor_t descriptor={.id="test.embedded",.name="Embedded fixture",.event_in=embedded_event,.stop=embedded_stopped};
+    embedded_fixture_t fixture={0};struct desktop_embed *slot=&app->embeds[0];struct embed_win *window=&slot->win[0];
+    slot->app=app;slot->descriptor=&descriptor;slot->state=&fixture;slot->running=1;window->slot=slot;window->id=1;
+    window->window=tiku_workspace_open(app->desk,"Embedded fixture",(tiku_rect_t){10,10,100,80},NULL,NULL,NULL);
+    tiku_window_t *native=window->window;tiku_event_t event={.type=TIKU_EVENT_KEY_DOWN,.key='q',.modifiers=TIKU_MOD_CMD};
+    check(native!=NULL,"embedded fixture has a native window");if(!native)return;
+    check(!embed_deliver(window,&event)&&slot->running&&native->open&&fixture.events==1&&fixture.key=='q'&&!fixture.stops,"embedded quit veto retains owner and window");
+    fixture.allow=1;
+    check(embed_deliver(window,&event)&&!slot->running&&!native->open&&fixture.stops==1,"embedded quit consent stops owner and retires window");
+    slot->state=&fixture;slot->running=1;fixture.allow=0;
+    window->window=tiku_workspace_open(app->desk,"Embedded replacement",(tiku_rect_t){10,10,100,80},NULL,NULL,NULL);native=window->window;
+    check(!desktop_window_resource_perform(app,native,TIKU_TRK_WINDOW_CLOSE,0,0)&&slot->running&&native->open&&fixture.key=='w',"resource close retains embedded owner veto");
+    fixture.allow=1;
+    check(!desktop_window_resource_perform(app,native,TIKU_TRK_WINDOW_CLOSE,0,0)&&!slot->running&&!native->open&&fixture.stops==2,"resource close honors embedded owner completion");
+}
+
 int
 main(void)
 {
@@ -170,6 +199,7 @@ main(void)
     check(stranger_unclaimed(app),
           "a window reusing the object is no folder's");
 
+    embedded_decisions(app);
     for (i = 0; i < app->folder_count; i++) {
         tiku_trk_poseview_free(app->folders[i].view);
     }

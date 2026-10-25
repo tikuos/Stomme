@@ -180,7 +180,7 @@ tiku_resource_registry_t *tiku_resource_registry_new(const tiku_resource_limits_
         if (requested->events_per_watch) limits.events_per_watch = requested->events_per_watch;
         if (requested->receipts) limits.receipts = requested->receipts;
     }
-    if (limits.providers > 256 || limits.resources > 4096 || limits.watches > 256 ||
+    if (limits.providers > 256 || limits.resources > 16384 || limits.watches > 256 ||
         limits.events_per_watch > 256 || limits.receipts > 16) { free(registry); return NULL; }
     registry->thread = pthread_self();
     registry->limits = limits;

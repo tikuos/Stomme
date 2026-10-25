@@ -57,6 +57,41 @@ sync_addons(desktop_t *app, int force)
     }
 }
 
+void desktop_script_request(desktop_t *app,folder_t *folder,const tiku_trk_req_t *req,tiku_trk_rep_t *rep)
+{
+    int i;
+    memset(rep,0,sizeof *rep);
+    if(!folder||!folder->view){rep->error=TIKU_TRK_ERR_NOT_FOUND;return;}
+    tiku_trk_script_run(folder->view,req,rep);
+    if(rep->error!=TIKU_TRK_ERR_OK)return;
+    if (req->verb == TIKU_TRK_VERB_EXECUTE) {
+        for (i = 0; i < rep->nresult; i++) {
+            tiku_model_t m;
+
+            if (app->backend->ops->stat(app->backend, rep->result[i],
+                                        &m) != 0) {
+                continue;
+            }
+            if (tiku_model_is_container(&m)) {
+                (void)open_folder(app, rep->result[i]);
+            } else {
+                (void)open_one(app, &m);
+            }
+        }
+    } else if (req->verb == TIKU_TRK_VERB_DELETE) {
+        const char *sel[64];
+        int n = 0;
+
+        for (i = 0; i < rep->nresult && n < 64; i++) {
+            sel[n++] = rep->result[i];
+        }
+        if (n > 0) {
+            (void)tiku_fs_trash(app->fs, sel, n);
+        }
+    }
+    desktop_damage_all(app);
+}
+
 /**
  * @brief Run one scripting line against the focused folder window, or the
  *        first folder (PVK-052).
@@ -90,38 +125,10 @@ script_command_line(desktop_t *app, const char *line, FILE *reply)
         }
         return;
     }
-    memset(&rep, 0, sizeof rep);
-    tiku_trk_script_run(fl->view, &req, &rep);
-    if (rep.error != TIKU_TRK_ERR_OK) {
-        if (reply != NULL) {
-            fprintf(reply, "error %d\n", rep.error);
-        }
+    desktop_script_request(app,fl,&req,&rep);
+    if(rep.error!=TIKU_TRK_ERR_OK) {
+        if(reply)fprintf(reply,"error %d\n",rep.error);
         return;
-    }
-    if (req.verb == TIKU_TRK_VERB_EXECUTE) {
-        for (i = 0; i < rep.nresult; i++) {
-            tiku_model_t m;
-
-            if (app->backend->ops->stat(app->backend, rep.result[i],
-                                        &m) != 0) {
-                continue;
-            }
-            if (tiku_model_is_container(&m)) {
-                (void)open_folder(app, rep.result[i]);
-            } else {
-                (void)open_one(app, &m);
-            }
-        }
-    } else if (req.verb == TIKU_TRK_VERB_DELETE) {
-        const char *sel[64];
-        int n = 0;
-
-        for (i = 0; i < rep.nresult && n < 64; i++) {
-            sel[n++] = rep.result[i];
-        }
-        if (n > 0) {
-            (void)tiku_fs_trash(app->fs, sel, n);
-        }
     }
     if (reply != NULL) {
         fprintf(reply, "ok %d\n", rep.nresult);

@@ -13,6 +13,9 @@
  */
 
 #include "tiku_trk_background.h"
+#include <ctype.h>
+#include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,27 +24,20 @@
 int
 tiku_trk_bg_parse(const char *rec, tiku_trk_bg_t *out)
 {
-    int mode = 0, x = 0, y = 0, used = 0;
-
-    if (rec == NULL || out == NULL || rec[0] == '\0') {
-        return 0;
+    long fields[3]; const char *at = rec; int i;
+    tiku_trk_bg_t parsed = {0};
+    if (!rec || !out || !*rec) return 0;
+    for (i = 0; i < 3; i++) {
+        char *end;
+        errno = 0; fields[i] = strtol(at,&end,10);
+        if (errno || end == at || fields[i] < INT_MIN || fields[i] > INT_MAX ||
+            (*end && !isspace((unsigned char)*end))) return 0;
+        at = end; while (isspace((unsigned char)*at)) at++;
     }
-    if (sscanf(rec, "%d %d %d %n", &mode, &x, &y, &used) < 3 || used <= 0) {
-        return 0;
-    }
-    if (mode < TIKU_TRK_BG_AT_OFFSET || mode > TIKU_TRK_BG_TILED) {
-        return 0;
-    }
-    memset(out, 0, sizeof *out);
-    out->mode = (tiku_trk_bg_mode_t)mode;
-    out->x = x;
-    out->y = y;
-    /* The path takes the rest of the line, so a name with a space in it
-     * survives the round trip. */
-    if (rec[used] != '\0') {
-        snprintf(out->path, sizeof out->path, "%s", rec + used);
-    }
-    return 1;
+    if (fields[0] < TIKU_TRK_BG_AT_OFFSET || fields[0] > TIKU_TRK_BG_TILED || strlen(at) >= sizeof parsed.path ||
+        fields[1] < -32768 || fields[1] > 32768 || fields[2] < -32768 || fields[2] > 32768) return 0;
+    parsed.mode = (tiku_trk_bg_mode_t)fields[0]; parsed.x = (int)fields[1]; parsed.y = (int)fields[2];
+    strcpy(parsed.path,at); *out = parsed; return 1;
 }
 
 int

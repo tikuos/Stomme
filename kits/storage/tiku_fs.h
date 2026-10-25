@@ -308,6 +308,13 @@ int tiku_fs_step(tiku_fs_t *fs, int budget);
 /** @brief Snapshot of what is happening, for the progress window. */
 const tiku_progress_t *tiku_fs_progress(const tiku_fs_t *fs);
 
+/** @brief Copy the operation incarnation, current progress and busy flag under its lock.
+ *  @return Nonzero after an operation has been accepted. */
+int tiku_fs_observe(tiku_fs_t *, uint64_t *generation, tiku_progress_t *, int *busy);
+/** @brief Cancel the matching current operation; replacement operations are unchanged.
+ *  @return 1 when cancellation was requested, 0 for a stale or finished operation. */
+int tiku_fs_cancel_generation(tiku_fs_t *, uint64_t generation);
+
 /** @brief Answer a conflict the engine stopped on and continue. */
 void tiku_fs_resolve(tiku_fs_t *fs, tiku_conflict_t how);
 

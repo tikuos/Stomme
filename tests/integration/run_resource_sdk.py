@@ -38,6 +38,7 @@ def run(args):
         runtime = work / "control"
         env = os.environ.copy()
         env.update(HOME=str(home), XDG_CONFIG_HOME=str(home / ".config"),
+                   XDG_DATA_HOME=str(home / ".local/share"), XDG_CACHE_HOME=str(home / ".cache"),
                    STOMME_RESOURCE_DIRECTORY=str(runtime), STOMME_RESOURCE_TEST_PROVIDER="1",
                    STOMME_RESOURCE_MOUNT="/sv2-" + str(os.getpid()))
         env.pop("DISPLAY", None)

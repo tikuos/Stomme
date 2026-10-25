@@ -466,8 +466,8 @@ the read mount and destroys its endpoint/backend/registry after file work drains
 `STOMME_RESOURCE_TEST_PROVIDER=1` enables synthetic settings, read-only state,
 actions, failing persistence, a collection, a stream and queued work under
 `/test` and `/test-work`. The test stop action requests orderly desktop shutdown.
-Without this flag the composition registers product identity under `/about`;
-existing product preferences are owned by their controllers.
+Without this flag the composition registers product identity under `/about`
+and connects the shared preference controllers under `/settings`.
 `examples/resource_client.c` builds against relocated public SDK headers/archives
 and exercises discovery, read, change, watch, stale/invalid/read-only requests,
 failed persistence, collection enumeration, streaming, jobs and request lookup.
@@ -477,3 +477,503 @@ charges record storage and bounded encoding overhead for each queued event.
 The first reached byte or 256-event bound produces overflow markers and pauses
 incremental delivery. Root metadata reports the effective charged record count;
 it can be lower than 256 for multi-path event records.
+
+## Shared preference controller
+
+The desktop binds its existing TrackerSettings table to an owner-thread
+`tiku_trk_settings` controller. With the resource endpoint enabled, the controller
+registers provider `settings` under `/settings`. Without the endpoint, the same
+controller handles GUI saves and external reloads. The table supplies defaults,
+setting types and interlocks. Its text file and unknown lines retain their
+existing representation.
+
+`/settings/ui/theme` uses the enum choices `light`, `dark` and `monochrome`.
+`/settings/ui/global-menu-bar` and `/settings/ui/reduce-motion` are booleans.
+Other Tracker preferences are under `/settings/tracker/<lowercase-key>`.
+Sound volume is `/settings/sound/volume`, with integer bounds 0 through 100.
+Each sound event has `/settings/sound/<event>/enabled` and
+`/settings/sound/<event>/clip`. The enabled suffix permits the event directory
+and its clip setting to share a parent. TikuDesktop's CurrentDevice and
+CurrentDevicePort fields are observed state, absent from KintsugiOS's table.
+
+Setting changes require CHANGE and JOBS. They return queued job identities;
+clients reconcile the final outcome with job-status or request-status.
+The controller copies proposed values, saves on a worker, and applies successful
+completions on the desktop thread before publishing snapshots. GUI controls
+submit through the same owner. A failed save retains committed model values.
+A changed file conflicts with a prepared save. The file replacement uses
+cooperative content checks before creation and rename; it is not a filesystem
+compare-and-swap against an unrelated writer.
+
+The reload worker reads regular files up to 65,536 bytes and compares presence,
+resolved target and complete bytes. It detects edits that retain size and
+modification time, and observes file removal as a return to defaults.
+Invalid reload values retain the active model. Startup theme and volume values
+use their existing fallback/clamp rules, and a valid GUI save can repair an
+invalid file. A symbolic settings path retains its link when its resolved target
+is replaced. Workers own their input and detach from a retired controller.
+
+`/settings/profile` is a composite setting containing the complete editable
+table, keyed by its existing file names. Missing or unknown keys and inconsistent
+interlocked requests are rejected before persistence. The owner validates the
+complete proposal and saves one file before applying the model. Product-observed
+state is excluded. Granular resources and the profile publish from that same
+committed model. Each changed resource has its normal revision/event; this does
+not introduce a multi-resource atomic watch event.
+
+The preference controller does not advertise the protocol's atomic transaction
+operation. GUI Defaults/Revert proposals and profile replacements are saved as
+complete table copies. Deskbar and Fonts use a record owner within that same
+settings provider, backed by their session store. The text-file settings retain
+user durability; a record owner backed by a memory store reports session
+durability.
+
+`examples/settings_client.c` builds using the Application and Support SDK
+archives. It reads a typed resource, or submits one scalar change and waits for
+its asynchronous outcome:
+
+```sh
+settings-client /path/to/private-directory /settings/ui/theme
+settings-client /path/to/private-directory /settings/ui/theme enum dark
+```
+
+In either product, `make check-settings-service` compiles that example against
+a relocated SDK and drives an isolated desktop. It checks API changes against
+rendered theme/menu state, GUI changes against the API, failed saves, same-size
+and same-timestamp external edits, restart and endpoint cleanup. Linux conductor
+results do not establish native macOS behavior.
+
+
+## Staged session record updates
+
+Storage Kit exports `tiku_state_update.h`. The store owner calls
+`tiku_store_update_begin` and edits its copied memory store through
+`tiku_store_update_model`. Existing record serializers can write to that copy.
+`tiku_store_update_run` persists the isolated inputs on a worker;
+`tiku_store_update_finish` reconciles the completed cache on the owner thread.
+Workers do not access the live store.
+
+The persisted baseline, candidate and current sidecar are merged by record key.
+Nonoverlapping external changes and unknown attributes are retained. An
+incompatible change to a locally edited record returns conflict before
+replacement. The complete captured file is checked before creation and rename;
+this is cooperative conflict detection. Replacement writes a private file,
+syncs it, renames it and syncs its directory. Truncated, duplicate or malformed
+records and files above 4 MiB or 4096 records are rejected before replacement.
+The TRKSTATE1 layout is preserved.
+
+Cached writes made after preparation survive completion and remain dirty when
+they were not in the persisted snapshot. A later conflicting cached change
+retains the newer value and reports an uncertain outcome. An active update
+makes legacy flush return EBUSY. A detached update also requires successful
+staged reconciliation before legacy flush, preventing an older cache from
+replacing a completed worker write. Cache reconciliation can be retried after
+NO_MEMORY without repeating persistence. Releasing a prepared operation before
+its worker starts removes its reservation without a reload barrier.
+Free an operation after its worker has
+returned; store destruction cancels and detaches active work.
+
+Memory stores support the copied update without claiming persistence. Extended
+attribute stores return ENOTSUP from begin; their existing read/write API is
+unchanged. The Deskbar/Fonts controller uses the desktop session sidecar, queues
+one proposal behind a reload and validates its original model precondition
+before dispatching it. It drains accepted work during normal desktop teardown.
+
+## Deskbar and Fonts resources
+
+The shared provider registers the 18 Deskbar fields under
+`/settings/deskbar/<field>`, including three-element `recent_enabled` and
+`recent_count` arrays. Numeric bounds and interlocks use the existing Deskbar
+normalizer. Requests that would be silently clamped, including odd baked font
+sizes, are rejected before persistence. GUI normalization retains its existing
+behavior.
+
+`/settings/ui/font/family`, `size` and `dropped` use the same record owner.
+The family and size aliases under `/settings/deskbar` share their values and
+notifications. `/settings/deskbar/profile` and `/settings/ui/font/profile` accept
+complete objects keyed by their respective field names. Preparing the Deskbar
+record and dropped-font attribute in one copied store permits one sidecar
+replacement while retaining unrelated session and window state. Older Deskbar
+record versions remain readable.
+
+The owner applies successful completion through the existing Deskbar and font
+APIs. A missing dropped face retains its desired and saved name, reports the
+actual baked face through applied values, and marks the snapshot as fallback.
+A failed save retains the previously committed GUI values. External record edits
+are detected by complete content, including edits with unchanged file size and
+timestamp. API writes, GUI controls, aliases and restart share these owners.
+
+Deskbar and Fonts show pending saves and failed-write feedback through the bound
+record owner. Failure retains committed controls and leaves a retry message;
+background reloads retain that message. A later accepted save clears it. Busy
+submissions restore committed controls and request a retry.
+
+The record controller does not advertise the protocol's atomic transaction
+operation. Its profiles have owner-scoped validation and one-file persistence;
+publication still uses per-resource events. Queued jobs use the broker's
+cancellation rules; running controller jobs have no cancellation hook.
+
+## Folder window defaults
+
+`/settings/tracker/window-defaults` is an object setting backed by the existing
+session `_trk/window_default` record. A complete value contains integer `x`, `y`,
+`width` and `height`; an empty object clears the default. Coordinates use native
+signed 32-bit values. Width and height must be at least the native frame minima,
+180 and 120. Requests reject unknown, missing or incorrectly typed fields before
+persistence. A frame is persisted as one native record through the shared staged
+store. Clearing writes the native zero-length unset value and retains unrelated
+session records. Its proposal edits the default record; the staged store retains
+other session records and pending cache changes.
+
+The applied value is the default available to future folder openings. Existing
+windows keep their frames. A folder's own saved frame takes precedence, followed
+by its parent's frame with the native offset, then the default and the normal
+cascade. The root takes no inherited/default frame. Native screen clamping uses
+wide arithmetic for coordinate sums, including extreme stored values.
+
+Desired and applied defaults follow the live session cache. Persisted values use
+the last known saved cache. Legacy cache edits report `pending_persistence` until
+saved. Complete sidecar reload observes same-size and same-timestamp edits. A
+queued proposal retains its original default as a dispatch precondition. Failed
+writes preserve the committed default; a conflicting later cache edit remains
+visible and reports an uncertain outcome. The same record owner supplies native
+save feedback and keeps failed-write feedback across background reloads.
+
+Memory-backed settings declare `session` persistence, and sidecar-backed settings
+declare `user`. Broker requests must select the declared durability. This default
+is separate from current window geometry and from other session record families.
+Those resources use their own owners and namespaces.
+
+## File types and preferred handlers
+
+The settings provider includes `/settings/associations` and
+`/settings/file-types` collections. Their children use the lowercase hexadecimal
+UTF-8 bytes of the MIME string as a path component. These identities retain the
+same paths across label changes and application discovery order. Each
+association has a `preferred` text setting and a read-only `details` object
+containing its MIME identity, label and candidate application names. The empty
+preferred value selects Automatic. New choices must name a related installed
+application; requests cannot supply commands or module paths.
+
+Preferred snapshots retain the configured handler in desired values and the last
+known saved handler in persisted values. Cached edits report
+`pending_persistence` until their store save completes.
+`tiku_store_persisted_read` reads that saved cache without filesystem I/O; memory
+stores report their volatile records and xattr stores return ENOTSUP.
+The applied value is the first candidate the existing launcher would use.
+An unavailable saved handler reports fallback and retains its saved name.
+Changes use copied association drafts and staged session updates. They wait for
+other store owners, recheck changed rows against their saved preconditions and
+preserve unrelated records. Persistence finishes before GUI save completion and
+resource success. Failed saves retain the previous live handlers; stale GUI
+drafts require reopening the window. A pending save belongs to its accepted
+draft, so reopening the window does not transfer its close-on-success callback.
+
+Native file-type children are object settings. A complete record contains
+`mime` (text), `description` (text), `icon` (text), `document` (boolean),
+`columns` (array of native integer column IDs) and `attributes` (array of text).
+The MIME must match the child's hexadecimal path. An empty object deletes a
+record. Removed identities remain discoverable for the desktop session, with
+empty saved values. `/settings/file-types/upsert` accepts one complete record;
+`/settings/file-types/replace` accepts an array of complete records and replaces
+the definitions in one native-file save. Empty replacement arrays are valid.
+`/settings/file-types/status` reports readiness, errors, saved/applied counts,
+file presence, restart state and record/identity limits. Action results use this
+summary object. The action argument schema describes the input.
+
+Desired and persisted definitions reflect the last valid file observation or
+successful save. Applied definitions retain the startup catalog; changes report
+`restart_required` until a new desktop session loads them. File Associations and
+other native type consumers continue using that startup catalog. The compatibility
+catalog constructor without a file path supplies read-only loaded records.
+
+The file owner reads on workers every 500 ms and captures complete content plus
+the resolved target. Same-size and same-timestamp edits are detected. Accepted
+writes retain their captured precondition while waiting behind a read. Changed
+bytes or symbolic-link targets refuse replacement. Successful saves preserve the
+symbolic link and replace its regular-file target, sync the temporary file,
+rename it and sync its directory. A directory-sync failure has unknown outcome.
+Conflict detection is cooperative and does not provide a filesystem compare-and-swap.
+Comments, opaque lines, unchanged rows and unknown column tokens in retained
+records survive edits. Removing a record removes its unknown column tokens too.
+
+Files are limited to 64 KiB, 40 records and native rows below 511 bytes before
+the newline. The owner retains at most 80 distinct type identities per session;
+exceeding the union limit requires a desktop restart. Collection membership
+changes invalidate child identities and catalog cursors. Clients relist after a
+catalog change. MIME, description and icon fields retain native byte limits;
+column and attribute arrays hold at most six entries each. Attribute names are
+limited to 18 UTF-8 bytes by the native token parser. Invalid UTF-8, embedded NUL,
+control characters in editable fields, duplicate type rows, excess known columns
+and malformed rows refuse editing and retain the last valid observation. Unknown
+lines without tabs remain opaque. An absent file selects product defaults;
+a present empty file selects no definitions. Registry publication allocation
+failures are retried and block new writes while resynchronizing.
+
+The owner serializes native-file writes without advertising protocol atomic
+transactions. Its batch action persists one file and publishes per-resource
+observations. Queued jobs use broker cancellation; running saves have no public
+cancellation hook. Shutdown drains work for five seconds, then detaches and asks
+remaining workers to stop before replacement.
+
+Open With's make-preferred action and Get Info's Opens with control use the same
+staged association owner. The chooser saves every selected type in one update,
+validates the handler for each type and launches only after success. Failure
+keeps the chooser open with its saved handler unchanged. Closing, retargeting or
+destroying a chooser detaches its launch completion; an accepted save may still
+finish. The shared owner outlives its bound chooser, which detaches before
+teardown. Get Info refreshes open views after commit and after API changes.
+Standalone chooser controllers without a bound owner retain their cache API.
+
+The desktop host allocates 8192 registry nodes for settings and catalog entries.
+The configurable registry limit is 16384 nodes.
+The portable registry's default remains 256. Collection children retain normal
+provider revisions, read authority and bounded snapshot rules. The endpoint
+remains opt-in through `STOMME_RESOURCE_DIRECTORY`.
+
+
+## Native Desktop preferences
+
+`/settings/desktop/bg` is an object with `path` (text), `mode` (integer 0–3),
+`x` and `y` (integers from -32768 to 32768). An empty path selects no picture.
+Modes retain their native order: offset, centred, scaled and tiled. Paths must
+fit the native buffer, use absolute paths when nonempty and contain no tab or
+line break. The native image loader determines whether the configured file can
+be displayed; `/desktop/backdrop` reports the picture actually drawn.
+
+`/settings/desktop/icon_size` accepts the six sizes exposed by Desktop
+preferences: 32, 40, 48, 64, 96 and 128. Its observation can contain a saved native
+size from 16 through 128. `/settings/desktop/have_bg` observes whether a picture
+path is configured. Applied fields use the native draw result; an unreadable
+image retains its configured path while reporting an empty applied image path
+and `fallback`. `/settings/desktop/reduce_motion` aliases
+`/settings/ui/reduce-motion` through the existing table owner and settings file.
+
+The Desktop window submits picture and icon proposals through the same owner as
+resource writes. Accepted values apply after their save; failed saves restore
+its accepted model and display retry feedback. Defaults and Revert can change
+two native attributes and the table-owned motion preference. These are separate
+persistence boundaries. A partial native save reports that some settings saved.
+The icon writer preserves the view record's scroll, origins and sort fields.
+Native reloads run every 500 ms on copied worker inputs and retain the last
+accepted model when a read or parse fails. Saved and cached sidecar fields remain
+separate, and a failed save retains its retry feedback through successful
+reloads. Background edits retain unchanged native icon sizes outside the six
+interactive step values.
+
+`tiku_state_attribute.h` provides copied attribute reads and proposals. Reads
+capture the resolved regular file or directory, device/inode identity, attribute
+presence and complete bytes, with a 64 KiB limit. Missing and empty attributes
+remain distinct. Workers open the resolved path without following a replacement
+symlink, verify node identity and prior attribute bytes, then write through that
+descriptor and synchronize it. A symlink used at capture time selects that
+resolved target. Comparison and replacement are separate filesystem calls and
+require cooperating writers. Changed preconditions return conflict; a completed
+write whose synchronization fails returns uncertain. Preparation copies its
+capture without I/O. The source capture can be freed afterwards.
+
+## Live shell observations
+
+The following resources observe current native owners:
+
+| Paths | Representation |
+| --- | --- |
+| `/desktop/backdrop` | Drawn image path and dimensions, backdrop colour and current icon size |
+| `/desktop/icon-layout`, `/desktop/selection` | Complete loaded poses, including filtered entries, with node identity and unscaled positions |
+| `/desktop/menus` | Folder menus, current popup tree and focused window's published menu entries |
+| `/deskbar/clock`, `/deskbar/dock`, `/deskbar/frame` | Displayed clock/calendar state, docking and current geometry |
+| `/deskbar/replicants`, `/deskbar/tray` | Current replicant readings and application tray items |
+| `/deskbar/teams` | Running application rows, published windows and process identifiers |
+| `/session/identity`, `/session/state` | Session incarnation, product and process identity, running state and native window counts |
+| `/session/restore-policy` | Saved restore/fallback choices and the choices used at boot |
+| `/session/startup` | Saved policy followed by installed startup applications and their saved enablement |
+| `/session/windows` | Current workspace windows with generation, title, geometry, focus and minimization |
+
+Icon layout, selection, menus, replicants, tray items, teams, startup and window
+lists are frozen streams of newline-delimited JSON objects. Clients describe the
+resource, open a lease at that revision and read its chunks. An empty list is a
+zero-byte stream. Captures are complete within 4 MiB. Failure or excess output
+retains the previous complete content and reports `last_good_unavailable`;
+recovery publishes a complete replacement. Paths, startup entries, window titles
+and application/tray contents require content authority. Callback pointers,
+window tags and launch commands are not serialized. Observers inspect their
+owners every 250 ms without filesystem access. Unchanged contents retain their
+stream identity. Each session leaf has a separate provider incarnation.
+
+## Saved native record families
+
+`/session/records/defaults`, `/session/records/deskbar-prefs` and
+`/session/records/ui-font` alias the existing window-default, Deskbar profile and
+font-profile setting owners. They retain those owners' codecs, persistence and
+live application behavior.
+
+The other families are collections of known native contexts:
+
+| Family | Public value |
+| --- | --- |
+| `columns`, `desk-columns`, `disks-columns` | Array of version-2 column fields, offsets, widths in reference-font units, alignment and attribute name |
+| `view-state`, `desk-view-state`, `disks-view-state` | Version-1 mode and present native size, scroll, origin and sort fields |
+| `pose-info` | Native position version, unscaled coordinates and the invisible flag |
+| `frame` | Saved folder rectangle |
+| `deskbar-prefs-frame` | Saved preferences-window position |
+| `dock` | Native dock enumeration and bar width |
+| `replicants` | Array of label, namespace path and requested height |
+| `session` | Ordered array of folder paths and minimized flags |
+| `original` | Read-only original path retained by the Trash owner |
+
+Each opaque context directory has a `node` state object with its source node and
+storage kind, and a `value` setting or read-only original-path state. Contexts
+come from loaded desktop/folder views and cached session-store records. They remain
+cataloged until the desktop session ends. New contexts replace that family's
+catalog and invalidate its child handles and outstanding list cursors. Clients
+relist after a membership change and after restart. Paths remain scoped by the
+resource session and provider incarnation.
+
+The catalog retains up to 1800 contexts. `/session/records/status` reports its
+count, capacity, overflow, pending families and unavailable entries. `complete`
+means the catalog has published its discovered contexts within that capacity.
+Unsupported, malformed or unreadable records retain their last valid value with
+`last_good_unavailable`. An existing captured malformed attribute can be repaired
+by a validated replacement. Other attributes in the store are preserved.
+`tiku_state_cached_each` visits cached sidecar/memory records without filesystem
+access; native attribute stores report ENOTSUP. Attribute reloads use copied
+workers every second.
+
+Native record settings expose saved configuration separately from current live
+owners. Their applied field is an empty value of the declared shape and their
+apply state is `saved_for_next_open`; live observations provide current state.
+Successful writes also notify loaded pose, view, column, frame, docking and
+preferences-position owners. Explicit view/column clears survive unrelated
+position saves; a later view/column edit writes its changed fields. Initial
+Desktop placement reserves the configured menu strip before restoring poses.
+The initial merged Desktop listing uses the pose view's 4096-entry capacity;
+explicit model replacement invalidates outstanding directory loads. Subsequent
+native saves can normalize records through those owners' existing formats. Replicant configuration applies at the
+next desktop start. A saved session replacement supersedes shutdown's automatic
+folder-list capture for that desktop session. It does not close current folders.
+
+An empty object or array clears an editable record. Column codecs check native
+versions, byte order, names, unique fields, required Name column and numeric
+bounds. Position, frame, docking and pose codecs enforce their native ranges.
+Text codecs reject overflowing integers, unsupported field combinations,
+duplicate folder/replicant entries and injected line separators. Sidecar record
+writes retain their existing 4096-byte limit. Sidecar changes use staged store
+updates; native attribute changes use captured node/attribute preconditions.
+During dispatched record writes, the provider defers catalog and value
+publication until completion so a refresh cannot invalidate its own mutation. Running record
+jobs have no cancellation callback. Shutdown drains accepted work for five
+seconds, then detaches worker completions from the released owners.
+
+`/session/records/capture` saves the session owner's current restorable folder
+list; `/session/records/clear` saves an empty next-start list. Both actions take
+an empty object, return asynchronous jobs and preserve the current windows.
+Saved folder entries contain namespace paths and minimized flags. Startup
+application entries remain owned by the existing Startup preferences controller.
+
+## Windows and the composited workspace
+
+The desktop registry reserves 64 provider slots. Portable registry defaults
+remain 16 providers and 256 resources. Each live window uses a separate provider
+incarnation under `/windows/<id>`. Its opaque ID is allocated at registration;
+a closed native slot, replaced application window or new connection gets a new
+ID. `/workspaces/<id>` identifies the desktop's composited workspace for that
+resource session. The current desktop has one workspace; its arrangement reports
+`workspace_count: 1` and `switch_supported: false`.
+
+Each window publishes object states named `identity`, `owner`, `title`,
+`geometry`, `constraints`, `focus`, `visibility` and `workspace`. Identity retains
+the resource session, native window generation and workspace ID. Owner identifies
+an application connection and its window generation/local ID, an embedded app,
+or the desktop. Native pointers, tags and callbacks are not serialized. Geometry
+contains outer-frame coordinates, dimensions and native zoom state. Constraints
+report the available commands alongside size controls and frame limits.
+
+The workspace publishes `identity`, `active`, `arrangement` and `windows` object
+states. `windows` maps stacking-order indexes to opaque window IDs. Arrangement
+reports the registered window count and whether discovery is complete. Capture
+or publication failure retains the previous complete observation with
+`last_good_unavailable`. Window registration failure leaves discovery incomplete.
+Observers reconcile on the desktop thread after application-session updates and
+before resource requests are dispatched.
+
+Window actions are `focus`, `maximize`, `minimize`, `move`, `request-close`,
+`resize` and `restore`. They require authenticated content, invocation,
+cross-application and host-control authority. Plain windows retain their native
+restrictions. Hidden windows cannot be focused. Unsupported operations return
+`unsupported`; a native pointer gesture in progress returns `busy`.
+
+Move accepts exactly `{x, y}`, integers within -32768 through 32768. Resize
+accepts exactly `{width, height}`, with width 180–8192 and height 90–8192. These
+are outer-frame dimensions. Other actions accept an empty object. Commands pass
+through native tracking, docking, content fitting and app event delivery. Move
+keeps the tab reachable using the native screen constraints. Maximization uses
+the folder's native content fit or the application's available desktop area.
+Restore restores a minimized window and its saved pre-zoom rectangle.
+
+Actions use queued jobs and recheck current native membership, slot generation,
+connection generation and capabilities before dispatch. A changed provider
+revision rejects a queued proposal. Retirement removes the provider's resources
+and fails its queued jobs; outstanding handles cannot target another window.
+Each provider emits its changed and removed resources through normal watches.
+Workspace membership observations and directory enumeration discover new IDs.
+
+A successful action result reports `request_dispatched` with its window ID,
+generation and action. Request-close confirms that the request was dispatched;
+it does not assert that an application accepted closing. Remote requests queue
+Cmd-W through the app protocol without minting an input-gesture grant. Embedded
+requests use the application's event route. Native close callbacks can retain
+the window. Folder closure uses its lifecycle owner and preserves saved state.
+Unsaved-document decisions remain with the application.
+
+## Applications, services and native jobs
+
+The shared shell derives `/apps/catalog/<manifest-id>/actions/launch` and `open`
+from its loaded application inventory. Launch accepts an empty object. Open
+accepts one absolute `path` text member and requires a document-capable app.
+A successful request records `launch_requested`; the child can subsequently fail.
+`/services/runner/applications` and `failures` retain the launch owner's current
+children and last 64 exits, including report paths and expected-stop state.
+The catalog's `manifests`, `capabilities`, `types` and `associations` are complete
+frozen NDJSON streams. Capture failure retains the previous stream and marks
+it `last_good_unavailable`.
+
+Each connected application or pending child has a lifetime-bound `/apps/<id>`
+provider with identity, manifest, capabilities, windows and state observations.
+Manifest attribution requires an authenticated peer PID matching a current
+owned child. External connections with no verified manifest retain that fact.
+Activation restores and focuses an existing owned window. `request-quit` queues
+the application's normal quit shortcut. Acceptance does not establish that the
+application agreed to close. Retired identities cannot control a replacement.
+These host actions require invoke, cross-application and host-control scopes.
+They provide no force-quit or input-gesture grant.
+
+`/services/supervisor` observes a snapshot sent by the actual parent supervisor
+through an authenticated local socket. It includes child PID, prior exit and
+restart count. Direct desktop execution reports supervision unavailable.
+An authenticated supervisor restart can recover an abandoned control socket.
+Recovery holds the private directory lock, checks socket ownership and mode,
+requires a refused connection and verifies the same inode before removal.
+Live listeners, links and ordinary files are preserved. Ordinary endpoint open
+continues to refuse preexisting paths.
+`/notifications` copies the existing alert, progress and status models.
+`/services/lifecycle` reports observed and registered entity counts and capacity.
+The host registry permits 256 providers and 16384 nodes; portable defaults remain
+16 providers and 256 nodes.
+
+`/jobs/<id>` observes worker or file-engine generations. The work pool copies
+at most 64 active items and its last 64 collected outcomes. Its void callbacks
+supply lifecycle state, without application-result or progress semantics.
+Per-item cancellation is unsupported because each owner's completion and cleanup
+contracts remain authoritative. File-engine jobs expose actual progress, errors,
+counts and cancellation. Cancellation rechecks the exact operation generation
+under the engine lock; an old identity cannot cancel a later operation.
+
+The six `/desktop/file-manager/actions/TIKU_TRK_VERB_*` actions use the same
+native scripting controller as the command-file interface. Arguments contain
+`window`, `generation` and `order_token` from `/desktop/file-manager/state`, plus
+`property` and `specifier`. Optional `index` and `end` are nonnegative integers;
+`path` or up to eight `paths` are literal text. The order token covers ordered
+paths and selection flags. Changed generations or order reject the request
+before dispatch. Native script errors remain explicit in the result, and deletes
+use the native Trash operation. `/session/actions/request-end` and `request-quit`
+open the existing quit confirmation; `restore` uses the saved-folder controller.

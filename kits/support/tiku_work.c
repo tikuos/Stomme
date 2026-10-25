@@ -19,6 +19,8 @@
 #include "tiku_work.h"
 
 #include <pthread.h>
+#include <limits.h>
+#include <stdio.h>
 #include <string.h>
 #include <time.h>
 
@@ -49,6 +51,8 @@ static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  more = PTHREAD_COND_INITIALIZER;
 static unsigned long   posted;
 static int             started;
+static tiku_work_observation_t history[SLOTS];
+static unsigned history_at, history_count;
 static int             busy;        /* posted, not yet collected */
 
 /** @brief Milliseconds on a clock that does not step. */
@@ -209,6 +213,8 @@ post(const tiku_work_job_t *job, int slow)
         tiku_trail("work: full, %s refused", job->key);
         return -1;
     }
+    if(posted==ULONG_MAX){pthread_mutex_unlock(&lock);return -1;}
+    slots[i].began_ms=slots[i].ended_ms=0;
     slots[i].job = *job;
     slots[i].job.key[TIKU_WORK_KEY - 1] = '\0';
     slots[i].state = QUEUED;
@@ -269,6 +275,12 @@ tiku_work_collect(void)
             job.free(job.ctx);
         }
         pthread_mutex_lock(&lock);
+        tiku_work_observation_t *record = &history[history_at++ % SLOTS];
+        memset(record,0,sizeof *record);
+        record->id=s->order;snprintf(record->key,sizeof record->key,"%s",s->job.key);
+        record->state=s->cancelled?3:2;record->slow=s->slow;record->cancellation_requested=s->cancelled;
+        record->posted_ms=s->posted_ms;record->began_ms=s->began_ms;record->ended_ms=s->ended_ms;
+        if(history_count<SLOTS)history_count++;
         s->state = FREE;
         busy--;
         pthread_mutex_unlock(&lock);
@@ -322,4 +334,26 @@ tiku_work_busy(void)
     n = busy;
     pthread_mutex_unlock(&lock);
     return n;
+}
+
+size_t tiku_work_observe(tiku_work_observation_t *out,size_t capacity)
+{
+    size_t count=0;int i;
+    pthread_mutex_lock(&lock);
+    for(i=0;i<SLOTS;i++)if(slots[i].state!=FREE) {
+        slot_t *slot=&slots[i];
+        if(out && count<capacity) {
+            tiku_work_observation_t *record=&out[count];memset(record,0,sizeof *record);
+            record->id=slot->order;snprintf(record->key,sizeof record->key,"%s",slot->job.key);
+            record->state=slot->state==QUEUED?0:slot->state==RUNNING?1:slot->cancelled?3:2;
+            record->slow=slot->slow;record->cancellation_requested=slot->cancelled;
+            record->posted_ms=slot->posted_ms;record->began_ms=slot->began_ms;record->ended_ms=slot->ended_ms;
+        }
+        count++;
+    }
+    for(i=0;i<(int)history_count;i++) {
+        if(out && count<capacity)out[count]=history[(history_at-history_count+(unsigned)i)%SLOTS];
+        count++;
+    }
+    pthread_mutex_unlock(&lock);return count;
 }

@@ -191,7 +191,7 @@ conduct_chrome(desktop_t *app, const char *name, char *out, size_t max)
  * @brief Answer the conductor channel's question @p name into @p out: a
  *        conduct_chrome() question, the trail, the longest turn, the focused
  *        window's title or every window's, the status line, the count, the
- *        open menu, the alert, the sounds, the mounts, the focused window's
+ *        open menu, the alert, the sounds, the mounts, the focused window's frame,
  *        controls or narration, the running operation, or a path the
  *        namespace serves.
  * @return 1 when answered; 0 for a name this build does not know or a path
@@ -221,6 +221,27 @@ conduct_text(void *context, const char *name, char *out, size_t max)
          * answered or the desktop started; answering resets it. */
         snprintf(out, max, "%ld", tiku_watch_longest_ms());
         tiku_watch_longest_reset();
+        return 1;
+    }
+    if (strcmp(name, "layout") == 0) {
+        tiku_window_t *window = tiku_workspace_focused(app->desk);
+        tiku_trk_folder_window_t *folder = window ? tiku_trk_folder_lifecycle_find(&app->folder_lifecycle,window) : NULL;
+        const tiku_trk_column_t *columns; int i, count; size_t used;
+        if (!folder) folder = tiku_trk_desktop_view_folder(&app->desktop_view);
+        if (!folder || !folder->view) { out[0] = 0; return 1; }
+        count = tiku_trk_poseview_columns(folder->view,&columns);
+        used = (size_t)snprintf(out,max,"%d %d %d",tiku_trk_poseview_mode(folder->view),tiku_trk_poseview_icon_size(folder->view),count);
+        for (i = 0; i < count && used < max; i++) {
+            int written = snprintf(out+used,max-used," %d %d",columns[i].field,columns[i].width);
+            if (written < 0 || (size_t)written >= max-used) break;
+            used += (size_t)written;
+        }
+        return 1;
+    }
+    if (strcmp(name, "frame") == 0) {
+        tiku_window_t *w = tiku_workspace_focused(app->desk);
+        if (w) snprintf(out, max, "%d %d %d %d", w->frame.x, w->frame.y, w->frame.w, w->frame.h);
+        else out[0] = 0;
         return 1;
     }
     if (strcmp(name, "title") == 0) {

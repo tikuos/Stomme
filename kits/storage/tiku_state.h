@@ -85,7 +85,8 @@ tiku_store_t *tiku_store_sidecar_open(const char *devid);
  *         not persist. */
 tiku_store_t *tiku_store_memory_open(void);
 
-/** @brief Free @p s; a sidecar with unsaved changes is written first. */
+/** @brief Free the store; flush sidecar records when no reconciliation is outstanding.
+ *  @note An active update is cancelled and detached; its worker retains its own data. */
 void tiku_store_free(tiku_store_t *s);
 
 /**
@@ -101,6 +102,9 @@ int tiku_state_read(tiku_store_t *s, const char *node,
 int tiku_state_write(tiku_store_t *s, const char *node,
                          const char *attr, const void *buf, size_t len);
 
+/** @brief Whether native file attributes hold this store's records. */
+int tiku_store_native_attributes(const tiku_store_t *s);
+
 /**
  * @brief Whether this store can persist at all: 0 for a sidecar with
  *        nowhere to write.
@@ -113,6 +117,7 @@ int tiku_store_writable(const tiku_store_t *s);
  * @brief Persist pending changes: a sidecar is written whole, and the other
  *        stores have nothing pending.
  *
+ * An active or detached staged update returns EBUSY until reconciliation.
  * The sidecar batches: callers flush on directory switch, window close
  * and link loss, not on every change.
  */
@@ -141,6 +146,13 @@ int tiku_state_forget(tiku_store_t *s, const char *node);
 int tiku_state_each(tiku_store_t *s, const char *node,
                         int (*fn)(const char *attr, const void *val,
                                   size_t len, void *ctx), void *ctx);
+
+/** @brief Visit cached records without filesystem I/O; return ENOTSUP for native attributes.
+ *  @note Borrowed names and bytes remain valid during the callback. A nonzero callback
+ *        stops enumeration. The caller must not mutate or free this store in the callback.
+ *  @return Records visited, or -1 for an invalid argument or unsupported store. */
+int tiku_state_cached_each(const tiku_store_t *,
+    int (*visitor)(const char *node, const char *attribute, const void *, size_t length, void *), void *);
 
 /** @brief Records held (tests and the store's own reporting). */
 int tiku_store_count(const tiku_store_t *s);

@@ -431,6 +431,12 @@ static void limits_test(void)
     tiku_resource_entry_t page[4];
     uint64_t epoch = 0;
     size_t count;
+    {
+        tiku_resource_limits_t host = {.resources = 8192};
+        tiku_resource_registry_t *large = tiku_resource_registry_new(&host);
+        CHECK(large); tiku_resource_registry_free(large);
+        host.resources = 16385; CHECK(!tiku_resource_registry_new(&host));
+    }
     fixture.registry = tiku_resource_registry_new(&limits);
     memset(fixture.caller.principal, '1', 32);
     CHECK(fixture.registry && register_fixture(&fixture, "settings", "/settings") == TIKU_RESOURCE_LIMIT);

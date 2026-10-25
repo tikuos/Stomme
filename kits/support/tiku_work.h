@@ -84,4 +84,16 @@ int tiku_work_cancelled(const void *ctx);
 /** @brief Jobs posted and not yet collected. */
 int tiku_work_busy(void);
 
+/** @brief Copied lifecycle data for a work item; no callback or context addresses. */
+typedef struct {
+    unsigned long long id;
+    char key[TIKU_WORK_KEY];
+    int state; /**< 0 queued, 1 running, 2 finished, 3 cancelled */
+    int slow, cancellation_requested;
+    long posted_ms, began_ms, ended_ms;
+} tiku_work_observation_t;
+/** @brief Copy active work and the latest 64 collected items under the pool lock.
+ *  @return Required count; up to capacity entries are copied. Loop thread only. */
+size_t tiku_work_observe(tiku_work_observation_t *out, size_t capacity);
+
 #endif /* TIKU_WORK_H_ */

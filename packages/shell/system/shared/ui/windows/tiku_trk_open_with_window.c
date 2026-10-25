@@ -80,11 +80,38 @@ enables(const tiku_trk_open_with_window_t *c, int *can_open,
 {
     int sel = tiku_list_chosen(&c->list);
 
-    *can_open = (sel >= 0 && sel < c->count);
-    /* An application with no relation cannot become preferred, and the
-     * preferred one already is, so the button is off for both. */
-    *can_prefer = *can_open && c->cand[sel].rel != TIKU_TRK_REL_NONE &&
-                  !c->cand[sel].preferred;
+    *can_open = !c->pending && (sel >= 0 && sel < c->count);
+    /* Shared owners validate the handler for each selected type. A choice
+     * already shared by the selection requires no preference change. */
+    *can_prefer = *can_open && c->cand[sel].rel != TIKU_TRK_REL_NONE;
+    if (*can_prefer && c->settings) {
+        const char *types[TIKU_TRK_APP_TYPES_MAX];
+        int i, all_preferred = c->type_count > 0;
+        char preferred[TIKU_TRK_APP_NAME_MAX];
+        for (i = 0; i < c->type_count; i++) {
+            types[i] = c->types[i];
+            if (strcmp(tiku_trk_launch_preferred(c->store, types[i], preferred, sizeof preferred), c->cand[sel].app->name))
+                all_preferred = 0;
+        }
+        *can_prefer = !all_preferred &&
+            !tiku_trk_catalog_settings_prefer_validate(c->settings,
+                types, c->type_count, c->cand[sel].app->name);
+    } else if (*can_prefer) {
+        *can_prefer = !c->cand[sel].preferred;
+    }
+}
+
+/** @brief Refresh candidate preference marks from the current owner-thread cache. */
+static void refresh_preferred(tiku_trk_open_with_window_t *c)
+{
+    int i, j;
+    char preferred[TIKU_TRK_APP_NAME_MAX];
+    for (i = 0; i < c->count; i++) {
+        c->cand[i].preferred = 0;
+        for (j = 0; j < c->type_count; j++)
+            if (!strcmp(tiku_trk_launch_preferred(c->store, c->types[j], preferred, sizeof preferred), c->cand[i].app->name))
+                c->cand[i].preferred = 1;
+    }
 }
 
 /** @brief Draw the candidates, the chosen one marked, and the two buttons. */
@@ -98,9 +125,10 @@ draw(tiku_window_t *window, tiku_surface_t *surface,
     int can_open, can_prefer, i;
 
     (void)window;
+    refresh_preferred(c);
     tiku_fill(surface, content, TIKU_C_PANEL);
     tiku_text(surface, font, content.x + 10, content.y + 16,
-                   "Open with:", TIKU_C_TEXT);
+                   c->status[0] ? c->status : "Open with:", TIKU_C_TEXT);
     for (i = 0; i < OW_ROWS; i++) {
         int at = c->list.top + i;
         tiku_rect_t row = tiku_list_row_rect(&c->list,
@@ -145,15 +173,52 @@ draw(tiku_window_t *window, tiku_surface_t *surface,
                         (tiku_press_held(&c->press, 1) ? TIKU_S_PRESSED : 0u));
 }
 
+/** @brief Drop the chooser's launch completion while retaining an accepted store update. */
+static void detach_save(tiku_trk_open_with_window_t *c)
+{
+    if (c->pending) tiku_trk_catalog_settings_detach(c->settings, c);
+    c->pending = 0;
+    c->press = (tiku_press_t){0};
+}
+
+/** @brief Retire the chooser when its workspace window closes. */
+static void destroyed(tiku_window_t *window, void *context)
+{
+    tiku_trk_open_with_window_t *c = context;
+    if (c->window != window) return;
+    detach_save(c);
+    c->window = NULL;
+    mark_dirty(c);
+}
+
 /** @brief Close the window, if open, and ask for a redraw. */
 static void
 close_window(tiku_trk_open_with_window_t *c)
 {
+    detach_save(c);
     if (c->window != NULL) {
         tiku_workspace_close(c->workspace, c->window);
         c->window = NULL;
     }
     mark_dirty(c);
+}
+
+/** @brief Launch the captured choice after saving, or retain the chooser with its error. */
+static void preferred_saved(void *context, tiku_resource_error_t error)
+{
+    tiku_trk_open_with_window_t *c = context;
+    if (!c->pending) return;
+    c->pending = 0;
+    if (!c->window || !c->window->open || c->window->generation != c->pending_generation) return;
+    if (error) {
+        snprintf(c->status, sizeof c->status, "%s", error == TIKU_RESOURCE_STALE ?
+            "Associations changed. Reopen and retry." : error == TIKU_RESOURCE_UNKNOWN_OUTCOME ?
+            "Save outcome unknown. Reopen to check." : "Could not save preferred app. Retry.");
+        mark_dirty(c);
+        return;
+    }
+    close_window(c);
+    if (c->open) c->open(c->open_context, &c->pending_app, c->path_ptr, c->path_count);
 }
 
 /** @brief Open with the selected application, asking first if it must. */
@@ -168,6 +233,21 @@ do_open(tiku_trk_open_with_window_t *c, int make_preferred)
         return;
     }
     pick = &c->cand[tiku_list_chosen(&c->list)];
+    if (make_preferred && c->settings) {
+        const char *types[TIKU_TRK_APP_TYPES_MAX];
+        tiku_resource_error_t error;
+        int i;
+        for (i = 0; i < c->type_count; i++) types[i] = c->types[i];
+        error = tiku_trk_catalog_settings_prefer(c->settings, types, c->type_count,
+            pick->app->name, preferred_saved, c);
+        if (!error) {
+            c->pending_app = *pick->app; c->pending = 1;
+            c->pending_generation = c->window->generation;
+            snprintf(c->status, sizeof c->status, "Saving preferred application...");
+        } else snprintf(c->status, sizeof c->status, "Could not start saving. Retry.");
+        mark_dirty(c);
+        return;
+    }
     if (make_preferred && c->store != NULL) {
         int t;
 
@@ -201,6 +281,7 @@ do_open(tiku_trk_open_with_window_t *c, int make_preferred)
 void
 tiku_trk_open_with_window_confirmed(tiku_trk_open_with_window_t *c)
 {
+    if (c->pending) return;
     {
         int sel = tiku_list_chosen(&c->list);
 
@@ -228,6 +309,7 @@ event(tiku_window_t *window, const tiku_event_t *ev,
     if (c->window == NULL) {
         return 0;
     }
+    if (c->pending) return 1;
     content = tiku_window_content(c->window);
     buttons(c, content, &open_b, &prefer_b);
 #define INSIDE(r) (ev->x >= (r).x && ev->x < (r).x + (r).w && \
@@ -293,6 +375,20 @@ tiku_trk_open_with_window_init(tiku_trk_open_with_window_t *c,
     tiku_list_set_row_h(&c->list, row_h());
 }
 
+void tiku_trk_open_with_window_bind_settings(tiku_trk_open_with_window_t *c,
+    tiku_trk_catalog_settings_t *settings)
+{
+    detach_save(c);
+    c->settings = settings;
+}
+
+void tiku_trk_open_with_window_destroy(tiku_trk_open_with_window_t *c)
+{
+    if (!c) return;
+    close_window(c);
+    c->settings = NULL;
+}
+
 void
 tiku_trk_open_with_window_open(tiku_trk_open_with_window_t *c,
     const tiku_trk_apps_t *apps, const char *const *types, int ntypes,
@@ -303,6 +399,8 @@ tiku_trk_open_with_window_open(tiku_trk_open_with_window_t *c,
     if (apps == NULL) {
         return;
     }
+    detach_save(c);
+    c->status[0] = 0;
     c->count = 0;
     tiku_list_init(&c->list, 1);
     tiku_list_set_row_h(&c->list, row_h());
@@ -383,7 +481,7 @@ tiku_trk_open_with_window_open(tiku_trk_open_with_window_t *c,
             c->window = tiku_workspace_open(c->workspace, "Open with",
                 frame, draw, c, NULL);
             if (c->window != NULL) {
-                tiku_window_set_handlers(c->window, event, NULL, NULL);
+                tiku_window_set_handlers(c->window, event, NULL, destroyed);
             }
         }
     }
@@ -409,6 +507,7 @@ tiku_trk_open_with_window_key(tiku_trk_open_with_window_t *c, int key,
          * shell's chain (AW-046). */
         return 0;
     }
+    if (c->pending && key != TIKU_KEY_ESCAPE) return 1;
     switch (key) {
     case TIKU_KEY_ESCAPE:
         /* Escape closes the window without opening anything

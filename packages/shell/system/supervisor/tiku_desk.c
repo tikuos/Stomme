@@ -16,6 +16,8 @@
  */
 #include "tiku_shell_product.h"
 #include "tiku_report.h"
+#include "tiku_supervisor_state.h"
+#include <sys/socket.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -236,7 +238,9 @@ run_desk(const char *desk, int argc, char **argv, const char *after)
 {
     /* argv[0], the caller's arguments, -after, its path, the end. */
     const char **args = calloc((size_t)argc + 4u, sizeof *args);
-    int status = 0, i, n = 0, log;
+    int status = 0, i, n = 0, log, telemetry[2]={-1,-1};
+    static unsigned restart_count;
+    static int previous_status,have_previous;
 
     if (args == NULL) {
         return -1;
@@ -252,8 +256,14 @@ run_desk(const char *desk, int argc, char **argv, const char *after)
     args[n] = NULL;
 
     log = open_log();
+    (void)socketpair(AF_UNIX,SOCK_DGRAM,0,telemetry);
+    if(telemetry[1]>=0) {
+        char number[32];snprintf(number,sizeof number,"%d",telemetry[1]);
+        (void)setenv("STOMME_SUPERVISOR_FD",number,1);
+    } else unsetenv("STOMME_SUPERVISOR_FD");
     child = fork();
     if (child == 0) {
+        if(telemetry[0]>=0)close(telemetry[0]);
         /* Only what is needed to become the desk: no allocation, no
          * stdio, between here and exec. */
         if (log >= 0) {
@@ -262,6 +272,16 @@ run_desk(const char *desk, int argc, char **argv, const char *after)
         }
         execvp(desk, (char *const *)(void *)args);
         _exit(127);
+    }
+    unsetenv("STOMME_SUPERVISOR_FD");
+    if(telemetry[1]>=0)close(telemetry[1]);
+    if(telemetry[0]>=0) {
+        tiku_trk_supervisor_state_t snapshot={.version=1,.restart_count=restart_count,
+            .supervisor=getpid(),.child=child,.has_exit=have_previous,
+            .signal=have_previous&&WIFSIGNALED(previous_status)?WTERMSIG(previous_status):0,
+            .status=have_previous&&WIFEXITED(previous_status)?WEXITSTATUS(previous_status):0};
+        if(child>0)(void)send(telemetry[0],&snapshot,sizeof snapshot,0);
+        close(telemetry[0]);
     }
     if (log >= 0) {
         (void)close(log);
@@ -276,6 +296,7 @@ run_desk(const char *desk, int argc, char **argv, const char *after)
         }
     }
     ended = child;
+    previous_status=status;have_previous=1;restart_count++;
     child = 0;
     return status;
 }

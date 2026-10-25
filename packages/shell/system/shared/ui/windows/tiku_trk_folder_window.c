@@ -363,6 +363,7 @@ tiku_trk_folder_window_draw_background(tiku_trk_folder_window_t *folder,
         }
         snprintf(folder->bg_shown, sizeof folder->bg_shown, "%s", bg.path);
     }
+    folder->bg_applied = bg;
     for (i = 0; tiku_trk_bg_place(&bg, content.w, content.h,
                                   folder->bg_image.w, folder->bg_image.h,
                                   i, &dx, &dy, &dw, &dh); i++) {

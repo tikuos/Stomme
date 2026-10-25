@@ -28,6 +28,10 @@
 #include "tiku_form.h"
 #include "tiku_fs.h"
 #include "tiku_trk_resource_session.h"
+#include "tiku_trk_resource_observer.h"
+#include "tiku_trk_window_resources.h"
+#include "tiku_trk_native_settings.h"
+#include "tiku_trk_settings.h"
 #include "tiku_host.h"
 #include "tiku_iconpaint.h"
 #include "tiku_icons.h"
@@ -215,6 +219,16 @@ typedef struct desktop {
     tiku_trk_deskbar_t  *deskbar;       /**< the bar, drawn last */
     tiku_backend_t  *backend;           /**< the namespace: files and mounts */
     tiku_trk_resource_session_t *resource_session;
+    tiku_trk_settings_t *settings;
+    tiku_trk_catalog_settings_t *catalog_settings;
+    tiku_trk_record_settings_t *record_settings;
+    tiku_trk_desktop_settings_t *desktop_settings;
+    tiku_trk_native_settings_t *native_settings;
+    tiku_trk_resource_observer_t *shell_observers[10];
+    struct desktop_lifecycle_vfs *lifecycle_vfs;
+    tiku_trk_window_resources_t *window_resources;
+    int resource_safe_mode, resource_boot_restore, resource_boot_fallback;
+    uint64_t resource_next_native_scan;
     tiku_fs_t       *fs;                /**< file operations over it */
     folder_t             folders[TIKU_WINDOW_MAX]; /**< the folder windows */
     tiku_trk_services_t  services;      /**< what the views ask the desktop */
@@ -1340,6 +1354,11 @@ int desktop_report_write(desktop_t *app, const char *why, char *out,
 void desktop_frame_report(desktop_t *app, FILE *out);
 void desktop_report_poll(desktop_t *app);
 
+/* tiku_trk_desktop_resources.c */
+int desktop_resources_open(desktop_t *app);
+void desktop_resources_poll(desktop_t *app, uint64_t now_ms);
+void desktop_resources_close(desktop_t *app);
+
 /* tiku_trk_desktop_startup.c */
 tiku_window_t *desktop_startup_handle(desktop_t *app);
 void desktop_startup_close(desktop_t *app);
@@ -1350,6 +1369,10 @@ void desktop_startup_offer_id(desktop_t *app, const char *path,
                               const char *label, const char *id,
                               const char *legacy);
 void desktop_startup_open(desktop_t *app);
+/** @brief Copy saved restore choices and installed startup entries without draft values. */
+tiku_msg_t *desktop_startup_observe(desktop_t *app, int index);
+/** @brief Number of installed startup application rows. */
+int desktop_startup_count(const desktop_t *app);
 void desktop_startup_run(desktop_t *app, int safe_mode, int *restore,
                          int *fallback);
 
@@ -1378,6 +1401,23 @@ void desktop_vfs_request(desktop_t *app, int session,
 /* tiku_trk_desktop_windows.c */
 void desktop_windows_attach(desktop_t *app);
 
+/** @brief Capture the inherited supervisor channel before application launches. */
+void desktop_lifecycle_vfs_prepare(desktop_t *);
+/** @brief Whether the authenticated supervisor supplied a preceding child exit. */
+int desktop_lifecycle_vfs_restarting(desktop_t *);
+/** @brief Register native application, service and job owners after boot. */
+int desktop_lifecycle_vfs_open(desktop_t *);
+/** @brief Refresh native lifecycle caches before servicing resource requests. */
+void desktop_lifecycle_vfs_poll(desktop_t *,uint64_t);
+/** @brief Retire lifecycle providers and release their native observation caches. */
+void desktop_lifecycle_vfs_close(desktop_t *);
+/** @brief Run a parsed native scripting request against a lifetime-checked folder. */
+void desktop_script_request(desktop_t *,folder_t *,const tiku_trk_req_t *,tiku_trk_rep_t *);
+
 /* End of the shared declarations. */
+
+/** @brief Route resource commands through native window and application owners. */
+tiku_resource_error_t desktop_window_resource_perform(void *, tiku_window_t *,
+    tiku_trk_window_action_t, int, int);
 
 #endif /* TIKU_TRK_DESKTOP_PRIVATE_H_ */

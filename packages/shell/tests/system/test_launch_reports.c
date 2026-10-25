@@ -24,6 +24,10 @@ int main(void)
             _exit(i == 0 ? 7 : 0);
         }
         tiku_trk_launch_note(child, "ChildFixture");
+        tiku_trk_launch_identify(child,"fixture");
+        tiku_trk_launch_observation_t observation;
+        assert(!tiku_trk_launch_observe(0,&observation));
+        assert(observation.running&&observation.generation&&observation.pid==child&&!strcmp(observation.app_id,"fixture"));
         if (i == 1) killed = child;
         if (i == 2) { expected = child; tiku_trk_launch_expect_stop(child); }
     }
@@ -45,7 +49,14 @@ int main(void)
         } else assert(!d.report[0]);
     }
     assert(count == 24 && failed == 2 && forced == 1);
-    /* Exec failures must reach the same reaper, not an eager waitpid(NULL). */
+    tiku_trk_launch_observation_t history[25];
+    for(int i=0;i<24;i++) {
+        assert(!tiku_trk_launch_observe(i,&history[i]));
+        assert(!history[i].running&&history[i].generation&&!strcmp(history[i].app_id,"fixture"));
+        for(int j=0;j<i;j++)assert(history[i].generation!=history[j].generation);
+    }
+    assert(tiku_trk_launch_observe(24,&history[24])<0);
+    /* Exec failures reach the same reaper and retain their report path. */
     tiku_trk_app_t app = {0};
     strcpy(app.name, "MissingExecutable");
     strcpy(app.cmd, "/not-a-real-tiku-application");
@@ -55,6 +66,8 @@ int main(void)
         reaped = tiku_trk_launch_reap(&d, 1); if (!reaped) usleep(1000);
     }
     assert(reaped == 1 && d.status == 127 && d.report[0]);
+    assert(!tiku_trk_launch_observe(24,&history[24]));
+    assert(history[24].status==127&&!strcmp(history[24].report,d.report));
     puts("PASS: all 24 exits retained, failed exits logged, Force Quit excluded, exec failure captured");
     return 0;
 }

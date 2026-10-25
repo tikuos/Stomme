@@ -283,7 +283,7 @@ int
 tiku_trk_prefs_load(tiku_trk_prefs_t *p, const char *path)
 {
     FILE *f;
-    char line[512];
+    int result;
 
     if (p == NULL || path == NULL) {
         return -1;
@@ -292,6 +292,16 @@ tiku_trk_prefs_load(tiku_trk_prefs_t *p, const char *path)
     if (f == NULL) {
         return 0;                   /* no file yet: the defaults stand */
     }
+    result = tiku_trk_prefs_read(p, f);
+    if (fclose(f)) result = -1;
+    return result;
+}
+
+int
+tiku_trk_prefs_read(tiku_trk_prefs_t *p, FILE *f)
+{
+    char line[512];
+    if (!p || !f) return -1;
     while (fgets(line, sizeof line, f) != NULL) {
         char name[128], val[128];
         tiku_trk_pref_t *pr;
@@ -339,16 +349,15 @@ tiku_trk_prefs_load(tiku_trk_prefs_t *p, const char *path)
             }
         }
     }
-    (void)fclose(f);
-    return 0;
+    return ferror(f) ? -1 : 0;
 }
 
-/** @brief The file's lines for @p context's settings, into @p f. */
-static int
-write_lines(FILE *f, void *context)
+int
+tiku_trk_prefs_write(FILE *f, const tiku_trk_prefs_t *p)
 {
-    const tiku_trk_prefs_t *p = context;
     int i;
+
+    if (!f || !p) return -1;
 
     for (i = 0; i < p->n; i++) {
         const tiku_trk_pref_t *pr = &p->pref[i];
@@ -378,7 +387,20 @@ write_lines(FILE *f, void *context)
     for (i = 0; i < p->nunknown; i++) {
         fprintf(f, "%s\n", p->unknown[i]);
     }
-    return 0;
+    return ferror(f) ? -1 : 0;
+}
+
+/** @brief Serialize the table supplied to the atomic-file callback. */
+static int write_lines(FILE *f, void *context)
+{
+    return tiku_trk_prefs_write(f, context);
+}
+
+int tiku_trk_prefs_submit(tiku_trk_prefs_t *p, const char *path)
+{
+    if (!p || !path) return -1;
+    return p->submit_save ? p->submit_save(p->save_context, path)
+                          : tiku_trk_prefs_save(p, path);
 }
 
 int

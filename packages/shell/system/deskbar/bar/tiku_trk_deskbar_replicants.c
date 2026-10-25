@@ -491,3 +491,10 @@ tiku_trk_deskbar_trayicons(const tiku_trk_deskbar_t *db, int i,
     }
     return db->trayicon_count;
 }
+
+int
+tiku_trk_deskbar_replicant_at(const tiku_trk_deskbar_t *db, int index, tiku_trk_replicant_t *out)
+{
+    if (!db || !out || index < 0 || index >= db->tray_count) return -1;
+    *out = db->tray[index]; return 0;
+}

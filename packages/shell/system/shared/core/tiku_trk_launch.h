@@ -62,6 +62,7 @@ typedef enum {
 
 /** @brief One application the registry knows about. */
 typedef struct tiku_trk_app {
+    char category[32],startup[96],help[128]; /* loaded manifest metadata */
     char id[64];                         /* manifest's stable identity */
     char name[TIKU_TRK_APP_NAME_MAX];    /* as the Open With menu says it */
     char cmd[TIKU_TRK_APP_CMD_MAX];      /* argv[0], run with the paths   */
@@ -183,6 +184,12 @@ const char *tiku_trk_launch_preferred(struct tiku_store *store,
                                       const char *type, char *buf,
                                       size_t max);
 
+/** @brief Read the last saved preferred handler without filesystem I/O.
+ *  @return 0 for a copied handler or no preference; -1 when unavailable. */
+int tiku_trk_launch_preferred_persisted(struct tiku_store *store, const char *type,
+    char *buffer, size_t max);
+
+
 /** @brief The word a Relation column shows for @p rel (AW-042, MA-081). */
 const char *tiku_trk_launch_relation_label(tiku_trk_relation_t rel);
 
@@ -260,5 +267,18 @@ typedef struct {
  * @return how many, each written into the trail with how it went.
  */
 int tiku_trk_launch_reap(tiku_trk_death_t *out, int max);
+
+/** @brief Copied child identity and retained exit outcome. */
+typedef struct {
+    unsigned long long generation;
+    long pid;
+    char name[64], app_id[64], report[512];
+    int running, signal, status, expected;
+} tiku_trk_launch_observation_t;
+/** @brief Copy one current child or one of the latest 64 exits; -1 out of range.
+ *  @note Loop thread only; index zero begins a current native snapshot. */
+int tiku_trk_launch_observe(int index,tiku_trk_launch_observation_t *);
+/** @brief Associate a tracked child with its loaded manifest identity. */
+void tiku_trk_launch_identify(pid_t pid,const char *app_id);
 
 #endif /* TIKU_TRK_LAUNCH_H_ */

@@ -123,7 +123,7 @@ struct tiku_trk_folder_window {
     /* Its folder or volume vanished: the window is closing, and its frame
      * is not saved. */
     int                        gone;
-    tiku_trk_frame_t           opened_with; /* the frame restored at open */
+    tiku_trk_frame_t           opened_with; /* baseline for the next frame save */
     tiku_scroll_t          sbar;    /* its scroll bar (PVL-051) */
     int                        trash_union; /* every volume's trash, one
                                              * window (PVN-027) */
@@ -145,6 +145,7 @@ struct tiku_trk_folder_window {
      * frame does not decode the file again. */
     tiku_image_t           bg_image;       /* the decoded picture */
     char                       bg_shown[TIKU_PATH_MAX]; /* its file */
+    tiku_trk_bg_t               bg_applied; /**< background used by the last image draw */
     int                        bg_drawn;   /* labels need a halo over it */
     /* The rows' or icons' pixels, kept between frames and blitted to the
      * frame whole, since the shell redraws the screen from the backdrop

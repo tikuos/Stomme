@@ -97,9 +97,9 @@ tiku_trk_fontprefs_save(const tiku_trk_fontprefs_t *prefs,
     record.value.font_family = prefs->value.family;
     record.value.font_size = prefs->value.size;
     tiku_trk_deskbar_settings_normalize(&record.value);
-    (void)tiku_state_write(store, TIKU_KEY_SESSION,
-                               TIKU_ATTR_UI_FONT, prefs->value.dropped,
-                               strlen(prefs->value.dropped));
+    if (tiku_state_write(store, TIKU_KEY_SESSION,
+                         TIKU_ATTR_UI_FONT, prefs->value.dropped,
+                         strlen(prefs->value.dropped))) return 0;
     return tiku_trk_deskbar_prefs_save(&record, store) == 0;
 }
 

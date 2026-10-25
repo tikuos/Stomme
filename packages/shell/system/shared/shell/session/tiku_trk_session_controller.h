@@ -18,6 +18,7 @@
 #include "tiku_trk_deskbar.h"
 #include "tiku_trk_desktop_view.h"
 #include "tiku_trk_folder_lifecycle.h"
+#include "tiku_trk_frame.h"
 
 /** @brief What the session reads and writes: the store, the Deskbar, the
  *         Desktop and the folder windows. */
@@ -26,6 +27,7 @@ typedef struct {
     tiku_trk_deskbar_t *deskbar;
     tiku_trk_desktop_view_t *desktop_view;
     tiku_trk_folder_lifecycle_t *folders;
+    int preserve_restore; /**< explicit next-start record supersedes shutdown capture */
 } tiku_trk_session_controller_t;
 
 /**
@@ -49,10 +51,14 @@ void tiku_trk_session_restore_deskbar(
 void tiku_trk_session_restore_folders(
     tiku_trk_session_controller_t *controller, const char *const *paths,
     int path_count, int safe_mode, int device_backend, int fallback);
+/** @brief Copy the current restorable folder entries without filesystem I/O.
+ *  @return Count, or -1 when the supplied array cannot hold the complete set. */
+int tiku_trk_session_controller_entries(const tiku_trk_session_controller_t *,
+    tiku_trk_session_entry_t *entries, int capacity);
 /**
- * @brief Save the session: every open folder window but a query's, each
- *        view's state, columns and frame, and the Deskbar's dock and
- *        width; then flush the store.
+ * @brief Save folder views, columns, frames and Deskbar docking; capture the
+ *        open folders unless an explicit next-start record supersedes capture.
+ *        Flush the session store afterwards.
  */
 void tiku_trk_session_controller_save(
     tiku_trk_session_controller_t *controller);

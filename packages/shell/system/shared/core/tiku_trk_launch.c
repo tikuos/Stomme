@@ -13,6 +13,7 @@
 #include "tiku_state.h"
 #include "tiku_trail.h"
 #include "tiku_trk_launch.h"
+#include "tiku_state_update.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -192,6 +193,18 @@ tiku_trk_launch_preferred(struct tiku_store *store, const char *type,
     }
     buf[n] = '\0';
     return buf;
+}
+
+int tiku_trk_launch_preferred_persisted(struct tiku_store *store, const char *type,
+    char *buffer, size_t max)
+{
+    int size;
+    if (!buffer || !max) return -1;
+    buffer[0] = 0;
+    size = tiku_store_persisted_read(store, PREF_NODE, type, buffer, max - 1);
+    if (size < 0) return errno == ENOENT ? 0 : -1;
+    buffer[size] = 0;
+    return 0;
 }
 
 int
@@ -445,6 +458,7 @@ launch_process(const tiku_trk_app_t *app, const char *const *paths,
         leaf = (leaf != NULL) ? leaf + 1 : app->name;
         tiku_trail("launch %s pid %d", leaf, (int)pid);
         tiku_trk_launch_note(pid, leaf);
+        tiku_trk_launch_identify(pid,app->id);
     }
     /* Only launch_reap consumes the status, including immediate failures. */
     return TIKU_TRK_LAUNCH_OK;
@@ -499,6 +513,8 @@ int tiku_trk_launch_message(const tiku_trk_app_t *app,
 /** @brief One launched program, until it is reaped. */
 typedef struct launched_app {
     pid_t pid;
+    unsigned long long generation;
+    char app_id[64];
     char  name[64];
     int expected;                   /* a Force Quit was requested */
     struct launched_app *next;
@@ -506,6 +522,9 @@ typedef struct launched_app {
 
 /* Every launched program not yet reaped, newest first. */
 static launched_app_t *launched;
+static unsigned long long launch_generation;
+static tiku_trk_launch_observation_t exits[64];
+static unsigned exit_at,exit_count;
 
 void tiku_trk_launch_expect_stop(pid_t pid)
 {
@@ -534,6 +553,7 @@ tiku_trk_launch_note(pid_t pid, const char *name)
     launched_app_t *a = calloc(1, sizeof *a);
     if (!a) { tiku_trail("cannot track child %ld", (long)pid); return; }
     a->pid = pid;
+    a->generation=++launch_generation;
     snprintf(a->name, sizeof a->name, "%s", name ? name : "?");
     a->next = launched; launched = a;
 }
@@ -571,9 +591,33 @@ tiku_trk_launch_reap(tiku_trk_death_t *out, int max)
         if (!death.expected && (death.signal || death.status))
             tiku_report_child(a->name, death.pid, death.signal,
                 death.status, death.report, sizeof death.report);
+        tiku_trk_launch_observation_t *record=&exits[exit_at++%64];
+        memset(record,0,sizeof *record);record->generation=a->generation;record->pid=death.pid;
+        snprintf(record->name,sizeof record->name,"%s",a->name);snprintf(record->app_id,sizeof record->app_id,"%s",a->app_id);
+        snprintf(record->report,sizeof record->report,"%s",death.report);record->signal=death.signal;record->status=death.status;record->expected=death.expected;
+        if(exit_count<64)exit_count++;
         if (out) out[n] = death;
         *slot = a->next; free(a);
         n++;
     }
     return n;
+}
+
+void tiku_trk_launch_identify(pid_t pid,const char *app_id)
+{
+    for(launched_app_t *child=launched;child;child=child->next)if(child->pid==pid) {
+        snprintf(child->app_id,sizeof child->app_id,"%s",app_id?app_id:"");return;
+    }
+}
+
+int tiku_trk_launch_observe(int index,tiku_trk_launch_observation_t *out)
+{
+    launched_app_t *child=launched;if(index<0||!out)return -1;
+    while(child && index){child=child->next;index--;}
+    if(child) {
+        memset(out,0,sizeof *out);out->pid=child->pid;out->generation=child->generation;out->running=1;
+        snprintf(out->name,sizeof out->name,"%s",child->name);snprintf(out->app_id,sizeof out->app_id,"%s",child->app_id);return 0;
+    }
+    if((unsigned)index>=exit_count)return -1;
+    *out=exits[(exit_at-exit_count+(unsigned)index)%64];return 0;
 }

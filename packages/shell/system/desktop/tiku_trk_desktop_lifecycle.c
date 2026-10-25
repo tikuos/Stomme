@@ -19,7 +19,83 @@
 #endif
 #include "tiku_trail.h"
 #include "tiku_trk_desktop_private.h"
+#include "tiku_resource_endpoint.h"
 #include <strings.h>
+
+/** @brief Apply committed shared preferences to live desktop views and sound. */
+static void settings_changed(void *context)
+{
+    desktop_t *app = context;
+    app->desktop_prefs_window.model.value.reduce_motion =
+        tiku_trk_prefs_get(prefs_model(app), "ReduceMotion") != 0;
+    tiku_trk_soundprefs_apply(prefs_model(app));
+    sync_folder_preferences(app);
+    desktop_damage_all(app);
+}
+
+/** @brief Apply committed Deskbar and font values to the existing native owners. */
+static void record_settings_changed(void *context)
+{
+    desktop_t *app = context;
+    tiku_trk_deskbar_apply_settings(app->deskbar, &app->deskbar_prefs_window.model.value);
+    tiku_trk_fontprefs_apply(&app->fonts_window.model);
+    desktop_damage_all(app);
+}
+
+/** @brief Apply accepted native Desktop preferences through its existing view. */
+static void desktop_settings_changed(void *context)
+{
+    desktop_t *app = context;
+    tiku_trk_folder_window_t *folder = tiku_trk_desktop_view_folder(&app->desktop_view);
+    if (folder && folder->view) {
+        int size = app->desktop_prefs_window.model.value.icon_size;
+        if (tiku_trk_poseview_icon_size(folder->view) != size) tiku_trk_poseview_set_icon_size(folder->view, size);
+        tiku_trk_folder_window_forget(folder);
+        tiku_trk_desktop_settings_feedback(app->desktop_settings,folder->bg_drawn ? &folder->bg_applied : NULL,tiku_trk_poseview_icon_size(folder->view));
+    }
+    desktop_damage_all(app);
+}
+
+/** @brief Enqueue the Desktop window's current native proposals. */
+static int desktop_settings_submit(void *context)
+{
+    return tiku_trk_desktop_settings_submit(((desktop_t *)context)->desktop_settings);
+}
+
+/** @brief Report native Desktop persistence feedback to its preferences window. */
+static const char *desktop_settings_status(void *context)
+{
+    return tiku_trk_desktop_settings_status(((desktop_t *)context)->desktop_settings);
+}
+
+/** @brief Redraw preferences after the committed association cache changes. */
+static void catalog_settings_changed(void *context)
+{
+    desktop_t *app = context;
+    int i;
+    for (i = 0; i < TIKU_TRK_INFO_WINDOW_MAX; i++)
+        if (app->info_windows.window[i] && app->info_windows.window[i]->open)
+            info_opens_with_fill(app, &app->info_windows.model[i]);
+    desktop_damage_all(app);
+}
+
+/** @brief Read pending or failed record persistence feedback for native preferences. */
+static const char *record_save_status(void *context)
+{
+    return tiku_trk_record_settings_status(((desktop_t *)context)->record_settings);
+}
+
+/** @brief Submit the current Deskbar GUI proposal through its record owner. */
+static int record_bar_submit(void *context)
+{
+    return tiku_trk_record_settings_submit(((desktop_t *)context)->record_settings, 0);
+}
+
+/** @brief Submit the current Fonts GUI proposal through its record owner. */
+static int record_font_submit(void *context)
+{
+    return tiku_trk_record_settings_submit(((desktop_t *)context)->record_settings, 1);
+}
 
 /** @brief A script's resize: the same path a window manager's takes. */
 static int
@@ -438,6 +514,9 @@ boot_namespace(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
         if(directory && *directory){
             const char *mount=getenv("STOMME_RESOURCE_MOUNT");
             const char *fixture=getenv("STOMME_RESOURCE_TEST_PROVIDER");
+            if(desktop_lifecycle_vfs_restarting(app)&&tiku_resource_endpoint_recover(directory)) {
+                fprintf(stderr,"resource service: endpoint recovery refused\n");return 1;
+            }
             app->resource_session=tiku_trk_resource_session_open(app->backend,directory,
                 mount && *mount?mount:"/.stomme",TIKU_SHELL_PRODUCT_NAME,fixture && !strcmp(fixture,"1"));
             if(!app->resource_session){fprintf(stderr,"resource service: startup refused\n");return 1;}
@@ -633,8 +712,28 @@ boot_settings(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
         (app->backend != NULL && app->backend->ops->state_store != NULL)
             ? app->backend->ops->state_store(app->backend) : NULL,
         DESK_W, DESK_H, &app->dirty);
+    if (app->desktop_prefs_window.store && app->desktop_prefs_window.node[0]) {
+        tiku_trk_folder_window_t *folder = tiku_trk_desktop_view_folder(&app->desktop_view);
+        if (folder && folder->view) app->desktop_prefs_window.model.value.icon_size = tiku_trk_poseview_icon_size(folder->view);
+        app->desktop_settings = tiku_trk_desktop_settings_open(app->desktop_prefs_window.store,
+            app->desktop_prefs_window.node, &app->desktop_prefs_window.model, desktop_settings_changed, app);
+        if (!app->desktop_settings) return 1;
+        app->desktop_prefs_window.save_context = app;
+        app->desktop_prefs_window.submit_save = desktop_settings_submit;
+        app->desktop_prefs_window.save_status = desktop_settings_status;
+    }
     tiku_trk_fonts_window_init(&app->fonts_window, app->desk, app->deskbar,
                                app->store, DESK_W, DESK_H, &app->dirty);
+    app->record_settings = tiku_trk_record_settings_open(app->store,
+        &app->deskbar_prefs_window.model, &app->fonts_window.model,
+        record_settings_changed, app);
+    if (!app->record_settings) return 1;
+    app->deskbar_prefs_window.save_context = app;
+    app->deskbar_prefs_window.submit_save = record_bar_submit;
+    app->deskbar_prefs_window.save_status = record_save_status;
+    app->fonts_window.save_context = app;
+    app->fonts_window.submit_save = record_font_submit;
+    app->fonts_window.save_status = record_save_status;
     {
         if (!find_help_dir(o->argv0, app->help_root, sizeof app->help_root))
             app->help_root[0] = 0;
@@ -771,6 +870,20 @@ boot_icons(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
         tiku_trk_prefs_window_init(&app->prefs_window, app->desk,
             DESK_W, DESK_H, path, &app->dirty,
             &alert_model(app)->open);
+        if (path[0]) {
+            char types_path[TIKU_PATH_MAX];
+            if (snprintf(types_path, sizeof types_path, TIKU_SHELL_TYPE_SETTINGS_PATH, home) >= (int)sizeof types_path) return 1;
+            app->catalog_settings = tiku_trk_catalog_settings_open_with_file(app->store, &app->apps, &app->types, types_path, catalog_settings_changed, app);
+            if (!app->catalog_settings) return 1;
+            tiku_trk_open_with_window_bind_settings(&app->open_with_window, app->catalog_settings);
+            app->settings = tiku_trk_settings_open_with_desktop(prefs_model(app), path,
+                tiku_trk_resource_session_registry(app->resource_session), app->record_settings, app->catalog_settings, app->desktop_settings,
+                settings_changed, app);
+            if (!app->settings) {
+                fprintf(stderr, "settings controller: startup refused\n");
+                return 1;
+            }
+        }
         tiku_trk_desktop_prefs_window_bind_settings(&app->desktop_prefs_window,
                                                     prefs_model(app), path);
         tiku_trk_sounds_window_init(&app->sounds_window, app->desk,
@@ -949,6 +1062,9 @@ boot_session(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
 #endif
 
     desktop_startup_run(app, o->safe_mode, &restore, &fallback);
+    app->resource_safe_mode = o->safe_mode;
+    app->resource_boot_restore = !o->safe_mode && restore;
+    app->resource_boot_fallback = fallback;
 #if TIKU_SHELL_BOARD_SERVICES
 
     tiku_trk_session_restore_folders(&app->session, o->openme, o->nopen,
@@ -1268,6 +1384,7 @@ boot_shots(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
  * @return -1 once the desktop is up, else the exit code of the stage that
  *         failed.
  */
+
 int
 desktop_boot(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
 {
@@ -1311,6 +1428,9 @@ desktop_boot(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
     }
 
     app->running = 1;
+    if (desktop_resources_open(app)) {
+        fprintf(stderr,"desktop resource providers: startup refused\n"); return 1;
+    }
     app->applied_hide_dotfiles = -1;
     app->applied_full_path = -1;
     app->applied_folders_first = -1;
@@ -1355,6 +1475,14 @@ desktop_teardown(desktop_t *app, desktop_loop_t *lp)
     int vfs_drained = desktop_vfs_destroy(app);
 #endif
 
+    tiku_trk_open_with_window_destroy(&app->open_with_window);
+    desktop_resources_close(app);
+    tiku_trk_desktop_settings_close(app->desktop_settings);
+    app->desktop_settings = NULL;
+    tiku_trk_record_settings_close(app->record_settings);
+    app->record_settings = NULL;
+    tiku_trk_catalog_settings_close(app->catalog_settings);
+    app->catalog_settings = NULL;
     tiku_sound_free();
     splash_stage(app, "the session");
     tiku_trk_session_controller_save(&app->session);
@@ -1379,6 +1507,8 @@ desktop_teardown(desktop_t *app, desktop_loop_t *lp)
     desktop_associations_destroy(app);
     desktop_forcequit_destroy(app);
     tiku_trk_sounds_window_destroy(&app->sounds_window);
+    tiku_trk_settings_close(app->settings);
+    app->settings = NULL;
     tiku_trk_prefs_window_destroy(&app->prefs_window);
     splash_stage(app, "the Deskbar");
     tiku_trk_deskbar_free(app->deskbar);

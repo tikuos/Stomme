@@ -32,6 +32,9 @@ typedef struct {
     int                    screen_w;
     int                    screen_h;
     int                   *dirty;
+    void *save_context;
+    int (*submit_save)(void *);
+    const char *(*save_status)(void *);
 } tiku_trk_fonts_window_t;
 
 /**

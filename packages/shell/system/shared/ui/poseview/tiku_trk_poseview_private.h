@@ -28,7 +28,7 @@
 #include <strings.h>
 
 /** @brief How many poses one view can hold. */
-#define POSES_MAX 4096
+#define POSES_MAX TIKU_TRK_POSES_MAX
 
 /** @brief The most rows a value sweep reads, from the first row shown. */
 #define REFRESH_WINDOW 40
@@ -114,6 +114,8 @@ struct tiku_trk_poseview {
     int                 icon_size;      /* the art's edge, in pixels        */
     int                 hint_x, hint_y; /* where the next icon is placed    */
     int                 state_dirty;    /* state changed since last saved   */
+    int                 view_cleared; /**< an explicit clear awaits a view-field change */
+    char                cleared_view[96]; /**< field signature at that clear */
     /* Set by the column mutators and cleared by a save; a click that only
      * re-sorted leaves it clear (TS-036). */
     int                 columns_dirty;
@@ -289,6 +291,8 @@ void pv_set_selected(tiku_trk_pose_t *p, int on);
 
 /* tiku_trk_poseview_spatial.c */
 const char *pv_state_node(const tiku_trk_poseview_t *v, char *buf, size_t max);
+/** @brief Encode current view fields; return length or -1 when the buffer is short. */
+int pv_view_record(const tiku_trk_poseview_t *, char *, size_t);
 
 /* tiku_trk_poseview_typeahead.c */
 void pv_filter_changed(tiku_trk_poseview_t *v, int grew);

@@ -16,6 +16,7 @@
 #define TIKU_TRK_TYPES_H_
 
 #include "tiku_model.h"
+#include <stdio.h>
 #include "tiku_trk_view_defs.h"
 
 /** @brief Room for types, the columns of one type, and a description. */
@@ -86,6 +87,15 @@ const tiku_trk_typerec_t *tiku_trk_types_super(const tiku_trk_types_t *db,
  * @return how many records were read, or -1 when it cannot be opened.
  */
 int tiku_trk_types_load(tiku_trk_types_t *db, const char *path);
+
+/** @brief Product type definitions without reading or writing a file. */
+void tiku_trk_types_defaults(tiku_trk_types_t *db);
+
+/** @brief Native column spelling, or NULL for an unknown numeric ID. */
+const char *tiku_trk_types_column_name(int column);
+
+/** @brief Write one native record without its terminating newline. */
+int tiku_trk_types_write_record(FILE *file, const tiku_trk_typerec_t *record);
 
 /** @brief Write @p db to @p path.  @return 0 when written, else -1. */
 int tiku_trk_types_save(const tiku_trk_types_t *db, const char *path);

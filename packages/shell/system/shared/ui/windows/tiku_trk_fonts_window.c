@@ -113,6 +113,11 @@ static void controls(tiku_trk_fonts_window_t *p, font_layout_t l)
 static void
 apply(tiku_trk_fonts_window_t *controller)
 {
+    if (controller->submit_save) {
+        (void)controller->submit_save(controller->save_context);
+        if (controller->dirty) *controller->dirty = 1;
+        return;
+    }
     tiku_trk_deskbar_prefs_t record;
 
     (void)tiku_trk_fontprefs_save(&controller->model, controller->store);
@@ -196,8 +201,9 @@ static void draw(tiku_window_t *window, tiku_surface_t *s,
     tiku_text_block_draw(s, (tiku_rect_t){title.x, title.y + title.h + 8,
         title.w, l.paper.h - title.h - 28}, TIKU_MEASURE_PLAIN,
         tiku_str("prefs.fonts.sample_body"), TIKU_C_TEXT, 3);
+    const char *status = p->save_status ? p->save_status(p->save_context) : "";
     tiku_text_block_draw(s, l.help, TIKU_MEASURE_PLAIN,
-        tiku_str("prefs.fonts.help"), TIKU_C_TEXT, 3);
+        status && *status ? status : tiku_str("prefs.fonts.help"), TIKU_C_TEXT, 3);
     buttons_draw(p, s);
 }
 

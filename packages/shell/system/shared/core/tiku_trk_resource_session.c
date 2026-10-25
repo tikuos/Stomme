@@ -172,7 +172,10 @@ tiku_trk_resource_session_t *tiku_trk_resource_session_open(tiku_backend_t *name
     session=calloc(1,sizeof *session);if(!session)return NULL;
     session->thread=pthread_self();session->namespace_backend=namespace_backend;strcpy(session->mount,mount);
     for(i=0;i<8;i++){session->peers[i].fd=-1;session->peers[i].session=session;}
-    session->registry=tiku_resource_registry_new(NULL);
+    {
+        tiku_resource_limits_t limits={.providers=256,.resources=16384};
+        session->registry=tiku_resource_registry_new(&limits);
+    }
     if(!session->registry || tiku_resource_new_id(session->interactive.principal))goto fail;
     session->interactive.authenticated=1;session->interactive.scopes=63;
     if(providers(session,product,fixture))goto fail;
@@ -182,6 +185,11 @@ tiku_trk_resource_session_t *tiku_trk_resource_session_open(tiku_backend_t *name
     return session;
 fail:
     tiku_resource_endpoint_close(session->endpoint);tiku_backend_close(session->backend);tiku_resource_registry_free(session->registry);free(session);return NULL;
+}
+
+tiku_resource_registry_t *tiku_trk_resource_session_registry(tiku_trk_resource_session_t *session)
+{
+    return session ? session->registry : NULL;
 }
 
 int tiku_trk_resource_session_pump(tiku_trk_resource_session_t *session)

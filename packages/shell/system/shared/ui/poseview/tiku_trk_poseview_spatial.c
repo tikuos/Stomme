@@ -55,6 +55,7 @@ void
 tiku_trk_poseview_set_state_slot(tiku_trk_poseview_t *v, const char *key)
 {
     if (v != NULL) {
+        v->view_cleared = 0;
         snprintf(v->state_key, sizeof v->state_key, "%s",
                  key != NULL ? key : "");
     }
@@ -190,6 +191,16 @@ tiku_trk_poseview_restore_state(tiku_trk_poseview_t *v)
 }
 
 int
+pv_view_record(const tiku_trk_poseview_t *view, char *out, size_t capacity)
+{
+    const char *mode = view->mode == TIKU_TRK_MODE_ICON ? "icon" : view->mode == TIKU_TRK_MODE_MINI ? "mini" : "list";
+    int length = snprintf(out,capacity,"%s %d %d %d %d %d %d %d %d %d %d",mode,
+        view->icon_size,view->scroll,view->icon_x,view->icon_y,view->mini_x,view->mini_y,
+        view->sort_field,view->sort2_field,view->sort_reverse,view->last_icon == TIKU_TRK_MODE_MINI ? 1 : 0);
+    return length < 0 || (size_t)length >= capacity ? -1 : length;
+}
+
+int
 tiku_trk_poseview_save_state(tiku_trk_poseview_t *v)
 {
     tiku_store_t *store;
@@ -204,27 +215,14 @@ tiku_trk_poseview_save_state(tiku_trk_poseview_t *v)
         return 0;               /* a read-only store: nothing written */
     }
     {
-        /* IV-014: the icon size is saved with the mode, so a folder
-         * reopens at the size it was arranged at. */
-        const char *mode = (v->mode == TIKU_TRK_MODE_ICON) ? "icon"
-                         : (v->mode == TIKU_TRK_MODE_MINI) ? "mini" : "list";
-        char rec[96];
-
-        /* The list scroll and both icon origins are saved, each in its
-         * own field, so a folder reopens where it was scrolled (MA-061). */
-        /* The sort keys go with the rest, so a folder arranged by size and
-         * closed comes back by size (MA-061, PVL-041). */
-        snprintf(rec, sizeof rec, "%s %d %d %d %d %d %d %d %d %d %d", mode,
-                 v->icon_size, v->scroll, v->icon_x, v->icon_y, v->mini_x,
-                 v->mini_y, v->sort_field, v->sort2_field,
-                 v->sort_reverse,
-                 (v->last_icon == TIKU_TRK_MODE_MINI) ? 1 : 0);
-        char node[TIKU_PATH_MAX];
-
-        (void)tiku_state_write(store,
-                                   pv_state_node(v, node, sizeof node),
-                                   state_attr(v), rec, strlen(rec));
+        char rec[96], node[TIKU_PATH_MAX];
+        int length = pv_view_record(v,rec,sizeof rec);
+        if (length >= 0 && (!v->view_cleared || strcmp(rec,v->cleared_view))) {
+            v->view_cleared = 0;
+            (void)tiku_state_write(store,pv_state_node(v,node,sizeof node),state_attr(v),rec,(size_t)length);
+        }
     }
+
     for (i = 0; i < v->count; i++) {
         pose_info_t info;
 
