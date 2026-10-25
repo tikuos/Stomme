@@ -342,25 +342,32 @@ close_pipe:
     return 0;
 }
 
+/** @brief Match an offset frame to the current executable's native basename. */
+static int frame_is_self(const char *leaf, const char *paren, char *image,
+                         size_t capacity)
+{
+    if (paren <= leaf || tiku_sys_self_path(image, capacity))
+        return 0;
+    const char *name = strrchr(image, '/');
+    name = name ? name + 1 : image;
+    size_t length = (size_t)(paren - leaf);
+    return length == strlen(name) && !memcmp(leaf, name, length);
+}
+
 void
 tiku_sys_frame_name(const char *raw, char *out, size_t max)
 {
     const char *paren = strchr(raw, '(');
     const char *self = strrchr(raw, '/');
-    char leaf[64] = "";
+    char leaf[64] = "", image[512];
 
     self = (self != NULL) ? self + 1 : raw;
     (void)sscanf(self, "%63[^(]", leaf);
-    /* An offset into KintsugiDesktop is named by addr2line, against the
-     * running program's image; a symbol a library frame already has is
-     * printed as it is. */
+    /* Offset lookup uses the running executable's image. */
     if (paren != NULL && paren[1] == '+' &&
-        strcmp(leaf, "KintsugiDesktop") == 0) {
-        char image[512], offset[2 * sizeof(uintptr_t) + 4], line[160];
+        frame_is_self(self, paren, image, sizeof image)) {
+        char offset[2 * sizeof(uintptr_t) + 4], line[160];
 
-        if (tiku_sys_self_path(image, sizeof image) != 0) {
-            snprintf(image, sizeof image, "/proc/self/exe");
-        }
         if (frame_offset(paren + 1, offset, sizeof offset) &&
             frame_symbol(image, offset, line, sizeof line)) {
             char *at = strstr(line, " at ");
