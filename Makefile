@@ -1,3 +1,12 @@
+# Feature selection precedes native dependency discovery.
+FOUNDATION_PROFILE ?= desktop
+ifeq ($(FOUNDATION_PROFILE),portable-ui)
+include mk/portable.mk
+else ifeq ($(FOUNDATION_PROFILE),desktop)
+FOUNDATION_TARGET ?= native
+ifneq ($(FOUNDATION_TARGET),native)
+$(error desktop requires FOUNDATION_TARGET=native)
+endif
 # Standalone shared kit libraries and relocatable SDK.
 # Authors: Ambuj Varshney <ambuj@tiku-os.org>
 # SPDX-License-Identifier: Apache-2.0
@@ -206,3 +215,7 @@ $(BUILD)/tools/glyphdump: kits/interface/tools/glyphdump.c $(LIBRARIES)
 resource-client: $(BUILD)/stomme-resources
 $(BUILD)/stomme-resources: examples/stomme_resources.c $(BUILD)/lib/libtiku_application.a $(BUILD)/lib/libtiku_support.a
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(INCLUDES) -o $@ $< $(BUILD)/lib/libtiku_application.a $(BUILD)/lib/libtiku_support.a $(LDFLAGS) -lm -pthread
+
+else
+$(error Unsupported FOUNDATION_PROFILE=$(FOUNDATION_PROFILE))
+endif

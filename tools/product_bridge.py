@@ -116,7 +116,9 @@ def compose(root, product, output, host, flags, allow_dirty=False):
             if not (basic / name).is_file():
                 raise RuntimeError('Unselected product provider: ' + name)
     owners = {p: 'product' for p in selected}
-    shared = {name: path for name, path in source_files(root).items() if name.startswith('kits/')}
+    shared = {name: path for name, path in source_files(root).items()
+              if name.startswith('kits/')
+              and ('portable' not in Path(name).parts or path.suffix == '.inl')}
     if provider == 'tiku-basic':
         package = root / metadata.get('optional_packages', {}).get(provider, {}).get('path', 'packages/document-basic')
         if not (package / 'kits/document/tiku_richdoc.h').is_file():

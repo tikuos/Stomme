@@ -1,0 +1,8 @@
+{
+  "width": 800,
+  "height": 480,
+  "format": "little-endian XRGB8888",
+  "sha256": "6e664e15bd2149bf267feb6e468e61426179826a809a181bf0a9ee1b6d5dc668",
+  "reference_revision": "1c37e3a716893d9cc769280110284d2ac2ffd663",
+  "reference": "Desktop Interface archive, default 12 px plain/bold fonts"
+}

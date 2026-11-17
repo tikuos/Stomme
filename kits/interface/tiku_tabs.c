@@ -8,7 +8,11 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#ifdef TIKU_PORTABLE_UI
+#include "tiku_control_text.inl"
+#else
 #include <stdio.h>
+#endif
 #include <string.h>
 
 #include "tiku_tabs.h"
@@ -32,7 +36,11 @@ tiku_tabs_add(tiku_tabs_t *t, const char *label)
         return -1;
     }
     at = t->count;
+#ifdef TIKU_PORTABLE_UI
+    tiku_control_label(t->label[at], sizeof t->label[at], label);
+#else
     snprintf(t->label[at], sizeof t->label[at], "%s", label);
+#endif
     t->count++;
     if (t->current < 0) {
         t->current = 0;             /* the first tab is current */

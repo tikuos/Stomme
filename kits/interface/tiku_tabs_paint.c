@@ -32,7 +32,7 @@ tiku_tabs_draw(const tiku_tabs_t *t, tiku_surface_t *s, tiku_rect_t strip)
     {
         int rec = tiku_gfx_rec_enter(s);
 
-        if (rec) {
+        if (TIKU_GFX_RECORDING_ENABLED && rec) {
             /* Recorded as the tabs by name with the current one
              * marked. */
             char labels[TIKU_TABS_MAX * TIKU_TABS_LABEL_MAX];

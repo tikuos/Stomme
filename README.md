@@ -190,6 +190,35 @@ inputs in this checkout and update the product pins after checking the results.
 The [maintenance contract](docs/contracts/maintenance.md) defines shared-change
 review, downstream qualification, release records and dependency rollback.
 
+## Portable UI profile
+
+`FOUNDATION_PROFILE=portable-ui` builds bounded controls, local painting,
+allocator-bound services, static application lifecycle and read-only paged
+storage. Products supply allocation, input, presentation, clock and storage
+providers. The profile uses shared C contracts without firmware headers.
+
+```sh
+make FOUNDATION_PROFILE=portable-ui test check-sdk
+make FOUNDATION_PROFILE=portable-ui FOUNDATION_TARGET=s31 \
+    CROSS_COMPILE=/path/to/riscv32-esp-elf- check-sdk
+```
+
+The host target executes the examples. The S31 target cross-links consumers
+for RV32 ILP32F; it does not produce bootable firmware. The default `desktop`
+profile retains native desktop selection. Use separate output directories for
+different targets and flags.
+
+The [profile contract](docs/contracts/portable-profile.md) defines source and
+font selection. [Services](docs/contracts/portable-services.md),
+[rendering](docs/contracts/portable-rendering.md) and
+[applications and storage](docs/contracts/portable-applications.md) specify
+ownership, cancellation and provider lifetimes. The
+[portable SDK contract](docs/contracts/portable-sdk.md) describes exported
+capabilities, ABI checks and relocated consumers. Board adapters, startup and
+combined hardware workloads require product qualification.
+
+## Desktop resources
+
 The [desktop resource contract](docs/contracts/desktop-vfs.md) specifies a typed
 VFS for desktop settings, state and actions. Its
 [local protocol](docs/contracts/desktop-vfs-protocol.md) defines caller context,

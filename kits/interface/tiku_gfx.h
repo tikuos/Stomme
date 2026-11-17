@@ -14,6 +14,13 @@
  */
 #ifndef TIKU_GFX_H_
 #define TIKU_GFX_H_
+/** @brief Whether drawing also emits display-list commands. */
+#ifdef TIKU_PORTABLE_UI
+#define TIKU_GFX_RECORDING_ENABLED 0
+#else
+#define TIKU_GFX_RECORDING_ENABLED 1
+#endif
+
 #ifdef TIKU_DISPLAYLESS
 /* A build with no pixels, a board's, takes these names from the
  * recorder's tiku_gfx.h on its include path; the declarations below are

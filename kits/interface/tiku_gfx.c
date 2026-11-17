@@ -19,7 +19,7 @@
 int
 tiku_gfx_rec_enter(tiku_surface_t *s)
 {
-    if (s == NULL || s->record == NULL || s->record_depth > 0) {
+    if (!TIKU_GFX_RECORDING_ENABLED || s == NULL || s->record == NULL || s->record_depth > 0) {
         return 0;
     }
     s->record_depth++;
@@ -29,7 +29,7 @@ tiku_gfx_rec_enter(tiku_surface_t *s)
 void
 tiku_gfx_rec_miss(tiku_surface_t *s)
 {
-    if (s != NULL && s->record != NULL && s->record_depth == 0) {
+    if (TIKU_GFX_RECORDING_ENABLED && s != NULL && s->record != NULL && s->record_depth == 0) {
         tiku_dl_miss(s->record);
     }
 }
@@ -105,6 +105,7 @@ scale_of(const tiku_surface_t *s)
     return (s != NULL && s->scale > 1) ? s->scale : 1;
 }
 
+#ifndef TIKU_PORTABLE_UI
 tiku_surface_t *
 tiku_surface_new(int w, int h, tiku_rgb_t bg)
 {
@@ -181,6 +182,8 @@ tiku_surface_rescale(tiku_surface_t *s, int scale,
     return result;
 }
 
+#endif
+
 tiku_rgb_t
 tiku_peek(const tiku_surface_t *s, int x, int y)
 {
@@ -193,6 +196,7 @@ tiku_peek(const tiku_surface_t *s, int x, int y)
     return s->px[(long)y * sc * ((long)s->w * sc) + (long)x * sc];
 }
 
+#ifndef TIKU_PORTABLE_UI
 void
 tiku_surface_free(tiku_surface_t *s)
 {
@@ -201,6 +205,8 @@ tiku_surface_free(tiku_surface_t *s)
         free(s);
     }
 }
+
+#endif
 
 tiku_rect_t tiku_rect_union(tiku_rect_t a, tiku_rect_t b)
 {
@@ -216,7 +222,7 @@ tiku_rect_t tiku_rect_union(tiku_rect_t a, tiku_rect_t b)
 void
 tiku_clip_reset(tiku_surface_t *s)
 {
-    if (s != NULL && s->record != NULL && s->record_depth == 0) {
+    if (TIKU_GFX_RECORDING_ENABLED && s != NULL && s->record != NULL && s->record_depth == 0) {
         (void)tiku_dl_clip_reset(s->record);
     }
     if (s != NULL) {
@@ -236,7 +242,7 @@ tiku_clip_set(tiku_surface_t *s, tiku_rect_t r)
     if (s == NULL) {
         return;
     }
-    if (s->record != NULL && s->record_depth == 0) {
+    if (TIKU_GFX_RECORDING_ENABLED && s->record != NULL && s->record_depth == 0) {
         (void)tiku_dl_clip_set(s->record, r);
     }
     x0 = (r.x > 0) ? r.x : 0;
@@ -380,7 +386,7 @@ tiku_picture(tiku_surface_t *s, int x, int y, int w, int h,
          */
         int rec = tiku_gfx_rec_enter(s);
 
-        if (rec && !tiku_dl_picture(s->record, x, y, w, h, px)) {
+        if (TIKU_GFX_RECORDING_ENABLED && rec && !tiku_dl_picture(s->record, x, y, w, h, px)) {
             tiku_dl_miss(s->record);
         }
         for (py = 0; py < h; py++) {
@@ -612,6 +618,7 @@ round_corners(tiku_surface_t *s, tiku_rect_t r, int radius, unsigned corners,
     }
 }
 
+#ifndef TIKU_PORTABLE_UI
 tiku_surface_t *
 tiku_grab(const tiku_surface_t *s, tiku_rect_t r)
 {
@@ -648,6 +655,8 @@ tiku_grab(const tiku_surface_t *s, tiku_rect_t r)
     }
     return out;
 }
+
+#endif
 
 void
 tiku_blend(tiku_surface_t *dst, int x, int y, const tiku_surface_t *src,
@@ -760,7 +769,7 @@ tiku_fill_round(tiku_surface_t *s, tiku_rect_t r, int radius,
         return;
     }
     rec = tiku_gfx_rec_enter(s);
-    if (rec) {
+    if (TIKU_GFX_RECORDING_ENABLED && rec) {
         (void)tiku_dl_fill(s->record, r, c);   /* recorded as a fill */
     }
     /* The cross the corners leave, opaque; a corner kept square is
@@ -805,7 +814,7 @@ tiku_frame_round(tiku_surface_t *s, tiku_rect_t r, int radius,
         return;
     }
     rec = tiku_gfx_rec_enter(s);
-    if (rec) {
+    if (TIKU_GFX_RECORDING_ENABLED && rec) {
         (void)tiku_dl_frame(s->record, r, c);
     }
     /* Each straight edge runs to the corner, or stops short of a curve. */
@@ -1052,7 +1061,7 @@ tiku_fill(tiku_surface_t *s, tiku_rect_t r, tiku_rgb_t c)
         return;
     }
     rec = tiku_gfx_rec_enter(s);
-    if (rec) {
+    if (TIKU_GFX_RECORDING_ENABLED && rec) {
         (void)tiku_dl_fill(s->record, r, c);
     }
     x0 = (r.x > s->clip.x) ? r.x : s->clip.x;
@@ -1082,7 +1091,7 @@ tiku_hline(tiku_surface_t *s, int x, int y, int len,
     tiku_rect_t r = { x, y, len, 1 };
     int rec = tiku_gfx_rec_enter(s);
 
-    if (rec) {
+    if (TIKU_GFX_RECORDING_ENABLED && rec) {
         (void)tiku_dl_hline(s->record, x, y, len, c);
     }
     tiku_fill(s, r, c);
@@ -1096,7 +1105,7 @@ tiku_vline(tiku_surface_t *s, int x, int y, int len,
     tiku_rect_t r = { x, y, 1, len };
     int rec = tiku_gfx_rec_enter(s);
 
-    if (rec) {
+    if (TIKU_GFX_RECORDING_ENABLED && rec) {
         (void)tiku_dl_vline(s->record, x, y, len, c);
     }
     tiku_fill(s, r, c);
@@ -1112,7 +1121,7 @@ tiku_frame(tiku_surface_t *s, tiku_rect_t r, tiku_rgb_t c)
         return;
     }
     rec = tiku_gfx_rec_enter(s);
-    if (rec) {
+    if (TIKU_GFX_RECORDING_ENABLED && rec) {
         (void)tiku_dl_frame(s->record, r, c);
     }
     tiku_hline(s, r.x, r.y, r.w, c);
@@ -1132,7 +1141,7 @@ tiku_bevel(tiku_surface_t *s, tiku_rect_t r,
         return;
     }
     rec = tiku_gfx_rec_enter(s);
-    if (rec) {
+    if (TIKU_GFX_RECORDING_ENABLED && rec) {
         (void)tiku_dl_bevel(s->record, r, light, shadow);
     }
     tiku_hline(s, r.x, r.y, r.w - 1, light);
@@ -1156,6 +1165,7 @@ tiku_inset(tiku_rect_t r, int n)
     return o;
 }
 
+#ifndef TIKU_PORTABLE_UI
 /*---------------------------------------------------------------------------*/
 /* PNG                                                                       */
 /*---------------------------------------------------------------------------*/
@@ -1323,6 +1333,8 @@ done:
     (void)fclose(f);
     return rc;
 }
+
+#endif
 
 /** @brief One inverted pixel, honouring the clip. */
 static void

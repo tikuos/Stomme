@@ -13,9 +13,21 @@ import hashlib
 from kit_packages import BASE_KITS, validate_selection
 
 
-def check(sdk):
+def check(sdk, cc="cc"):
     """Compile the public header set and reject private or document providers."""
     metadata = json.loads((sdk / 'sdk.json').read_text())
+    if metadata.get('profile') == 'portable-ui':
+        from portable_sdk import validate
+        validate(sdk, cc=cc)
+        headers = sorted((sdk / 'include').glob('*.h'))
+        with tempfile.TemporaryDirectory(prefix='portable-sdk-headers-') as temp:
+            source = Path(temp) / 'headers.c'
+            source.write_text(''.join('#include "' + p.name + '"\n' for p in headers))
+            subprocess.run(shlex.split(cc) + metadata['consumer_flags'] +
+                ['-I' + str(sdk / 'include'), '-include', str(sdk / 'include/tiku_portable_identity.h'),
+                 '-fsyntax-only', str(source)], check=True)
+        print('Portable SDK header closure:', len(headers), 'headers;', metadata['target'])
+        return
     profile = json.loads((Path(__file__).resolve().parents[1] / 'foundation.json').read_text())
     assert metadata['foundation_id'] == profile['id']
     provider = metadata['document_provider']
@@ -50,7 +62,9 @@ def main():
     """Validate one installed or exported SDK directory."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('sdk', type=Path)
-    check(parser.parse_args().sdk.resolve())
+    parser.add_argument('--cc', default='cc')
+    args = parser.parse_args()
+    check(args.sdk.resolve(), args.cc)
 
 
 if __name__ == '__main__':

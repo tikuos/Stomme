@@ -70,6 +70,26 @@ class ProductBridgeTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'Migrated product copy'):
             self.compose()
 
+    def test_desktop_excludes_portable_services(self):
+        """Portable services stay outside desktop views while fragments remain."""
+        name = 'kits/interface/portable/service.c'
+        source = self.base / name
+        source.parent.mkdir()
+        source.write_text('portable service')
+        fragment = source.with_name('shared.inl')
+        fragment.write_text('conditionally included fragment')
+        self.compose(allow=True)
+        self.assertNotIn(name, (self.output / 'sources.mk').read_text())
+        self.assertNotIn(name, json.loads((self.output / 'sources.json').read_text()))
+        self.assertFalse((self.output / name).exists())
+        self.assertIn(name, bridge.source_files(self.base))
+        self.assertEqual((self.output / fragment.relative_to(self.base)).resolve(), fragment)
+        stale = self.output / name
+        stale.parent.mkdir(parents=True, exist_ok=True)
+        stale.symlink_to(source)
+        self.compose(allow=True)
+        self.assertFalse(stale.is_symlink())
+
     def test_configuration_cycle(self):
         """Returning to prior flags invalidates the intervening configuration."""
         self.compose()

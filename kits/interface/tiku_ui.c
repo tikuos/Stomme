@@ -65,7 +65,7 @@ tiku_ui_panel(tiku_surface_t *s, tiku_rect_t r)
 {
     int rec = tiku_gfx_rec_enter(s);
 
-    if (rec) {
+    if (TIKU_GFX_RECORDING_ENABLED && rec) {
         (void)tiku_dl_panel(s->record, r);
     }
     tiku_fill(s, r, PANEL);
@@ -77,7 +77,7 @@ tiku_ui_raised(tiku_surface_t *s, tiku_rect_t r)
 {
     int rec = tiku_gfx_rec_enter(s);
 
-    if (rec) {
+    if (TIKU_GFX_RECORDING_ENABLED && rec) {
         (void)tiku_dl_raised(s->record, r);
     }
     tiku_fill(s, r, PANEL);
@@ -102,7 +102,7 @@ tiku_ui_sunken(tiku_surface_t *s, tiku_rect_t r,
 {
     int rec = tiku_gfx_rec_enter(s);
 
-    if (rec) {
+    if (TIKU_GFX_RECORDING_ENABLED && rec) {
         (void)tiku_dl_sunken(s->record, r, face);
     }
     tiku_fill(s, r, face);
@@ -129,7 +129,7 @@ tiku_ui_button(tiku_surface_t *s, tiku_rect_t r,
 {
     int rec = tiku_gfx_rec_enter(s);
 
-    if (rec) {
+    if (TIKU_GFX_RECORDING_ENABLED && rec) {
         (void)tiku_dl_button(s->record, r, label, state);
     }
     if (state & TIKU_S_ICON) {      /* the face only; the caller's icon */
@@ -267,7 +267,7 @@ tiku_ui_menufield(tiku_surface_t *s, tiku_rect_t r,
                            : TIKU_C_TEXT;
     int size, ax, ay, hin, vin, pen, i, y;
 
-    if (rec) {
+    if (TIKU_GFX_RECORDING_ENABLED && rec) {
         (void)tiku_dl_menufield(s->record, r, label, state);
     }
     tiku_fill(s, r, PANEL);
@@ -313,7 +313,7 @@ tiku_ui_checkbox(tiku_surface_t *s, tiku_rect_t r,
 {
     int rec = tiku_gfx_rec_enter(s);
 
-    if (rec) {
+    if (TIKU_GFX_RECORDING_ENABLED && rec) {
         (void)tiku_dl_checkbox(s->record, r, label, state);
     }
     tiku_rect_t b = box_rect(r);
@@ -351,7 +351,7 @@ tiku_ui_radio(tiku_surface_t *s, tiku_rect_t r,
 {
     int rec = tiku_gfx_rec_enter(s);
 
-    if (rec) {
+    if (TIKU_GFX_RECORDING_ENABLED && rec) {
         (void)tiku_dl_radio(s->record, r, label, state);
     }
     tiku_rect_t b = box_rect(r);
@@ -441,7 +441,7 @@ tiku_ui_textfield_scroll(tiku_surface_t *s, tiku_rect_t r,
     int rec = tiku_gfx_rec_enter(s);
     tiku_rect_t saved_clip = s->clip;
 
-    if (rec) {
+    if (TIKU_GFX_RECORDING_ENABLED && rec) {
         /* Recorded with its text and state; the caret, the selection
          * and the slide are not recorded. */
         (void)tiku_dl_textfield(s->record, r, text, state);
@@ -543,7 +543,7 @@ tiku_ui_tip(tiku_surface_t *s, tiku_rect_t r, const char *text)
         return;
     }
     rec = tiku_gfx_rec_enter(s);
-    if (rec) {
+    if (TIKU_GFX_RECORDING_ENABLED && rec) {
         (void)tiku_dl_tip(s->record, r, text);
     }
     tiku_fill(s, r, TIKU_C_NOTE);
@@ -583,7 +583,7 @@ tiku_ui_gauge(tiku_surface_t *s, tiku_rect_t r, float fraction)
 
     if (!(fraction >= 0.0f)) { fraction = 0.0f; }
     if (fraction > 1.0f) { fraction = 1.0f; }
-    if (rec) {
+    if (TIKU_GFX_RECORDING_ENABLED && rec) {
         /* Recorded as its value in thousandths; the frame and the bar
          * below are drawn without being recorded. */
         (void)tiku_dl_gauge(s->record, r, (int)(fraction * 1000.0f));
@@ -711,7 +711,7 @@ tiku_ui_scrollbar_held(tiku_surface_t *s, tiku_rect_t r,
     }
     if (frac > 1.0f) { frac = 1.0f; }
     if (frac < 0.05f) { frac = 0.05f; }
-    if (rec) {
+    if (TIKU_GFX_RECORDING_ENABLED && rec) {
         /* Recorded as the position and length in thousandths, rounded,
          * so thousandths handed in come back exactly. */
         (void)tiku_dl_scrollbar(s->record, r, (int)(pos * 1000.0f + 0.5f),
@@ -863,7 +863,7 @@ tiku_ui_list_row(tiku_surface_t *s, tiku_rect_t r,
 {
     int rec = tiku_gfx_rec_enter(s);
 
-    if (rec) {
+    if (TIKU_GFX_RECORDING_ENABLED && rec) {
         (void)tiku_dl_list_row(s->record, r, text, selected);
     }
     const tiku_font_t *f = tiku_font_plain();

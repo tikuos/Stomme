@@ -59,6 +59,25 @@ make check-package check-core check-app-build
 python3 tests/integration/run_html_sdk.py
 ```
 
+For products with a `foundation/` Git submodule, publish the foundation commit
+before publishing the product adoption. Update the gitlink and content lock in
+the same product commit. Release builds use the matching content pin without
+`FOUNDATION_ALLOW_DIRTY`; development overrides remain local configuration.
+Keep coupled product changes, such as firmware compiler flags, with adoption.
+
+Portable-profile changes also require host execution and relocated SDK links:
+
+```sh
+make FOUNDATION_PROFILE=portable-ui test check-sdk
+make FOUNDATION_PROFILE=portable-ui FOUNDATION_TARGET=s31 \
+    CROSS_COMPILE=/path/to/riscv32-esp-elf- check-sdk
+```
+
+Repeat export from the same built archives and compare SDK manifests and file
+hashes. This checks deterministic export; debug information can contain build
+paths, so it does not claim byte-identical builds in different source locations.
+Preserve the exported SDKs and matching source snapshot in the release record.
+
 Record the previous lock, provider profile, foundation revision, product source
 revision, source changes, compiler and linker versions, dependency versions,
 build flags and commands. A Git commit identifies a checkout's committed state;
@@ -85,6 +104,12 @@ and lock, restore any coupled product changes, and rebuild the desktop, SDK and
 application modules. Replace marked generated packages through their package
 commands. Do not remove user preference or document directories as part of a
 dependency rollback.
+
+For a pinned submodule, restore its preceding gitlink and content lock together
+with coupled product changes. Select that dependency and rebuild generated
+outputs; shared source files stay in the foundation checkout. Record successful
+reopening of a candidate-written native document with the preceding provider,
+and verify that rollback leaves the document and saved preferences unchanged.
 
 SDK identities change with foundation inputs. Old modules cannot be mixed with
 a newly built host, and new modules cannot be mixed with the preceding host.

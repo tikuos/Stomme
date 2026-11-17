@@ -1,0 +1,79 @@
+{
+  "format": 1,
+  "profile": "portable-ui",
+  "stage": "sdk",
+  "sources": [
+    "kits/interface/tiku_scroll.c",
+    "kits/interface/tiku_slider.c",
+    "kits/interface/tiku_dialog.c",
+    "kits/interface/tiku_press.c",
+    "kits/interface/tiku_choice.c",
+    "kits/interface/tiku_text_input.c",
+    "kits/interface/tiku_sensor.c",
+    "kits/interface/tiku_text_layout.c",
+    "kits/interface/tiku_properties.c",
+    "kits/interface/tiku_preferences_layout.c",
+    "kits/interface/tiku_tabs.c",
+    "kits/interface/tiku_list.c",
+    "kits/interface/tiku_layout.c",
+    "kits/interface/tiku_colors.c",
+    "kits/interface/tiku_form_row.c",
+    "kits/interface/portable/tiku_event_queue.c",
+    "kits/support/portable/tiku_allocator.c",
+    "kits/support/portable/tiku_clock.c",
+    "kits/application/portable/tiku_static_app.c",
+    "kits/storage/portable/tiku_paged_storage.c",
+    "packages/apps/models/tiku_word_model.c"
+  ],
+  "requires": [
+    "text-metrics"
+  ],
+  "excluded": {
+    "tiku_textview": "public-layout heap owner; excluded",
+    "tiku_field": "clipboard provider required",
+    "tiku_field_event": "clipboard provider required",
+    "tiku_doc": "document layout outside initial control selection",
+    "tiku_markdown": "document parser outside initial control selection",
+    "tiku_painter": "vector painter and outline paths are outside the control panel"
+  },
+  "runtime": [
+    "memchr",
+    "memcpy",
+    "memmove",
+    "memset",
+    "strlen",
+    "strchr",
+    "__stack_chk_fail",
+    "__strcpy_chk",
+    "__memcpy_chk",
+    "strcpy"
+  ],
+  "providers": [
+    "tiku_measure_width",
+    "tiku_measure_height",
+    "tiku_measure_ascent",
+    "tiku_measure_heading",
+    "tiku_measure_row_h",
+    "tiku_measure_step_w"
+  ],
+  "render_sources": [
+    "kits/interface/tiku_gfx.c",
+    "kits/interface/tiku_theme.c",
+    "kits/interface/tiku_ui.c",
+    "kits/interface/tiku_slider_paint.c",
+    "kits/interface/tiku_tabs_paint.c",
+    "kits/interface/portable/tiku_font_portable.c",
+    "kits/interface/portable/tiku_framebuffer.c"
+  ],
+  "capabilities": [
+    "control-models",
+    "local-rendering",
+    "font-subset",
+    "allocator-contexts",
+    "bounded-input",
+    "monotonic-time",
+    "static-applications",
+    "paged-storage-read",
+    "word-calculator"
+  ]
+}

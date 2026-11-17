@@ -8,7 +8,11 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#ifdef TIKU_PORTABLE_UI
+#include "tiku_control_text.inl"
+#else
 #include <stdio.h>
+#endif
 #include <string.h>
 
 #include "tiku_slider_paint.h"
@@ -26,7 +30,7 @@ tiku_slider_draw(const tiku_slider_t *sl, tiku_surface_t *s, tiku_rect_t r)
         return;
     }
     rec = tiku_gfx_rec_enter(s);
-    if (rec) {
+    if (TIKU_GFX_RECORDING_ENABLED && rec) {
         /* Recorded as a slider with its range and value. */
         (void)tiku_dl_slider(s->record, r, sl->min, sl->max, sl->value);
     }
@@ -56,7 +60,11 @@ tiku_stepper_draw(const tiku_slider_t *sl, tiku_surface_t *s, tiku_rect_t r)
     down = (tiku_rect_t){ up.x, r.y + r.h / 2, aw, r.h - r.h / 2 };
 
     tiku_ui_sunken(s, field, TIKU_C_DOC);
+#ifdef TIKU_PORTABLE_UI
+    tiku_control_decimal(digits, sizeof digits, sl->value);
+#else
     snprintf(digits, sizeof digits, "%d", sl->value);
+#endif
     /* The digits are right-aligned against the arrows. */
     tiku_text(s, f, field.x + field.w - 6 - tiku_text_width(f, digits),
               field.y + (field.h - f->height) / 2 + f->ascent, digits,

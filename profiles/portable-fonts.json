@@ -1,0 +1,27 @@
+{
+  "format": 1,
+  "source": "kits/interface/tiku_font_data.h",
+  "source_sha256": "fb141b5919677113215f99ff4fa9dc0e8082ace16b9428912a789173b8bd7d09",
+  "faces": [
+    "plain",
+    "bold"
+  ],
+  "pixels": 12,
+  "ranges": [
+    [
+      32,
+      126
+    ],
+    [
+      160,
+      255
+    ]
+  ],
+  "fallback": 63,
+  "expected_coverage_bytes": [
+    20009,
+    21527
+  ],
+  "expected_record_bytes": 6112,
+  "license": "licenses/LICENSE.DejaVu"
+}

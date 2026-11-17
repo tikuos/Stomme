@@ -26,6 +26,14 @@ BEHAVIOR = {'tiku_field', 'tiku_scroll', 'tiku_textview', 'tiku_slider', 'tiku_d
             'tiku_properties', 'tiku_preferences_layout', 'tiku_tabs', 'tiku_list',
             'tiku_layout', 'tiku_colors', 'tiku_measure', 'tiku_geom', 'tiku_event',
             'tiku_form_row'}
+NARROW_HEADERS = {('interface', 'support'): {'tiku_allocator.h'}}
+
+
+def allowed_header(kit, target, include):
+    """Permit declared kit edges and the Interface allocation contract."""
+    return target == kit or target in ALLOWS[kit] or include in NARROW_HEADERS.get((kit, target), set())
+
+
 PAINT = {'tiku_gfx.h', 'tiku_font.h', 'tiku_ui.h', 'tiku_dl.h', 'tiku_window.h', 'tiku_theme.h'}
 
 
@@ -58,14 +66,18 @@ def check(root, provider='none'):
             path.stem.startswith(stem + '_') for stem in BEHAVIOR))
         text = path.read_text(errors='replace')
         for include in re.findall(r'^\s*#\s*include\s*<([^>]+)>', text, re.M):
+            if path.name == 'tiku_allocator.h' and include not in {'stddef.h', 'stdint.h'}:
+                errors.append(str(relative) + ': allocator contract includes ' + include)
             parts = Path(include).parts
             if Path(include).is_absolute() or '..' in parts or any(
                     part in {'apps', 'system', 'board'} for part in parts):
                 errors.append(str(relative) + ': product or external include ' + include)
             target = owners.get(include, (None, None))[0]
-            if target and target != kit and target not in ALLOWS[kit]:
+            if target and not allowed_header(kit, target, include):
                 errors.append(str(relative) + ': forbidden kit dependency ' + target)
         for include in INCLUDES.findall(text):
+            if path.name == 'tiku_allocator.h' and include not in {'stddef.h', 'stdint.h'}:
+                errors.append(str(relative) + ': allocator contract includes ' + include)
             parts = Path(include).parts
             if Path(include).is_absolute() or '..' in parts or any(
                     part in {'apps', 'system', 'board'} for part in parts):
@@ -74,7 +86,7 @@ def check(root, provider='none'):
             target = owners.get(include, (None, None))[0]
             if target is None and include not in GENERATED:
                 errors.append(str(relative) + ': missing quoted include ' + include)
-            elif target and target != kit and target not in ALLOWS[kit]:
+            elif target and not allowed_header(kit, target, include):
                 errors.append(str(relative) + ': forbidden kit dependency ' + target)
             if kit == 'interface' and model and include in PAINT:
                 errors.append(str(relative) + ': displayless model includes paint header ' + include)
