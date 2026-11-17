@@ -47,7 +47,14 @@
 #define TIKU_KEY_F5 20u
 #define TIKU_KEY_F8 21u
 
+/** @brief Set to one before including Interface headers when the host owns tiku_event_t. */
+#ifndef TIKU_INPUT_NO_EVENT_ALIAS
+#define TIKU_INPUT_NO_EVENT_ALIAS 0
+#endif
+
+#if !TIKU_INPUT_NO_EVENT_ALIAS
 /** @brief The application-side name of an input event. */
 typedef tiku_input_event_t tiku_event_t;
+#endif
 
 #endif /* TIKU_EVENT_H_ */
