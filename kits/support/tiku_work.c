@@ -11,12 +11,16 @@
  * than SLOW_MAX slow jobs run; it runs the job unlocked and marks it
  * FINISHED.  The loop takes the FINISHED slots at collect and runs their
  * done unlocked.  Nothing here allocates: the slots are a fixed table,
- * and what a job needs it brought in its own context.
+ * and what a job needs it brought in its own context.  A build that
+ * defines TIKU_WORK_INLINE as 1 compiles tiku_work_inline.c instead, which
+ * runs the jobs on the loop thread.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "tiku_work.h"
+
+#if !defined(TIKU_WORK_INLINE) || !TIKU_WORK_INLINE
 
 #include <pthread.h>
 #include <limits.h>
@@ -375,3 +379,5 @@ void tiku_work_stats(tiku_work_stats_t *out)
     }
     pthread_mutex_unlock(&lock);
 }
+
+#endif

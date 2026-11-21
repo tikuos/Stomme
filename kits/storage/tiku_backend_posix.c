@@ -34,7 +34,16 @@
 
 typedef struct {
     tiku_store_t *store;
+    uint64_t mutations;     /* the platform's mutation count at the last changes */
 } posix_impl_t;
+
+/*
+ * A platform whose file layer counts every change it makes to the tree
+ * defines this: zero with the count, or -1.  The backend then reports a
+ * quiet tree as no changes, so views do not re-list it.  Without it, or
+ * once the count moves, the backend cannot tell and views re-list.
+ */
+extern int tiku_posix_mutations(uint64_t *count) __attribute__((weak));
 
 static tiku_store_t *px_store(tiku_backend_t *b);
 
@@ -684,11 +693,37 @@ px_mkdir(tiku_backend_t *b, const char *path, char *err, size_t errmax)
     return 0;
 }
 
+/** @brief No changes, complete, while the platform's mutation count stands
+ *         still; -1 when it moved or the platform keeps none. */
+static int
+px_changes(tiku_backend_t *b, tiku_model_change_t *out, int max,
+           int *complete)
+{
+    posix_impl_t *impl = (b != NULL) ? b->impl : NULL;
+    uint64_t count;
+
+    (void)out;
+    (void)max;
+    if (impl == NULL || (uintptr_t)tiku_posix_mutations == 0u ||
+        tiku_posix_mutations(&count) != 0) {
+        return -1;
+    }
+    if (complete != NULL) {
+        *complete = 1;
+    }
+    if (count == impl->mutations) {
+        return 0;
+    }
+    impl->mutations = count;
+    return -1;
+}
+
 static const tiku_backend_ops_t POSIX_OPS = {
-    /* A local filesystem has no change ring: a NULL changes makes the view
-     * poll, and with no change records there is no identity to resolve. */
+    /* A local filesystem has no change ring: the view re-lists unless the
+     * platform's mutation count shows the tree has not changed.  With no
+     * change records there is no identity to resolve. */
     "posix", px_stat, px_list,    px_read,  px_write, px_pump,
-    NULL,    NULL,    px_setperm, px_store, px_close, px_mkdir};
+    px_changes, NULL, px_setperm, px_store, px_close, px_mkdir};
 
 tiku_backend_t *
 tiku_backend_posix_open(void)

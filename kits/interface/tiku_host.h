@@ -50,6 +50,9 @@ int tiku_host_present(tiku_host_t *host,
  *  compares the whole surface either way. */
 int tiku_host_present_in(tiku_host_t *host, const tiku_surface_t *surface,
                          const tiku_rect_t *bounds);
+/** @brief Whether input waits to be polled.  A host that cannot inspect its
+ *  queue without taking from it returns 0, as does a NULL host. */
+int tiku_host_events_queued(tiku_host_t *host);
 /** @brief Wait for native input or @p timeout_us, at most a minute;
  *  returns at once while input is queued, and never takes it.  A NULL
  *  host sleeps. */

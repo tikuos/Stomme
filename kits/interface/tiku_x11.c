@@ -824,6 +824,13 @@ tiku_host_present_stats(tiku_host_t *host, uint64_t *frames, uint64_t *bytes,
         *rectangles = host ? host->presented_rects : 0;
 }
 
+int
+tiku_host_events_queued(tiku_host_t *host)
+{
+    (void)host;
+    return 0;
+}
+
 void
 tiku_host_wait(tiku_host_t *host, int64_t timeout_us)
 {
