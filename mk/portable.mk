@@ -133,3 +133,17 @@ sdk: check
 	$(PYTHON) tools/export_portable_sdk.py --build $(BUILD) --output $(SDK_DIR) --ar $(AR) --nm $(NM)
 check-sdk: sdk
 	$(PYTHON) tests/integration/run_portable_sdk.py --sdk $(SDK_DIR) --cc $(CC) --nm $(NM) --output $(BUILD)/sdk-consumer
+
+ifeq ($(FOUNDATION_TARGET),host-test)
+$(BUILD)/field: tests/portable/field.c tests/portable/heap_trap.c $(PORTABLE_LIBRARIES)
+	$(CC) $(PORTABLE_FLAGS) $(PORTABLE_INCLUDES) -DTIKU_PORTABLE_UI=1 -Ikits/interface $< tests/portable/heap_trap.c $(BUILD)/lib/libtiku_models.a -Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=free,--wrap=strdup -o $@
+.PHONY: check-field
+check-field: $(BUILD)/field
+	$(BUILD)/field
+$(BUILD)/field-event: tests/portable/field_event.c tests/portable/metrics.c tests/portable/heap_trap.c $(PORTABLE_LIBRARIES)
+	$(CC) $(PORTABLE_FLAGS) $(PORTABLE_INCLUDES) -DTIKU_PORTABLE_UI=1 -Ikits/interface $< tests/portable/metrics.c tests/portable/heap_trap.c $(BUILD)/lib/libtiku_models.a -Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=free,--wrap=strdup -o $@
+.PHONY: check-field-event
+check-field-event: $(BUILD)/field-event
+	$(BUILD)/field-event
+test: check-field check-field-event
+endif

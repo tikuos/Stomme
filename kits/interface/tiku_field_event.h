@@ -49,4 +49,12 @@ void tiku_field_input_init(tiku_field_input_t *input);
 tiku_field_result_t tiku_field_event(tiku_field_t *field,
     tiku_field_input_t *input, const tiku_input_event_t *ev,
     tiku_rect_t rect, int focused);
+/**
+ * @brief Route selection, UTF-8 commits and undo using a caller-owned clipboard.
+ * @note Provider refusal preserves the field and undo/redo histories. A missing
+ *       provider rejects clipboard transfers that require its callbacks.
+ */
+tiku_field_result_t tiku_field_event_with_clipboard(tiku_field_t *field,
+    tiku_field_input_t *input, const tiku_input_event_t *ev,
+    tiku_rect_t rect, int focused, const tiku_field_clipboard_t *clipboard);
 #endif

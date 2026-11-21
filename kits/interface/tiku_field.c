@@ -9,11 +9,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#ifndef TIKU_PORTABLE_UI
 #include "tiku_clipboard.h"
+#endif
 #include "tiku_text_input.h"
 #include "tiku_field.h"
 
-#include <stdio.h>
 #include <string.h>
 
 /** @brief Where the code point before the caret starts. */
@@ -54,10 +55,9 @@ tiku_field_result_t tiku_field_commit(tiku_field_t *e, const char *text)
     return TIKU_FIELD_HANDLED;
 }
 
-/** @brief Put the selection on the desk's text clipboard; with nothing
- *         selected the clipboard keeps what it holds. */
-static void
-copy_selection(tiku_field_t *e)
+/** @brief Publish a selected byte range; an empty selection makes no transfer. */
+static int
+copy_selection(tiku_field_t *e, const tiku_field_clipboard_t *clipboard)
 {
     int from, to;
 
@@ -65,25 +65,28 @@ copy_selection(tiku_field_t *e)
         char taken[TIKU_FIELD_MAX];
         size_t n = (size_t)(to - from);
 
-        if (n >= sizeof taken) {
-            n = sizeof taken - 1u;
-        }
+        if (from < 0 || to > e->len || n >= sizeof taken ||
+            !clipboard || !clipboard->write) return 0;
         memcpy(taken, e->text + from, n);
         taken[n] = '\0';
-        tiku_clipboard_set(taken);
+        return clipboard->write(clipboard->context, taken, n);
     }
+    return 1;
 }
 
 void
 tiku_field_start(tiku_field_t *e, const char *text)
 {
-    char kept[sizeof e->text];
+    char kept[sizeof e->text] = {0};
 
     if (e == NULL) {
         return;
     }
     /* Copied aside first: text may be this field's own text. */
-    snprintf(kept, sizeof kept, "%s", (text != NULL) ? text : "");
+    if (text) {
+        size_t n = 0;
+        while (n + 1 < sizeof kept && text[n]) { kept[n] = text[n]; ++n; }
+    }
     memset(e, 0, sizeof *e);
     e->deny = NULL;
     memcpy(e->text, kept, sizeof kept);
@@ -206,8 +209,8 @@ move_caret(tiku_field_t *e, int to, int shift)
 }
 
 tiku_field_result_t
-tiku_field_key(tiku_field_t *e, tiku_field_key_t key, int shift,
-                  char ch)
+tiku_field_key_with_clipboard(tiku_field_t *e, tiku_field_key_t key, int shift,
+                  char ch, const tiku_field_clipboard_t *clipboard)
 {
     if (e == NULL || !e->active) {
         return TIKU_FIELD_IGNORED;
@@ -287,22 +290,24 @@ tiku_field_key(tiku_field_t *e, tiku_field_key_t key, int shift,
         return TIKU_FIELD_HANDLED;
 
     case TIKU_FIELD_COPY:
-        copy_selection(e);
-        return TIKU_FIELD_HANDLED;
+        return copy_selection(e, clipboard) ? TIKU_FIELD_HANDLED : TIKU_FIELD_REJECTED;
 
     case TIKU_FIELD_CUT:
         if (!e->editable) {
             return TIKU_FIELD_HANDLED;
         }
-        copy_selection(e);
+        if (!copy_selection(e, clipboard)) return TIKU_FIELD_REJECTED;
         delete_selection(e);
         return TIKU_FIELD_HANDLED;
 
     case TIKU_FIELD_PASTE: {
-        if (!e->editable || !tiku_clipboard_text()[0]) {
-            return TIKU_FIELD_HANDLED;
-        }
-        return tiku_field_commit(e, tiku_clipboard_text());
+        char text[TIKU_FIELD_MAX] = {0}; size_t bytes = 0;
+        if (!e->editable) return TIKU_FIELD_HANDLED;
+        if (!clipboard || !clipboard->read ||
+            !clipboard->read(clipboard->context, text, sizeof text, &bytes) ||
+            bytes >= sizeof text || text[bytes] || memchr(text, 0, bytes))
+            return TIKU_FIELD_REJECTED;
+        return tiku_field_commit(e, text);
     }
 
     case TIKU_FIELD_COMMIT:
@@ -316,4 +321,30 @@ tiku_field_key(tiku_field_t *e, tiku_field_key_t key, int shift,
     default:
         return TIKU_FIELD_IGNORED;
     }
+}
+
+#ifndef TIKU_PORTABLE_UI
+/** @brief Copy the desktop clipboard into a bounded field transfer. */
+static int desktop_read(void *context, char *text, size_t capacity, size_t *bytes)
+{
+    (void)context;
+    const char *source = tiku_clipboard_text(); size_t n = 0;
+    while (n < capacity && source[n]) ++n;
+    if (n == capacity) return 0;
+    memcpy(text, source, n + 1); *bytes = n; return 1;
+}
+/** @brief Publish through the desktop clipboard's existing void-returning API. */
+static int desktop_write(void *context, const char *text, size_t bytes)
+{ (void)context; (void)bytes; tiku_clipboard_set(text); return 1; }
+#endif
+
+tiku_field_result_t tiku_field_key(tiku_field_t *e, tiku_field_key_t key,
+                                  int shift, char ch)
+{
+#ifdef TIKU_PORTABLE_UI
+    return tiku_field_key_with_clipboard(e, key, shift, ch, NULL);
+#else
+    const tiku_field_clipboard_t clipboard = {NULL, desktop_read, desktop_write};
+    return tiku_field_key_with_clipboard(e, key, shift, ch, &clipboard);
+#endif
 }

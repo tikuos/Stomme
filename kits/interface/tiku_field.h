@@ -68,6 +68,22 @@ typedef struct {
     const char *deny;
 } tiku_field_t;
 
+/** @brief Synchronous clipboard callbacks; refusal leaves the clipboard unchanged.
+ * @note read copies a terminated string and its byte length excluding NUL.
+ * write borrows text for the call. Callbacks must bound work and not reenter
+ * the field. The provider and context are borrowed for one key operation. */
+typedef struct {
+    void *context;
+    int (*read)(void *, char *text, size_t capacity, size_t *bytes);
+    int (*write)(void *, const char *text, size_t bytes);
+} tiku_field_clipboard_t;
+
+/** @brief Edit using an explicit clipboard; refused transfers preserve the field.
+ * @note NULL permits non-clipboard keys. Cut deletes after successful copying;
+ * paste requires a terminated UTF-8 string of at most TIKU_FIELD_MAX-1 bytes. */
+tiku_field_result_t tiku_field_key_with_clipboard(tiku_field_t *e,
+    tiku_field_key_t key, int shift, char ch, const tiku_field_clipboard_t *clipboard);
+
 /**
  * @brief Open the editor over @p text, with all of it selected and the
  *        caret at the end; editable, with no deny-set.
@@ -93,7 +109,9 @@ void tiku_field_deny(tiku_field_t *e, const char *deny);
 /** @brief Keep the field selectable while refusing text mutations. */
 void tiku_field_set_editable(tiku_field_t *e, int editable);
 
-/** @brief Feed one key.  @p ch is used only for TIKU_FIELD_CHAR. */
+/** @brief Feed a key with the desktop clipboard; portable builds have no default.
+ * @note ch is used only for TIKU_FIELD_CHAR. Portable clipboard keys require
+ * tiku_field_key_with_clipboard; absent providers refuse transfers. */
 tiku_field_result_t tiku_field_key(tiku_field_t *e,
                                          tiku_field_key_t key,
                                          int shift, char ch);

@@ -23,15 +23,15 @@
     "kits/support/portable/tiku_clock.c",
     "kits/application/portable/tiku_static_app.c",
     "kits/storage/portable/tiku_paged_storage.c",
-    "packages/apps/models/tiku_word_model.c"
+    "packages/apps/models/tiku_word_model.c",
+    "kits/interface/tiku_field.c",
+    "kits/interface/tiku_field_event.c"
   ],
   "requires": [
     "text-metrics"
   ],
   "excluded": {
     "tiku_textview": "public-layout heap owner; excluded",
-    "tiku_field": "clipboard provider required",
-    "tiku_field_event": "clipboard provider required",
     "tiku_doc": "document layout outside initial control selection",
     "tiku_markdown": "document parser outside initial control selection",
     "tiku_painter": "vector painter and outline paths are outside the control panel"
@@ -46,7 +46,10 @@
     "__stack_chk_fail",
     "__strcpy_chk",
     "__memcpy_chk",
-    "strcpy"
+    "strcpy",
+    "memcmp",
+    "strcmp",
+    "strncmp"
   ],
   "providers": [
     "tiku_measure_width",
@@ -74,6 +77,8 @@
     "monotonic-time",
     "static-applications",
     "paged-storage-read",
-    "word-calculator"
+    "word-calculator",
+    "text-field-provider",
+    "text-field-events"
   ]
 }

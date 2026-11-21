@@ -11,7 +11,6 @@
 
 #include "tiku_field_event.h"
 #include "tiku_measure.h"
-#include "tiku_clipboard.h"
 #include <string.h>
 
 void tiku_field_input_init(tiku_field_input_t *in)
@@ -147,12 +146,29 @@ static int replace(tiku_field_t *e, tiku_field_input_t *in,
     move(e, lo + (int)n, 0);
     return 1;
 }
+/** @brief Apply a clipboard transfer as one undo step after provider acceptance. */
+static int transfer(tiku_field_t *e, tiku_field_input_t *in,
+    tiku_field_key_t operation, const tiku_field_clipboard_t *clipboard, int defaults)
+{
+    tiku_field_t proposed = *e;
+    tiku_field_result_t result = defaults
+        ? tiku_field_key(&proposed, operation, 0, 0)
+        : tiku_field_key_with_clipboard(&proposed, operation, 0, 0, clipboard);
+    if (result == TIKU_FIELD_REJECTED) return -1;
+    if (proposed.len != e->len || memcmp(proposed.text, e->text, (size_t)e->len)) {
+        push(in->undo, &in->nundo, e);
+        in->nredo = 0;
+    }
+    *e = proposed;
+    return 1;
+}
 /**
  * @brief One key press: a Cmd shortcut, a caret move, a deletion or text.
  * @return 1 when handled, 0 when it is not the field's, -1 when its text
  *         was refused.
  */
-static int key(tiku_field_t *e, tiku_field_input_t *in, const tiku_input_event_t *ev)
+static int key(tiku_field_t *e, tiku_field_input_t *in, const tiku_input_event_t *ev,
+    const tiku_field_clipboard_t *clipboard, int defaults)
 {
     int lo = e->sel_a < e->sel_b ? e->sel_a : e->sel_b;
     int hi = e->sel_a > e->sel_b ? e->sel_a : e->sel_b;
@@ -160,15 +176,9 @@ static int key(tiku_field_t *e, tiku_field_input_t *in, const tiku_input_event_t
     if (ev->modifiers & TIKU_MOD_CMD) {
         switch (ev->key) {
         case 'a': case 'A': tiku_field_key(e, TIKU_FIELD_SELECT_ALL, 0, 0); break;
-        case 'c': case 'C': tiku_field_key(e, TIKU_FIELD_COPY, 0, 0); break;
-        case 'x': case 'X':
-            if (e->editable && lo != hi) {
-                tiku_field_key(e, TIKU_FIELD_COPY, 0, 0); replace(e, in, lo, hi, "");
-            }
-            break;
-        case 'v': case 'V':
-            return tiku_clipboard_text()[0]
-                   ? replace(e, in, lo, hi, tiku_clipboard_text()) : 1;
+        case 'c': case 'C': return transfer(e, in, TIKU_FIELD_COPY, clipboard, defaults);
+        case 'x': case 'X': return transfer(e, in, TIKU_FIELD_CUT, clipboard, defaults);
+        case 'v': case 'V': return transfer(e, in, TIKU_FIELD_PASTE, clipboard, defaults);
         case 'z': case 'Z': undo(e, in, shift); break;
         default: return 0;
         }
@@ -192,8 +202,10 @@ static int key(tiku_field_t *e, tiku_field_input_t *in, const tiku_input_event_t
     }
     return 1;
 }
-tiku_field_result_t tiku_field_event(tiku_field_t *e,
-    tiku_field_input_t *in, const tiku_input_event_t *ev, tiku_rect_t r, int focused)
+/** @brief Route one event with explicit or desktop clipboard ownership. */
+static tiku_field_result_t field_event(tiku_field_t *e,
+    tiku_field_input_t *in, const tiku_input_event_t *ev, tiku_rect_t r, int focused,
+    const tiku_field_clipboard_t *clipboard, int defaults)
 {
     if (!e->active) return TIKU_FIELD_IGNORED;
     int commit = tiku_text_input_event(&in->commit, ev);
@@ -222,10 +234,23 @@ tiku_field_result_t tiku_field_event(tiku_field_t *e,
     } else if (focused && ev->type == TIKU_EVENT_KEY_DOWN) {
         if (ev->key == TIKU_KEY_RETURN) return TIKU_FIELD_COMMITTED;
         if (ev->key == TIKU_KEY_ESCAPE) return TIKU_FIELD_CANCELLED;
-        int result = key(e, in, ev);
+        int result = key(e, in, ev, clipboard, defaults);
         if (!result) return TIKU_FIELD_IGNORED;
         if (result < 0) return TIKU_FIELD_REJECTED;
     } else return TIKU_FIELD_IGNORED;
     visible(e, in, r);
     return TIKU_FIELD_HANDLED;
+}
+
+tiku_field_result_t tiku_field_event_with_clipboard(tiku_field_t *e,
+    tiku_field_input_t *in, const tiku_input_event_t *ev, tiku_rect_t r, int focused,
+    const tiku_field_clipboard_t *clipboard)
+{
+    return field_event(e, in, ev, r, focused, clipboard, 0);
+}
+
+tiku_field_result_t tiku_field_event(tiku_field_t *e,
+    tiku_field_input_t *in, const tiku_input_event_t *ev, tiku_rect_t r, int focused)
+{
+    return field_event(e, in, ev, r, focused, NULL, 1);
 }
