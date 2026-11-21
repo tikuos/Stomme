@@ -51,7 +51,11 @@ main(void)
     }
     f = tiku_trk_deskbar_frame(db);
 
-    printf("what a drag is over (DB-009, DB-035)\n");
+    printf("a new Deskbar (DB-035)\n");
+    check(tiku_trk_deskbar_drop_team(db) == -1, "DB-035",
+          "no row is lit for a drop before any drag");
+
+    printf("\nwhat a drag is over (DB-009, DB-035)\n");
     check(tiku_trk_deskbar_drop_at(db, f.x + 10, f.y + 4, &which) ==
           TIKU_TRK_DB_DROP_LEAF, "DB-009",
           "the logo takes a drop: links go in the Deskbar folder");
