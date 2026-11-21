@@ -406,7 +406,7 @@ pv_insert_sorted(tiku_trk_poseview_t *v, const tiku_trk_pose_t *p)
 {
     int at, i;
 
-    if (v->count >= POSES_MAX) {
+    if (v->count >= POSES_MAX || pv_reserve(v, v->count + 1) != 0) {
         return -1;
     }
     /* The binary search needs an ordered array, which a changed sort key

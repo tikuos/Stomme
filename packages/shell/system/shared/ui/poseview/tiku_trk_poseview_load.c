@@ -123,6 +123,9 @@ pv_collect(const tiku_model_t *m, void *ctx)
             }
         }
     }
+    if (pv_reserve(v, v->count + 1) != 0) {
+        return 1;
+    }
     memset(&v->poses[v->count], 0, sizeof v->poses[0]);
     v->poses[v->count].model = *m;
     /* The descriptor is parsed once here; it decides formatting,
@@ -324,6 +327,20 @@ stage_one(const tiku_model_t *m, void *ctx)
     if (v->hide_dotfiles && m != NULL && m->name[0] == '.') {
         return 0;
     }
+    if (v->stage_count == v->stage_capacity) {
+        int cap = v->stage_capacity * 2;
+        tiku_model_t *grown;
+
+        if (cap > POSES_MAX) {
+            cap = POSES_MAX;
+        }
+        grown = realloc(v->stage, (size_t)cap * sizeof *grown);
+        if (grown == NULL) {
+            return 1;                   /* no room: stop the walk         */
+        }
+        v->stage = grown;
+        v->stage_capacity = cap;
+    }
     v->stage[v->stage_count++] = *m;
     return 0;
 }
@@ -349,10 +366,24 @@ already_inserted(const tiku_trk_poseview_t *v, uint64_t id)
 void
 pv_note_inserted(tiku_trk_poseview_t *v, uint64_t id)
 {
-    if (id != 0 && v->inserted_count < POSES_MAX &&
-        !already_inserted(v, id)) {
-        v->inserted[v->inserted_count++] = id;
+    if (id == 0 || v->inserted_count >= POSES_MAX || already_inserted(v, id)) {
+        return;
     }
+    if (v->inserted_count == v->inserted_capacity) {
+        int cap = v->inserted_capacity * 2;
+        uint64_t *grown;
+
+        if (cap > POSES_MAX) {
+            cap = POSES_MAX;
+        }
+        grown = realloc(v->inserted, (size_t)cap * sizeof *grown);
+        if (grown == NULL) {
+            return;
+        }
+        v->inserted = grown;
+        v->inserted_capacity = cap;
+    }
+    v->inserted[v->inserted_count++] = id;
 }
 
 int
@@ -634,6 +665,9 @@ fill_from(tiku_trk_poseview_t *v, const tiku_model_t *m, int n,
         }
     }
     for (i = 0; i < n && v->count < POSES_MAX; i++) {
+        if (pv_reserve(v, v->count + 1) != 0) {
+            break;
+        }
         memset(&v->poses[v->count], 0, sizeof v->poses[0]);
         v->poses[v->count].model = m[i];
         (void)tiku_desc_parse(m[i].facts.meta, &v->poses[v->count].desc);
@@ -749,6 +783,50 @@ tiku_trk_poseview_layout_path(const tiku_trk_poseview_t *v)
     return (v->query_layout[0] != '\0') ? v->query_layout : v->path;
 }
 
+int
+pv_reserve(tiku_trk_poseview_t *v, int need)
+{
+    tiku_trk_pose_t *poses;
+    int *filtered;
+    unsigned char *band;
+    int cap;
+
+    if (need <= v->capacity) {
+        return 0;
+    }
+    if (need > POSES_MAX) {
+        return -1;
+    }
+    for (cap = v->capacity > 0 ? v->capacity : POSES_MIN; cap < need; cap *= 2) {
+    }
+    if (cap > POSES_MAX) {
+        cap = POSES_MAX;
+    }
+    /* Each array keeps at least the old capacity whichever step fails, so
+     * the capacity is raised only once all three have grown. */
+    poses = realloc(v->poses, (size_t)cap * sizeof *poses);
+    if (poses == NULL) {
+        return -1;
+    }
+    v->poses = poses;
+    memset(poses + v->capacity, 0, (size_t)(cap - v->capacity) * sizeof *poses);
+    filtered = realloc(v->filtered, (size_t)cap * sizeof *filtered);
+    if (filtered == NULL) {
+        return -1;
+    }
+    v->filtered = filtered;
+    memset(filtered + v->capacity, 0,
+           (size_t)(cap - v->capacity) * sizeof *filtered);
+    band = realloc(v->band_was, (size_t)cap);
+    if (band == NULL) {
+        return -1;
+    }
+    v->band_was = band;
+    memset(band + v->capacity, 0, (size_t)(cap - v->capacity));
+    v->capacity = cap;
+    return 0;
+}
+
 tiku_trk_poseview_t *
 tiku_trk_poseview_new(tiku_backend_t *backend, const char *path)
 {
@@ -758,11 +836,14 @@ tiku_trk_poseview_new(tiku_backend_t *backend, const char *path)
         return NULL;
     }
     v->folders_first = 1;
-    v->poses = calloc(POSES_MAX, sizeof *v->poses);
-    v->filtered = calloc(POSES_MAX, sizeof *v->filtered);
-    v->band_was = calloc(POSES_MAX, 1u);
-    v->stage = calloc(POSES_MAX, sizeof *v->stage);
-    v->inserted = calloc(POSES_MAX, sizeof *v->inserted);
+    /* The arrays start small and grow with the folder (pv_reserve). */
+    v->capacity = v->stage_capacity = v->inserted_capacity =
+        (POSES_MIN < POSES_MAX) ? POSES_MIN : POSES_MAX;
+    v->poses = calloc((size_t)v->capacity, sizeof *v->poses);
+    v->filtered = calloc((size_t)v->capacity, sizeof *v->filtered);
+    v->band_was = calloc((size_t)v->capacity, 1u);
+    v->stage = calloc((size_t)v->stage_capacity, sizeof *v->stage);
+    v->inserted = calloc((size_t)v->inserted_capacity, sizeof *v->inserted);
     if (v->poses == NULL || v->filtered == NULL || v->band_was == NULL ||
         v->stage == NULL || v->inserted == NULL) {
         free(v->poses);

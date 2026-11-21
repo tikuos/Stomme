@@ -29,6 +29,8 @@
 
 /** @brief How many poses one view can hold. */
 #define POSES_MAX TIKU_TRK_POSES_MAX
+/** @brief Entries a view's arrays hold before their first growth. */
+#define POSES_MIN 16
 
 /** @brief The most rows a value sweep reads, from the first row shown. */
 #define REFRESH_WINDOW 40
@@ -41,6 +43,8 @@ struct tiku_trk_poseview {
 
     tiku_trk_pose_t    *poses;          /* every pose, in sort order        */
     int                 count;          /* poses[] in use                   */
+    int                 capacity;       /* poses[], filtered[] and          */
+                                        /* band_was[] entries allocated     */
     int                *filtered;       /* poses[] indices the filter keeps */
     int                 filtered_count; /* filtered[] in use                */
     int                 filtering;      /* the rows shown are filtered[]    */
@@ -174,6 +178,7 @@ struct tiku_trk_poseview {
      * never blank and never blocked (PVL-088, PVN-047). */
     tiku_model_t   *stage;              /* the entries read, not yet shown  */
     int                 stage_count;    /* stage[] in use                   */
+    int                 stage_capacity; /* stage[] entries allocated        */
     int                 stage_at;       /* next stage[] entry to publish    */
     int                 loading;        /* a load is under way              */
     int                 awaiting;       /* the listing is being fetched     */
@@ -187,8 +192,9 @@ struct tiku_trk_poseview {
     int                 load_gen;       /* the listing's generation         */
     /* Node ids published this load: a node the change notices brought in is
      * not published again by the loader (PVL-090). */
-    uint64_t           *inserted;       /* the ids, POSES_MAX of them       */
+    uint64_t           *inserted;       /* the ids, at most POSES_MAX       */
     int                 inserted_count; /* inserted[] in use                */
+    int                 inserted_capacity; /* inserted[] entries allocated  */
     /* The shared icon cache, or NULL.  Kept in step from the notice
      * handler: see tiku_trk_poseview_set_icons. */
     tiku_trk_nodeicon_t *icons;
@@ -265,6 +271,14 @@ void pv_column_def_v(const tiku_trk_poseview_t *v, int field,
 
 /* tiku_trk_poseview_extent.c */
 int pv_insert_sorted(tiku_trk_poseview_t *v, const tiku_trk_pose_t *p);
+
+/**
+ * @brief Room for @p need poses: poses[], filtered[] and band_was[] grow
+ *        together, doubling, up to POSES_MAX.  A growth moves poses[], so a
+ *        pointer into it does not survive the call.
+ * @return 0, or -1 when @p need is past POSES_MAX or memory is short.
+ */
+int pv_reserve(tiku_trk_poseview_t *v, int need);
 int pv_pose_index(const tiku_trk_poseview_t *v, const char *path);
 int pv_pose_is_hidden(tiku_trk_poseview_t *v, const char *path);
 int pv_sorted_slot(tiku_trk_poseview_t *v, const tiku_trk_pose_t *p);

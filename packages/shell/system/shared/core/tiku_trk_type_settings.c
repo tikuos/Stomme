@@ -821,6 +821,15 @@ static void release(void *context)
     free(job);
 }
 
+/** @brief Whether two reads of the file found the same target and bytes. */
+static int file_same(const type_file_t *a, const type_file_t *b)
+{
+    return a->exists == b->exists && a->size == b->size &&
+           !strcmp(a->target, b->target) &&
+           (a->size == 0 || (a->bytes && b->bytes &&
+                             !memcmp(a->bytes, b->bytes, a->size)));
+}
+
 /** @brief Apply worker observations and finish jobs before replacing child
  * identities.
  */
@@ -830,6 +839,10 @@ static void done(void *context)
     tiku_trk_type_settings_t *owner = job->owner;
     if (!owner) return;
     if (job->write) owner->writer = NULL; else owner->reader = NULL;
+    /* A re-read that finds the bytes already applied changes nothing. */
+    if (!job->write && !job->error && owner->ready && !owner->resync &&
+        file_same(&owner->file, &job->after))
+        return;
     if (!job->error && !identities_fit(owner, &job->observed))
         job->error = TIKU_RESOURCE_LIMIT;
     if (!job->error) {
