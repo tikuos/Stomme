@@ -193,7 +193,7 @@ review, downstream qualification, release records and dependency rollback.
 ## Portable UI profile
 
 `FOUNDATION_PROFILE=portable-ui` builds bounded controls, local painting,
-allocator-bound services, static application lifecycle and read-only paged
+allocator-bound services, static application lifecycle and writable paged
 storage. Products supply allocation, input, presentation, clock and storage
 providers. The profile uses shared C contracts without firmware headers.
 

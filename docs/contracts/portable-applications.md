@@ -1,6 +1,6 @@
 # Portable applications and storage
 
-The portable profile includes static application lifecycle and read-only paged
+The portable profile includes static application lifecycle and queued paged
 storage. These contracts use the resource API's caller, kind, entry and error
 types. The resource registry implementation and desktop process runtime are not
 linked. Products supply storage adapters and decide which applications to run.
@@ -50,9 +50,17 @@ copied `tiku_resource_caller_t`. It allocates a page of at most
 `TIKU_RESOURCE_STREAM_CHUNK` bytes. Either capacity may be zero to disable that
 operation. Requests reuse these buffers; directory size is independent of page capacity.
 
-Capabilities are READ plus COLLECTION and/or STREAM. Other feature bits are
-rejected. No mutation operation is exposed. A future writer adapter must define
-publication and writer ownership before advertising change support.
+Providers advertise READ plus COLLECTION and/or STREAM, with optional CHANGE
+support. Caller scopes admit each operation. Rename,
+delete, replacement, information, directory creation and subtree operations
+retain their request until the provider reports completion. The provider owns
+publication and writer serialization on its backing medium.
+
+Mutation requests copy paths into the storage session. Replacement requests
+borrow immutable input bytes through completion, including cancellation.
+Directory and subtree operations carry the expected catalog epoch and item
+identity so providers can reject stale work. Storage capability flags describe
+the backing volume; the consumer must check them before offering an operation.
 
 List supplies a path, catalog epoch and the previous node ID. Epoch zero and
 ID zero start enumeration. A provider returns ordered, increasing, nonzero

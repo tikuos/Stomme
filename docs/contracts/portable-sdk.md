@@ -2,8 +2,9 @@
 
 The `portable-ui` SDK contains selected C headers, static archives, font notices,
 a capability and ABI manifest, a Make include and a standalone integrity checker.
-It exports local painting and static application contracts. Desktop process,
-window, clipboard, remote-storage and document implementations are excluded.
+It exports local painting, caller-owned window workspaces, Deskbar painting,
+text fields and static application contracts. Native allocation, desktop
+process, system clipboard, remote-storage and document implementations are excluded.
 
 Build and exercise the host SDK:
 
@@ -60,12 +61,18 @@ The manifest records these capabilities:
 - `control-models`, `local-rendering`, `font-subset`.
 - `allocator-contexts`, `bounded-input`, `monotonic-time`.
 - `static-applications`, `paged-storage-read`, `word-calculator`.
+- `text-field-provider`, `text-field-events`, `word-checksum-input`.
+- `paged-storage-mutation`, `paged-storage-replacement`, `paged-storage-info`.
+- `paged-storage-directories`, `paged-storage-subtrees`,
+  `paged-storage-volume-features`, `paged-storage-tree-copy`.
+- `window-workspace`, `deskbar-paint`.
 
 The control archive's `text-metrics` requirement is supplied by the renderer's
 font provider when the complete SDK is linked. Allocation, presentation, input,
 clock and storage adapters remain consumer-owned bindings. A capability says
 which contract and implementation are supplied, not that hardware is attached.
-Storage writes are not advertised.
+Writable storage operations require a consumer-supplied provider with the
+corresponding capabilities and caller authorization.
 
 Public headers retain shared declarations that are also used by desktop builds.
 `sdk.json` lists the selected `public_symbols`; declarations alone do not imply

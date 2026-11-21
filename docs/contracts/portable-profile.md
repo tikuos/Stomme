@@ -3,7 +3,9 @@
 `FOUNDATION_PROFILE=portable-ui` selects bounded Interface models, allocator and queue services, and
 frozen font data. The default remains `desktop`. The portable profile includes local control drawing and presentation contracts.
 It includes static application lifecycle, bounded storage requests and shared
-integer calculator logic. Native window and process adapters are excluded.
+integer calculator logic. Caller-owned window workspaces and shared Deskbar
+painting provide the desktop composition. Native allocation and process
+adapters are excluded from the portable archives.
 `profiles/portable-ui.json` declares the selected sources, required metrics
 provider and C runtime symbols. Existing model headers and layouts are retained.
 
@@ -37,7 +39,7 @@ Application and storage ownership is defined in
 
 The control archive requires the `tiku_measure_*` provider listed in its
 manifest. The host probe supplies fixed metrics and links the complete control
-archive. Application text-entry fields and the document parser are excluded.
+archive. Text-entry fields use caller-provided clipboard operations. The document parser is excluded.
 The heap-owning `tiku_textview_t` is also excluded. Text-input staging and the
 selected control models operate on caller-owned records.
 
