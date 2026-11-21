@@ -159,6 +159,34 @@ struct tiku_window {
     int                          auto_hide_tab; /**< hide tab while unfocused */
 };
 
+/** @brief Optional owned-surface operations for workspace caches and animations.
+ * @note Create and capture transfer a surface to the workspace; release is
+ * required when either is supplied. Callbacks must not reenter the workspace.
+ * NULL operations leave drawing and window interaction allocation-free.
+ */
+typedef struct {
+    void *context;
+    tiku_surface_t *(*create)(void *, int width, int height, int scale, tiku_rgb_t);
+    tiku_surface_t *(*capture)(void *, const tiku_surface_t *, tiku_rect_t);
+    void (*release)(void *, tiku_surface_t *);
+} tiku_workspace_surfaces_t;
+/** @brief Required size and alignment for caller-owned workspace storage. */
+size_t tiku_workspace_size(void);
+size_t tiku_workspace_align(void);
+/** @brief Initialize unused caller-owned storage over a borrowed drawing surface.
+ * @note Storage and any supplied surface remain valid until deinit and cannot overlap.
+ * A NULL surface admits headless windows; drawing and tracking need a surface.
+ * Operations are copied. NULL operations disable owned pixel allocations.
+ * Use deinit, not free, to retire a workspace initialized in borrowed storage.
+ * @return Workspace, or NULL without modifying storage on invalid arguments.
+ */
+tiku_workspace_t *tiku_workspace_init(void *, size_t, tiku_surface_t *,
+                                      const tiku_workspace_surfaces_t *);
+/** @brief Close windows and release owned surfaces without freeing control storage. */
+void tiku_workspace_deinit(tiku_workspace_t *);
+/** @brief Borrow the workspace's drawing surface, or NULL for a NULL workspace. */
+tiku_surface_t *tiku_workspace_surface(const tiku_workspace_t *);
+
 /**
  * @brief An empty workspace drawing onto @p surface, or NULL when out of
  *        memory.

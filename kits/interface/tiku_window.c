@@ -11,10 +11,7 @@
 
 #include "tiku_window.h"
 #include "tiku_ui.h"
-#include "tiku_dl.h"
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 int
@@ -40,7 +37,6 @@ tiku_window_tab_button(void)
 struct tiku_workspace {
     uint64_t next_generation;
     tiku_surface_t *surface;
-    tiku_window_t windows[TIKU_WINDOW_MAX];
     int order[TIKU_WINDOW_MAX];
     int count;
     int focused;
@@ -70,6 +66,8 @@ struct tiku_workspace {
     int cache_mode;
     size_t cache_bytes;
     uint64_t content_draws, cache_hits;
+    tiku_workspace_surfaces_t surfaces;
+    tiku_window_t windows[TIKU_WINDOW_MAX];
 };
 
 /** @brief Retire a slot's pixel allocation before it is reused. */
@@ -78,7 +76,7 @@ static void cache_free(tiku_workspace_t *ws, int slot)
     tiku_surface_t *s = ws->cache[slot].pixels;
     if (s) {
         ws->cache_bytes -= (size_t)s->w*s->h*s->scale*s->scale*sizeof *s->px;
-        tiku_surface_free(s);
+        ws->surfaces.release(ws->surfaces.context, s);
     }
     memset(&ws->cache[slot], 0, sizeof ws->cache[slot]);
 }
@@ -153,37 +151,37 @@ tab_rect(const tiku_window_t *window)
     return tab;
 }
 
-tiku_workspace_t *
-tiku_workspace_new(tiku_surface_t *surface)
+size_t tiku_workspace_size(void) { return sizeof(tiku_workspace_t); }
+size_t tiku_workspace_align(void) { return _Alignof(tiku_workspace_t); }
+tiku_workspace_t *tiku_workspace_init(void *storage, size_t bytes,
+    tiku_surface_t *surface, const tiku_workspace_surfaces_t *surfaces)
 {
-    tiku_workspace_t *workspace = calloc(1u, sizeof *workspace);
-
-    if (workspace != NULL) {
-        workspace->surface = surface;
-        workspace->focused = -1;
-        workspace->track_window = -1;
-    }
+    tiku_workspace_t *workspace = storage;
+    if (!storage || bytes < sizeof *workspace ||
+        (uintptr_t)storage % _Alignof(tiku_workspace_t) ||
+        (surfaces && (surfaces->create || surfaces->capture) && !surfaces->release))
+        return NULL;
+    memset(workspace, 0, offsetof(tiku_workspace_t, windows));
+    for (int i = 0; i < TIKU_WINDOW_MAX; ++i) workspace->windows[i].open = 0;
+    workspace->surface = surface; workspace->focused = -1; workspace->track_window = -1;
+    if (surfaces) workspace->surfaces = *surfaces;
     return workspace;
 }
-
-void
-tiku_workspace_free(tiku_workspace_t *workspace)
+tiku_surface_t *tiku_workspace_surface(const tiku_workspace_t *workspace)
+{ return workspace ? workspace->surface : NULL; }
+void tiku_workspace_deinit(tiku_workspace_t *workspace)
 {
-    if (workspace != NULL) {
-        int g;
-
-        for (g = 0; g < 4; g++) {
-            if (workspace->ghost[g].pixels != NULL) {
-                tiku_surface_free(workspace->ghost[g].pixels);
-                workspace->ghost[g].pixels = NULL;
-            }
+    if (!workspace) return;
+    workspace->now = 0;
+    for (int g = 0; g < 4; ++g) {
+        if (workspace->ghost[g].pixels) {
+            workspace->surfaces.release(workspace->surfaces.context, workspace->ghost[g].pixels);
+            workspace->ghost[g].pixels = NULL;
         }
     }
-    while (workspace != NULL && workspace->count > 0) {
-        tiku_workspace_close(workspace,
-            &workspace->windows[workspace->order[workspace->count - 1]]);
-    }
-    free(workspace);
+    while (workspace->count > 0)
+        tiku_workspace_close(workspace, &workspace->windows[workspace->order[workspace->count-1]]);
+    tiku_workspace_end_track(workspace);
 }
 
 void
@@ -274,8 +272,10 @@ tiku_workspace_open(tiku_workspace_t *workspace, const char *title,
     window = &workspace->windows[slot];
     memset(window, 0, sizeof *window);
     window->generation = ++workspace->next_generation;
-    snprintf(window->title, sizeof window->title, "%s",
-             (title != NULL) ? title : "");
+    size_t length = 0;
+    if (title) while (length < sizeof window->title-1 && title[length]) ++length;
+    if (length) memcpy(window->title, title, length);
+    window->title[length] = 0;
     window->frame = frame;
     window->draw = draw;
     window->context = context;
@@ -320,7 +320,7 @@ ghost_take(tiku_workspace_t *ws, tiku_window_t *window, tiku_rect_t to,
     tiku_rect_t from = window_reach(window);
     int i;
 
-    if (ws->now == 0 || ws->surface == NULL || window->minimized) {
+    if (ws->now == 0 || ws->surface == NULL || window->minimized || !ws->surfaces.capture) {
         return;
     }
     for (i = 0; i < 4; i++) {
@@ -329,7 +329,7 @@ ghost_take(tiku_workspace_t *ws, tiku_window_t *window, tiku_rect_t to,
     if (i == 4) {
         return;
     }
-    ws->ghost[i].pixels = tiku_grab(ws->surface, from);
+    ws->ghost[i].pixels = ws->surfaces.capture(ws->surfaces.context, ws->surface, from);
     if (ws->ghost[i].pixels == NULL) {
         return;
     }
@@ -366,7 +366,7 @@ ghosts_draw(tiku_workspace_t *ws)
         if (ws->ghost[i].pixels == NULL) { continue; }
         age = ws->now - ws->ghost[i].since;
         if (ws->now == 0 || age < 0 || age >= ws->ghost[i].length) {
-            tiku_surface_free(ws->ghost[i].pixels);
+            ws->surfaces.release(ws->surfaces.context, ws->ghost[i].pixels);
             ws->ghost[i].pixels = NULL;
             continue;
         }
@@ -723,13 +723,10 @@ static void cache_capture(tiku_workspace_t *ws, int slot, tiku_rect_t r,
         cache_free(ws, slot); p = NULL;
     }
     if (!p) {
+        if (!ws->surfaces.create) return;
         if (bytes > (size_t)TIKU_WINDOW_CACHE_BYTES - ws->cache_bytes) return;
-        p = tiku_surface_new(r.w, r.h, 0);
+        p = ws->surfaces.create(ws->surfaces.context, r.w, r.h, sc, 0);
         if (!p) return;
-        if (sc > 1 && tiku_surface_rescale(p, sc, 0)) {
-            tiku_surface_free(p); return;
-        }
-        p->scale = sc;
         ws->cache[slot].pixels = p; ws->cache_bytes += bytes;
     }
     for (int y = 0; y < r.h*sc; y++)
@@ -792,9 +789,7 @@ draw_window_at(tiku_workspace_t *workspace, tiku_window_t *window,
 {
     tiku_surface_t *surface = workspace->surface;
     const tiku_font_t *font = tiku_font_bold();
-    tiku_rect_t tab = tab_rect(window);
     int tab_h = tiku_window_tab_h();
-    int btn = tiku_window_tab_button();
     int show_tab = !window->auto_hide_tab || active;
     tiku_rect_t body = { window->frame.x,
         window->frame.y + tab_h - 1, window->frame.w,
@@ -826,7 +821,11 @@ draw_window_at(tiku_workspace_t *workspace, tiku_window_t *window,
     tiku_frame_round(surface, body, radius,
                      show_tab ? TIKU_CORNER_ALL & ~TIKU_CORNER_TL :
                                 TIKU_CORNER_ALL, dark);
-    if (show_tab) {
+    if (show_tab && (surface->record || !surface->damage_active ||
+        (window->frame.y < surface->damage.y + surface->damage.h &&
+         window->frame.y + tab_h > surface->damage.y))) {
+        tiku_rect_t tab = tab_rect(window);
+        int btn = tiku_window_tab_button();
         tiku_fill_round(surface, tab, radius, TIKU_CORNER_TOP, tab_color);
         tiku_frame_round(surface, tab, radius, TIKU_CORNER_TOP, dark);
         /* The tab meets the body along one row of its fill. */
@@ -969,86 +968,6 @@ tiku_workspace_draw_window(tiku_workspace_t *workspace,
     workspace->surface = shown;
 }
 
-/**
- * @brief Draw @p window's content once onto a recording surface of the
- *        workspace's size, never the shown one, and return the list, or
- *        NULL when there is nothing to record.
- */
-static tiku_dl_t *
-workspace_record(tiku_workspace_t *workspace, tiku_window_t *window)
-{
-    tiku_surface_t *scratch;
-    tiku_dl_t *dl;
-    tiku_rect_t content;
-
-    if (workspace == NULL || workspace->surface == NULL ||
-        window == NULL || !window->open || window->draw == NULL) {
-        return NULL;
-    }
-    content = tiku_window_content(window);
-    if (content.w <= 0 || content.h <= 0) {
-        return NULL;
-    }
-    /* A scratch surface of the workspace's size: recording leaves the
-     * shown pixels alone. */
-    scratch = tiku_surface_new(workspace->surface->w,
-                                    workspace->surface->h, TIKU_C_PANEL);
-    if (scratch == NULL) {
-        return NULL;
-    }
-    dl = tiku_dl_new();
-    if (dl == NULL) {
-        tiku_surface_free(scratch);
-        return NULL;
-    }
-    scratch->record = dl;
-    tiku_clip_set(scratch, content);
-    window->draw(window, scratch, content, window->context);
-    tiku_clip_reset(scratch);
-    scratch->record = NULL;
-    tiku_surface_free(scratch);
-    return dl;
-}
-
-size_t
-tiku_workspace_narrate(tiku_workspace_t *workspace,
-                            tiku_window_t *window, char *out, size_t max)
-{
-    tiku_dl_t *dl;
-    size_t used;
-
-    if (out == NULL || max == 0u) {
-        return 0u;
-    }
-    out[0] = '\0';
-    dl = workspace_record(workspace, window);
-    if (dl == NULL) {
-        return 0u;
-    }
-    used = tiku_dl_say(dl, out, max);
-    tiku_dl_free(dl);
-    return used;
-}
-
-size_t
-tiku_workspace_controls(tiku_workspace_t *workspace,
-                             tiku_window_t *window, char *out, size_t max)
-{
-    tiku_dl_t *dl;
-    size_t used;
-
-    if (out == NULL || max == 0u) {
-        return 0u;
-    }
-    out[0] = '\0';
-    dl = workspace_record(workspace, window);
-    if (dl == NULL) {
-        return 0u;
-    }
-    used = tiku_dl_facts(dl, out, max);
-    tiku_dl_free(dl);
-    return used;
-}
 
 void
 tiku_window_publish_menus(struct tiku_window *window,

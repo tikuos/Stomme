@@ -58,7 +58,7 @@ def check(nm, paths, profile, linked=False):
         allowed = set(profile['runtime']) | set(profile['providers'])
         # Compiler-emitted arithmetic for the recorded S31 ABI.
         if profile['target'] == 's31':
-            allowed |= {'__udivdi3', '__umoddi3', '__divdi3', '__adddf3', '__subdf3', '__muldf3', '__divdf3', '__floatsidf', '__floatdidf', '__fixdfsi', '__floatundidf', '__ashldi3', '__lshrdi3'}
+            allowed |= {'__udivdi3', '__umoddi3', '__divdi3', '__adddf3', '__subdf3', '__muldf3', '__divdf3', '__floatsidf', '__floatdidf', '__fixdfsi', '__floatundidf', '__ashldi3', '__lshrdi3', '__floatdisf'}
         errors += ['Undeclared dependency: ' + name for name in sorted(unresolved - allowed)]
     return dict(objects=inventory, unresolved=sorted(unresolved), errors=errors)
 
@@ -99,7 +99,7 @@ def includes(root, sources):
                     included is not None and included.resolve().is_relative_to(root.resolve() / 'kits/support') and
                     name != 'tiku_allocator.h'):
                 errors.append(str(path) + ': forbidden portable support contract ' + name)
-            if included is None or name in {'tiku_host.h', 'tiku_window.h', 'tiku_ttf.h', 'tiku_cff.h', 'tiku_type1.h'}:
+            if included is None or name in {'tiku_host.h', 'tiku_ttf.h', 'tiku_cff.h', 'tiku_type1.h'}:
                 errors.append(str(path) + ': forbidden portable include ' + name)
             else:
                 pending.append(included)

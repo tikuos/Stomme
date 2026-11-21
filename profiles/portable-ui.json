@@ -66,7 +66,8 @@
     "kits/interface/tiku_slider_paint.c",
     "kits/interface/tiku_tabs_paint.c",
     "kits/interface/portable/tiku_font_portable.c",
-    "kits/interface/portable/tiku_framebuffer.c"
+    "kits/interface/portable/tiku_framebuffer.c",
+    "kits/interface/tiku_window.c"
   ],
   "capabilities": [
     "control-models",
@@ -87,6 +88,7 @@
     "paged-storage-directories",
     "paged-storage-subtrees",
     "paged-storage-volume-features",
-    "paged-storage-tree-copy"
+    "paged-storage-tree-copy",
+    "window-workspace"
   ]
 }

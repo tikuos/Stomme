@@ -156,3 +156,12 @@ check-word-checksum: $(BUILD)/word-checksum
 	$(BUILD)/word-checksum
 test: check-word-checksum
 endif
+
+ifeq ($(FOUNDATION_TARGET),host-test)
+$(BUILD)/workspace: tests/portable/workspace.c tests/portable/heap_trap.c $(PORTABLE_LIBRARIES) $(RENDER_LIBRARY)
+	$(CC) $(PORTABLE_FLAGS) $(PORTABLE_INCLUDES) $(PANEL_FLAGS) $< tests/portable/heap_trap.c -Wl,--start-group $(PORTABLE_LIBRARIES) $(RENDER_LIBRARY) -Wl,--end-group -Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=free,--wrap=strdup -o $@
+.PHONY: check-workspace
+check-workspace: $(BUILD)/workspace
+	$(BUILD)/workspace
+test: check-workspace
+endif
