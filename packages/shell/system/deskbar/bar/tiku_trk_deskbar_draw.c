@@ -10,6 +10,7 @@
  */
 #include "tiku_shell_product.h"
 #include "tiku_trk_deskbar_private.h"
+#include "tiku_deskbar_paint.h"
 #include <strings.h>
 
 /* Used before they are defined. */
@@ -40,27 +41,7 @@ void db_draw_leaf(tiku_trk_deskbar_t *db, tiku_surface_t *s,
 void db_draw_frame(tiku_trk_deskbar_t *db, tiku_surface_t *s, int *rows);
 /* End of the forward declarations. */
 
-/** @brief A window's state icon: filled when shown, hollow when minimised,
- *         and ringed in the selection colour when @p current. */
-static void
-draw_win_icon(tiku_surface_t *s, int x, int y, int minimized,
-              int current)
-{
-    tiku_rect_t b = { x, y, 9, 9 };
-    tiku_rgb_t dark = tiku_tint(TIKU_C_PANEL, 1.40f);
 
-    tiku_fill(s, b, minimized ? TIKU_C_PANEL : TIKU_C_DOC);
-    tiku_frame(s, b, dark);
-    if (!minimized) {
-        /* A shown window's glyph carries a title bar. */
-        tiku_hline(s, b.x + 1, b.y + 1, b.w - 2, TIKU_C_TAB);
-        tiku_hline(s, b.x + 1, b.y + 2, b.w - 2, TIKU_C_TAB);
-    }
-    if (current) {
-        tiku_frame(s, (tiku_rect_t){ b.x - 2, b.y - 2, b.w + 4,
-                                               b.h + 4 }, TIKU_C_SELECT);
-    }
-}
 
 /**
  * @brief Where the leaf menu goes: right of the bar when it is docked
@@ -840,69 +821,9 @@ db_open_sub(tiku_trk_deskbar_t *db, int at)
     }
 }
 
-/**
- * @brief The expander arrow beside a team: pointing down when its windows
- *        are shown, right when they are not.
- */
-static void
-draw_expander(tiku_surface_t *s, int x, int y, int expanded)
-{
-    tiku_rgb_t dark = tiku_tint(TIKU_C_PANEL, 1.40f);
-    int k;
 
-    /* An open three-point polyline, stroked with an EXPANDER_PEN-pixel
-     * pen. */
-    for (k = 0; k < EXPANDER_PEN; k++) {
-        int i;
 
-        for (i = 0; i < EXPANDER_ARM; i++) {
-            if (expanded) {           /* pointing down: \ then /            */
-                tiku_pixel(s, x + i, y + i + k, dark);
-                tiku_pixel(s, x + 2 * EXPANDER_ARM - 2 - i, y + i + k,
-                                dark);
-            } else {                  /* pointing right: / then \           */
-                tiku_pixel(s, x + i + k, y + i, dark);
-                tiku_pixel(s, x + i + k, y + 2 * EXPANDER_ARM - 2 - i,
-                                dark);
-            }
-        }
-    }
-}
 
-/**
- * @brief A list row's background.
- *
- * An idle row is bevelled on every edge over a light gradient; a selected
- * one is a darker gradient with a single dark line on top and no side
- * bevel.  The label colour is the same either way.
- */
-static void
-draw_row_bg(tiku_surface_t *s, tiku_rect_t r, int selected)
-{
-    int i;
-
-    for (i = 0; i < r.h; i++) {
-        float t = (r.h > 1) ? (float)i / (float)(r.h - 1) : 0.0f;
-        float tint = selected ? (1.25f + (1.20f - 1.25f) * t)
-                              : (0.69f + (1.03f - 0.69f) * t);
-
-        tiku_hline(s, r.x, r.y + i, r.w,
-                        tiku_tint(TIKU_C_PANEL, tint));
-    }
-    if (selected) {
-        tiku_hline(s, r.x, r.y, r.w,
-                        tiku_tint(TIKU_C_PANEL, 1.40f));
-        return;
-    }
-    tiku_hline(s, r.x, r.y, r.w,
-                    tiku_tint(TIKU_C_PANEL, 0.50f));
-    tiku_vline(s, r.x, r.y, r.h,
-                    tiku_tint(TIKU_C_PANEL, 0.70f));
-    tiku_vline(s, r.x + r.w - 1, r.y, r.h,
-                    tiku_tint(TIKU_C_PANEL, 1.08f));
-    tiku_hline(s, r.x, r.y + r.h - 1, r.w,
-                    tiku_tint(TIKU_C_PANEL, 1.08f));
-}
 
 /** @brief Truncate to a width budget, with an ellipsis (DB-032). */
 static void
@@ -1486,7 +1407,7 @@ db_draw_teams(tiku_trk_deskbar_t *db, tiku_surface_t *s, const tiku_font_t *f,
             if (bx + bw > right) {
                 break;
             }
-            draw_row_bg(s, b, t->active);
+            tiku_deskbar_row_paint(s, b, t->active);
             (void)tiku_icon_paint(s,
                 tiku_trk_deskbar_team_icon(db, db->order[i2]),
                 b.x + 3, b.y + (db_leaf_row() - 16) / 2, 16);
@@ -1535,7 +1456,7 @@ db_draw_teams(tiku_trk_deskbar_t *db, tiku_surface_t *s, const tiku_font_t *f,
             if (db->drop_team == team) {
                 tiku_fill(s, row, TIKU_C_SELECT);
             } else {
-                draw_row_bg(s, row, t->active);
+                tiku_deskbar_row_paint(s, row, t->active);
             }
             /* The application's icon: its own, or the generic one
              * (tiku_trk_deskbar_team_icon).  DB-018: when even that is
@@ -1552,7 +1473,7 @@ db_draw_teams(tiku_trk_deskbar_t *db, tiku_surface_t *s, const tiku_font_t *f,
                                label, TIKU_C_TEXT);
             }
             if (db->settings.show_expander) {
-                draw_expander(s, row.x + row.w - EXPANDER_W - 2,
+                tiku_deskbar_expander(s, row.x + row.w - EXPANDER_W - 2,
                               (*y) + (team_h - 9) / 2,
                               t->expanded ||
                               db->expander_press == db->order[i]);
@@ -1571,8 +1492,8 @@ db_draw_teams(tiku_trk_deskbar_t *db, tiku_surface_t *s, const tiku_font_t *f,
                 if ((*y) + db_win_row() > lb) {
                     break;
                 }
-                draw_row_bg(s, wr, w->current);
-                draw_win_icon(s, wr.x + WIN_INDENT,
+                tiku_deskbar_row_paint(s, wr, w->current);
+                tiku_deskbar_window_icon(s, wr.x + WIN_INDENT,
                               (*y) + (db_win_row() - 9) / 2,
                               w->state == TIKU_TRK_DBW_MINIMIZED,
                               0);
@@ -1601,7 +1522,7 @@ db_draw_mini(tiku_trk_deskbar_t *db, tiku_surface_t *s, const tiku_font_t *f)
                                 db->frame.y + 2 + db_leaf_row() + 2,
                                 db->frame.w - 4, db_team_row() };
 
-        draw_row_bg(s, ab, db->apps_menu_open);
+        tiku_deskbar_row_paint(s, ab, db->apps_menu_open);
         (void)tiku_icon_paint(s, "application",
                                   ab.x + (ab.w - 16) / 2,
                                   ab.y + (ab.h - 16) / 2, 16);

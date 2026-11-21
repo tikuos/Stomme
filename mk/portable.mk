@@ -165,3 +165,12 @@ check-workspace: $(BUILD)/workspace
 	$(BUILD)/workspace
 test: check-workspace
 endif
+
+ifeq ($(FOUNDATION_TARGET),host-test)
+$(BUILD)/deskbar-paint: tests/portable/deskbar_paint.c $(PORTABLE_LIBRARIES) $(RENDER_LIBRARY)
+	$(CC) $(PORTABLE_FLAGS) $(PORTABLE_INCLUDES) $(PANEL_FLAGS) $< -Wl,--start-group $(PORTABLE_LIBRARIES) $(RENDER_LIBRARY) -Wl,--end-group -o $@
+.PHONY: check-deskbar-paint
+check-deskbar-paint: $(BUILD)/deskbar-paint
+	$(BUILD)/deskbar-paint
+test: check-deskbar-paint
+endif

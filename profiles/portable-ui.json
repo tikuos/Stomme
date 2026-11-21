@@ -67,7 +67,8 @@
     "kits/interface/tiku_tabs_paint.c",
     "kits/interface/portable/tiku_font_portable.c",
     "kits/interface/portable/tiku_framebuffer.c",
-    "kits/interface/tiku_window.c"
+    "kits/interface/tiku_window.c",
+    "kits/interface/tiku_deskbar_paint.c"
   ],
   "capabilities": [
     "control-models",
@@ -89,6 +90,7 @@
     "paged-storage-subtrees",
     "paged-storage-volume-features",
     "paged-storage-tree-copy",
-    "window-workspace"
+    "window-workspace",
+    "deskbar-paint"
   ]
 }
