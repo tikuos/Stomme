@@ -95,7 +95,26 @@ int main(void)
     memset(deep + 32, ']', 32);
     deep[64] = 0;
     reject(deep);
+    {
+        /* Equality ignores member order, sees a nested difference, and
+         * never holds for an invalid value, even against itself. */
+        tiku_msg_t *one = NULL, *two = NULL, *other = NULL;
+        tiku_msg_t *broken = tiku_msg_new(0);
+
+        assert(!tiku_resource_literal_parse("json", "{\"a\":1,\"b\":{\"c\":[true,2]}}", &one));
+        assert(!tiku_resource_literal_parse("json", "{\"b\":{\"c\":[true,2]},\"a\":1}", &two));
+        assert(!tiku_resource_literal_parse("json", "{\"a\":1,\"b\":{\"c\":[true,3]}}", &other));
+        assert(tiku_resource_value_equal(one, two) && tiku_resource_value_equal(two, one));
+        assert(!tiku_resource_value_equal(one, other) && !tiku_resource_value_equal(other, one));
+        assert(broken && tiku_msg_add_string(broken, "type", "integer"));
+        assert(!tiku_resource_value_equal(broken, broken));
+        assert(!tiku_resource_value_equal(broken, one) && !tiku_resource_value_equal(one, broken));
+        tiku_msg_free(one);
+        tiku_msg_free(two);
+        tiku_msg_free(other);
+        tiku_msg_free(broken);
+    }
     puts(
-        "PASS resource literals: lossless custom types, Unicode, bounds and incomplete input");
+        "PASS resource literals: lossless custom types, Unicode, bounds, incomplete input and equality");
     return 0;
 }

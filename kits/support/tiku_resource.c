@@ -329,10 +329,32 @@ static int equal_value(const tiku_msg_t *a, const tiku_msg_t *b)
     return !strcmp(tiku_msg_find_string(a, "value", 0), tiku_msg_find_string(b, "value", 0));
 }
 
+/** @brief Whether @p a and @p b flatten to the same bytes. */
+static int same_bytes(const tiku_msg_t *a, const tiku_msg_t *b)
+{
+    size_t size = tiku_msg_flat_size(a);
+    unsigned char *bytes;
+    int same;
+
+    if (!size || size != tiku_msg_flat_size(b) || size > TIKU_RESOURCE_FRAME_MAX) return 0;
+    bytes = malloc(2 * size);
+    if (!bytes) return 0;
+    same = tiku_msg_flatten(a, bytes, size, NULL) &&
+           tiku_msg_flatten(b, bytes + size, size, NULL) &&
+           !memcmp(bytes, bytes + size, size);
+    free(bytes);
+    return same;
+}
+
 int tiku_resource_value_equal(const tiku_msg_t *a, const tiku_msg_t *b)
 {
-    if (tiku_resource_value_check(a) || tiku_resource_value_check(b)) return 0;
-    return a == b || equal_value(a, b);
+    if (tiku_resource_value_check(a)) return 0;
+    /* Once the first value is valid, a second with the same bytes is the
+     * same valid value; a second whose bytes differ is checked, then
+     * compared member by member in any order. */
+    if (a == b || same_bytes(a, b)) return 1;
+    if (tiku_resource_value_check(b)) return 0;
+    return equal_value(a, b);
 }
 
 void tiku_resource_snapshot_clear(tiku_resource_snapshot_t *snapshot)

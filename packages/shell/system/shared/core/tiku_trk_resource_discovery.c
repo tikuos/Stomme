@@ -39,6 +39,11 @@ static const struct {
             {"/schema/permissions", TIKU_RESOURCE_OBJECT},
             {"/schema/resource-kinds", TIKU_RESOURCE_ARRAY},
             {"/schema/schema-versions", TIKU_RESOURCE_OBJECT}};
+/* The registry and event observations are refreshed every 100 ms,
+ * multiplied by TIKU_SHELL_POLL_SCALE. */
+#ifndef TIKU_SHELL_POLL_SCALE
+#define TIKU_SHELL_POLL_SCALE 1
+#endif
 /** @brief Construct owned primitive values for typed observation members. */
 static tiku_msg_t *text(const char *value)
 {
@@ -250,7 +255,7 @@ void tiku_trk_resource_discovery_poll(tiku_trk_resource_discovery_t *owner,
     static const unsigned refresh[] = {9, 11, 12, 13};
     if (!owner || (now && now < owner->next_poll))
         return;
-    owner->next_poll = now + 100;
+    owner->next_poll = now + 100 * TIKU_SHELL_POLL_SCALE;
     tiku_resource_caller_t reader = {.authenticated = 1,
                                      .scopes = TIKU_RESOURCE_READ};
     strcpy(reader.principal, "00000000000000000000000000000001");

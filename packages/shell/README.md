@@ -46,9 +46,9 @@ A build may define smaller values for the sizes the shell and kits allocate:
 `TIKU_WINDOW_CACHE_BYTES` (window content caches, 64 MiB),
 `TIKU_EVENTS_MAX` (notices per batch, 128), `TIKU_REMOTE_SESSIONS` (8) and
 `TIKU_STATE_UPDATE_BYTES` (4 MiB). `TIKU_SHELL_POLL_SCALE` multiplies the
-settings providers' poll intervals. A platform without job threads defines
-`TIKU_WORK_INLINE` as 1, and `kits/support/tiku_work_inline.c` runs the jobs
-on the loop thread.
+settings providers' poll intervals and the resource discovery's refresh. A
+platform without job threads defines `TIKU_WORK_INLINE` as 1, and
+`kits/support/tiku_work_inline.c` runs the jobs on the loop thread.
 
 Product builds compile `build/foundation/system`. Its `shell-sources.json`
 records the selected source owner and hash. Matching tests are composed with
