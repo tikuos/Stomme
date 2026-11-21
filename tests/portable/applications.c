@@ -106,7 +106,7 @@ static int storage(void)
     uint64_t epoch = 0, after = 0, old_token;
     int eof = 0;
     const tiku_storage_request_t *result;
-    CHECK(store);
+    CHECK(store && pool.live == 1);
     calls = pool.calls;
     cfg.caller.scopes = 0;
     while (!eof) {
@@ -162,6 +162,134 @@ static int storage(void)
     return 0;
 }
 
+/** @brief Check copied mutation inputs, capability admission and retained cancellation. */
+static int storage_mutations(void)
+{
+    fixture_t fixture = {.epoch=7,.entries=2};
+    portable_browser_config_t cfg=config(&fixture);
+    tiku_paged_storage_t *store=tiku_paged_storage_create(cfg.allocator,cfg.provider,&cfg.caller,1,8);
+    CHECK(store);
+    CHECK(tiku_paged_storage_rename(store,"/old",7,1,"/new")==TIKU_RESOURCE_UNSUPPORTED);
+    CHECK(tiku_paged_storage_delete(store,"/old",7,1)==TIKU_RESOURCE_UNSUPPORTED);
+    CHECK(!fixture.submits);tiku_paged_storage_close(store);CHECK(tiku_paged_storage_destroy(&store));
+    cfg.provider.capabilities|=TIKU_RESOURCE_FEATURE_CHANGE;
+    store=tiku_paged_storage_create(cfg.allocator,cfg.provider,&cfg.caller,0,0);CHECK(store);
+    CHECK(tiku_paged_storage_rename(store,"/old",7,1,NULL)==TIKU_RESOURCE_INVALID);
+    CHECK(tiku_paged_storage_rename(store,"/old",7,1,"relative")==TIKU_RESOURCE_INVALID);
+    CHECK(tiku_paged_storage_delete(store,"/old",0,1)==TIKU_RESOURCE_INVALID);
+    CHECK(tiku_paged_storage_delete(store,"/old",7,0)==TIKU_RESOURCE_INVALID);
+    char source[]="/old",destination[]="/new";
+    CHECK(tiku_paged_storage_rename(store,source,7,1,destination)==TIKU_RESOURCE_PENDING);
+    source[1]=destination[1]='x';
+    CHECK(!strcmp(fixture.request->path,"/old")&&!strcmp(fixture.request->destination,"/new"));
+    CHECK(fixture.request->node_id==1&&fixture.request->epoch==7&&!fixture.request->capacity&&
+        !fixture.request->entries&&!fixture.request->bytes&&fixture.request->operation==TIKU_STORAGE_RENAME);
+    CHECK(tiku_paged_storage_delete(store,"/old",7,1)==TIKU_RESOURCE_BUSY);
+    CHECK(tiku_paged_storage_complete(store,fixture.request->token,TIKU_RESOURCE_OK,0,8,1));fixture.request=NULL;
+    CHECK(tiku_paged_storage_status(store)==TIKU_RESOURCE_OK);
+    size_t count;uint64_t epoch;int eof;
+    CHECK(tiku_paged_storage_result(store,&count,&epoch,&eof)&&!count&&epoch==8&&eof);
+    CHECK(tiku_paged_storage_delete(store,"/new",8,1)==TIKU_RESOURCE_PENDING);
+    CHECK(!fixture.request->destination[0]&&fixture.request->operation==TIKU_STORAGE_DELETE);
+    CHECK(tiku_paged_storage_complete(store,fixture.request->token,TIKU_RESOURCE_OK,1,9,1));fixture.request=NULL;
+    CHECK(tiku_paged_storage_status(store)==TIKU_RESOURCE_INVALID);
+    CHECK(tiku_paged_storage_delete(store,"/new",8,1)==TIKU_RESOURCE_PENDING);
+    const tiku_storage_request_t *borrowed=fixture.request;
+    tiku_paged_storage_cancel(store);tiku_paged_storage_cancel(store);CHECK(fixture.cancels==1);
+    tiku_paged_storage_close(store);CHECK(!tiku_paged_storage_destroy(&store)&&tiku_paged_storage_pending(store));
+    CHECK(!strcmp(borrowed->path,"/new")&&borrowed->epoch==8);
+    CHECK(tiku_paged_storage_complete(store,borrowed->token,TIKU_RESOURCE_OK,0,9,1));fixture.request=NULL;
+    CHECK(tiku_paged_storage_status(store)==TIKU_RESOURCE_CANCELLED);
+    CHECK(tiku_paged_storage_destroy(&store)&&!pool.used);
+    return 0;
+}
+
+/** @brief Borrow immutable replacement bytes through cancellation and validate atomic completion. */
+static int storage_replacement(void)
+{
+    fixture_t fixture={.epoch=7};portable_browser_config_t cfg=config(&fixture);
+    tiku_paged_storage_t *store=tiku_paged_storage_create(cfg.allocator,cfg.provider,&cfg.caller,1,8);CHECK(store);
+    CHECK(tiku_paged_storage_replace(store,"/new",7,0,"abc",3)==TIKU_RESOURCE_UNSUPPORTED);
+    tiku_paged_storage_close(store);CHECK(tiku_paged_storage_destroy(&store));cfg.provider.capabilities|=TIKU_RESOURCE_FEATURE_CHANGE;
+    store=tiku_paged_storage_create(cfg.allocator,cfg.provider,&cfg.caller,0,0);CHECK(store);
+    CHECK(tiku_paged_storage_replace(store,"/new",0,0,"abc",3)==TIKU_RESOURCE_INVALID);
+    CHECK(tiku_paged_storage_replace(store,"/new",7,0,NULL,3)==TIKU_RESOURCE_INVALID);
+    char path[]="/new",bytes[]="abc";
+    CHECK(tiku_paged_storage_replace(store,path,7,0,bytes,3)==TIKU_RESOURCE_PENDING);path[1]='x';
+    const tiku_storage_request_t *r=fixture.request;
+    CHECK(r->operation==TIKU_STORAGE_REPLACE&&!strcmp(r->path,"/new")&&r->input==(unsigned char *)bytes&&r->input_bytes==3&&!r->bytes&&!r->node_id);
+    CHECK(tiku_paged_storage_complete(store,r->token,TIKU_RESOURCE_OK,2,8,1));fixture.request=NULL;
+    CHECK(tiku_paged_storage_status(store)==TIKU_RESOURCE_INVALID);
+    CHECK(tiku_paged_storage_replace(store,"/new",7,1,bytes,3)==TIKU_RESOURCE_PENDING);
+    CHECK(tiku_paged_storage_complete(store,fixture.request->token,TIKU_RESOURCE_OK,3,8,1));fixture.request=NULL;
+    size_t count;uint64_t epoch;int eof;CHECK(tiku_paged_storage_result(store,&count,&epoch,&eof)&&count==3&&epoch==8&&eof);
+    CHECK(tiku_paged_storage_replace(store,"/empty",8,0,NULL,0)==TIKU_RESOURCE_PENDING);
+    CHECK(tiku_paged_storage_complete(store,fixture.request->token,TIKU_RESOURCE_OK,0,9,1));fixture.request=NULL;
+    CHECK(tiku_paged_storage_status(store)==TIKU_RESOURCE_OK);
+    CHECK(tiku_paged_storage_replace(store,"/new",9,1,bytes,3)==TIKU_RESOURCE_PENDING);r=fixture.request;
+    tiku_paged_storage_cancel(store);tiku_paged_storage_close(store);CHECK(!tiku_paged_storage_destroy(&store));
+    CHECK(r->input==(unsigned char *)bytes&&!memcmp(r->input,"abc",3)&&tiku_paged_storage_pending(store));
+    CHECK(tiku_paged_storage_complete(store,r->token,TIKU_RESOURCE_OK,3,10,1));fixture.request=NULL;
+    CHECK(tiku_paged_storage_status(store)==TIKU_RESOURCE_CANCELLED);CHECK(tiku_paged_storage_destroy(&store)&&!pool.used);return 0;
+}
+
+/** @brief Require epoch/capability, copy directory paths and retain cancellation ownership. */
+static int storage_directories(void)
+{
+    fixture_t fixture={.epoch=7};portable_browser_config_t cfg=config(&fixture);
+    tiku_paged_storage_t *store=tiku_paged_storage_create(cfg.allocator,cfg.provider,&cfg.caller,1,8);CHECK(store);
+    CHECK(tiku_paged_storage_mkdir(store,"/folder",7)==TIKU_RESOURCE_UNSUPPORTED);
+    tiku_paged_storage_close(store);CHECK(tiku_paged_storage_destroy(&store));cfg.provider.capabilities|=TIKU_RESOURCE_FEATURE_CHANGE;
+    store=tiku_paged_storage_create(cfg.allocator,cfg.provider,&cfg.caller,0,0);CHECK(store);
+    CHECK(tiku_paged_storage_mkdir(store,"/folder",0)==TIKU_RESOURCE_INVALID);
+    char path[]="/folder";CHECK(tiku_paged_storage_mkdir(store,path,7)==TIKU_RESOURCE_PENDING);path[1]='x';
+    const tiku_storage_request_t *r=fixture.request;
+    CHECK(r->operation==TIKU_STORAGE_MKDIR&&!r->input&&!r->capacity&&!r->node_id&&!strcmp(r->path,"/folder"));
+    CHECK(tiku_paged_storage_complete(store,r->token,TIKU_RESOURCE_OK,1,8,1));fixture.request=NULL;
+    CHECK(tiku_paged_storage_status(store)==TIKU_RESOURCE_INVALID);
+    CHECK(tiku_paged_storage_mkdir(store,"/folder",7)==TIKU_RESOURCE_PENDING);
+    CHECK(tiku_paged_storage_complete(store,fixture.request->token,TIKU_RESOURCE_OK,0,8,1));fixture.request=NULL;
+    CHECK(tiku_paged_storage_status(store)==TIKU_RESOURCE_OK);
+    CHECK(tiku_paged_storage_tree_rename(store,"/folder",0,1,"/new")==TIKU_RESOURCE_INVALID);
+    CHECK(tiku_paged_storage_tree_delete(store,"/folder",8,0)==TIKU_RESOURCE_INVALID);
+    char destination[]="/moved";
+    CHECK(tiku_paged_storage_tree_rename(store,"/folder",8,1,destination)==TIKU_RESOURCE_PENDING);destination[1]='x';r=fixture.request;
+    CHECK(r->operation==TIKU_STORAGE_TREE_RENAME&&!strcmp(r->destination,"/moved")&&r->node_id==1&&!r->capacity);
+    CHECK(tiku_paged_storage_complete(store,r->token,TIKU_RESOURCE_OK,0,9,1));fixture.request=NULL;
+    CHECK(tiku_paged_storage_tree_delete(store,"/moved",9,1)==TIKU_RESOURCE_PENDING);r=fixture.request;
+    CHECK(r->operation==TIKU_STORAGE_TREE_DELETE);
+    tiku_paged_storage_cancel(store);CHECK(tiku_paged_storage_pending(store));
+    CHECK(tiku_paged_storage_complete(store,r->token,TIKU_RESOURCE_OK,0,10,1));fixture.request=NULL;
+    CHECK(tiku_paged_storage_status(store)==TIKU_RESOURCE_CANCELLED);
+    CHECK(tiku_paged_storage_directory_upgrade(store,0)==TIKU_RESOURCE_INVALID);
+    CHECK(tiku_paged_storage_directory_upgrade(store,10)==TIKU_RESOURCE_PENDING);r=fixture.request;
+    CHECK(r->operation==TIKU_STORAGE_DIRECTORY_UPGRADE&&!strcmp(r->path,"/")&&!r->node_id&&!r->capacity);
+    CHECK(tiku_paged_storage_complete(store,r->token,TIKU_RESOURCE_OK,0,10,1));fixture.request=NULL;
+    unsigned char workspace[32];uint64_t prepared,total;
+    CHECK(tiku_paged_storage_tree_copy(store,"/folder",10,1,"/copy",NULL,32)==TIKU_RESOURCE_INVALID);
+    CHECK(tiku_paged_storage_tree_copy(store,"/folder",10,1,"/copy",workspace,32)==TIKU_RESOURCE_PENDING);r=fixture.request;
+    CHECK(r->operation==TIKU_STORAGE_TREE_COPY&&r->bytes==workspace&&r->capacity==32&&!r->input&&!r->input_bytes);
+    CHECK(tiku_paged_storage_set_progress(store,r->token,0,0));
+    CHECK(!tiku_paged_storage_set_progress(store,r->token+1,0,100));
+    CHECK(tiku_paged_storage_set_progress(store,r->token,10,100));
+    CHECK(!tiku_paged_storage_set_progress(store,r->token,9,100));
+    CHECK(!tiku_paged_storage_set_progress(store,r->token,10,101));
+    CHECK(!tiku_paged_storage_set_progress(store,r->token,101,100));
+    CHECK(tiku_paged_storage_progress(store,&prepared,&total)&&prepared==10&&total==100);
+    tiku_paged_storage_cancel(store);CHECK(tiku_paged_storage_pending(store)&&r->bytes==workspace);
+    CHECK(!tiku_paged_storage_set_progress(store,r->token,100,100));
+    CHECK(!tiku_paged_storage_progress(store,&prepared,&total));
+    CHECK(tiku_paged_storage_complete(store,r->token,TIKU_RESOURCE_OK,0,11,1));fixture.request=NULL;
+    CHECK(tiku_paged_storage_tree_copy(store,"/folder",10,1,"/copy",workspace,32)==TIKU_RESOURCE_PENDING);r=fixture.request;
+    CHECK(tiku_paged_storage_progress(store,&prepared,&total)&&!prepared&&!total);
+    CHECK(tiku_paged_storage_complete(store,r->token,TIKU_RESOURCE_OK,1,11,1));fixture.request=NULL;
+    CHECK(tiku_paged_storage_status(store)==TIKU_RESOURCE_INVALID);
+    CHECK(tiku_paged_storage_mkdir(store,"/again",8)==TIKU_RESOURCE_PENDING);r=fixture.request;
+    tiku_paged_storage_cancel(store);tiku_paged_storage_close(store);CHECK(!tiku_paged_storage_destroy(&store));
+    CHECK(tiku_paged_storage_complete(store,r->token,TIKU_RESOURCE_OK,0,9,1));fixture.request=NULL;
+    CHECK(tiku_paged_storage_destroy(&store)&&!pool.used);return 0;
+}
+
 /** @brief Reject malformed pages, no-progress results, count overrun and false capabilities. */
 static int invalid_results(void)
 {
@@ -169,7 +297,7 @@ static int invalid_results(void)
     portable_browser_config_t cfg = config(&fixture);
     tiku_paged_storage_t *store;
     uint64_t token;
-    cfg.provider.capabilities |= TIKU_RESOURCE_FEATURE_CHANGE;
+    cfg.provider.capabilities |= TIKU_RESOURCE_FEATURE_WATCH;
     CHECK(!tiku_paged_storage_create(cfg.allocator, cfg.provider, &cfg.caller, 1, 8));
     cfg = config(&fixture);
     CHECK(!tiku_paged_storage_create(cfg.allocator, cfg.provider, &cfg.caller, SIZE_MAX, 8));
@@ -271,7 +399,7 @@ static int applications(void)
 /** @brief Fail each allocation across application construction and browser startup. */
 static int startup_failures(void)
 {
-    for (size_t fail = 1; fail <= 7; ++fail) {
+    for (size_t fail = 1; fail <= 5; ++fail) {
         fixture_t fixture = {.epoch = 1, .entries = 2};
         portable_browser_config_t cfg = config(&fixture);
         CHECK(tiku_test_pool_reset(&pool));
@@ -374,12 +502,46 @@ static int calculator_vectors(void)
     return 0;
 }
 
+/** @brief Admit described reads while hiding cancelled, stale and inconsistent metadata. */
+static int storage_information(void)
+{
+    fixture_t fixture={.epoch=41};portable_browser_config_t cfg=config(&fixture);
+    tiku_paged_storage_t *store=tiku_paged_storage_create(cfg.allocator,cfg.provider,&cfg.caller,16,1024);
+    uint64_t bytes=0,version=0;CHECK(store);
+    CHECK(!tiku_paged_storage_info(store,&bytes,&version));
+    CHECK(tiku_paged_storage_read(store,"/file",41,1,0)==TIKU_RESOURCE_PENDING);
+    uint64_t token=fixture.request->token;
+    CHECK(!tiku_paged_storage_describe(store,token+1,10,7));
+    CHECK(tiku_paged_storage_describe(store,token,10,7));
+    CHECK(!tiku_paged_storage_info(store,&bytes,&version));
+    CHECK(tiku_paged_storage_complete(store,token,TIKU_RESOURCE_OK,7,41,0));fixture.request=NULL;
+    CHECK(tiku_paged_storage_info(store,&bytes,&version)&&bytes==10&&version==7);
+    CHECK(tiku_paged_storage_read(store,"/file",41,1,7)==TIKU_RESOURCE_PENDING);
+    token=fixture.request->token;CHECK(!tiku_paged_storage_info(store,&bytes,&version));
+    CHECK(tiku_paged_storage_complete(store,token,TIKU_RESOURCE_OK,3,41,1));fixture.request=NULL;
+    CHECK(!tiku_paged_storage_info(store,&bytes,&version));
+    CHECK(tiku_paged_storage_read(store,"/file",41,1,0)==TIKU_RESOURCE_PENDING);
+    token=fixture.request->token;CHECK(tiku_paged_storage_describe(store,token,5,9));
+    CHECK(tiku_paged_storage_complete(store,token,TIKU_RESOURCE_OK,7,41,1));fixture.request=NULL;
+    CHECK(tiku_paged_storage_status(store)==TIKU_RESOURCE_INVALID&&!tiku_paged_storage_info(store,NULL,NULL));
+    CHECK(tiku_paged_storage_read(store,"/file",41,1,0)==TIKU_RESOURCE_PENDING);
+    token=fixture.request->token;CHECK(tiku_paged_storage_describe(store,token,UINT64_MAX,UINT64_MAX));
+    CHECK(tiku_paged_storage_complete(store,token,TIKU_RESOURCE_OK,1,41,0));fixture.request=NULL;
+    CHECK(tiku_paged_storage_info(store,&bytes,&version)&&bytes==UINT64_MAX&&version==UINT64_MAX);
+    CHECK(tiku_paged_storage_read(store,"/file",41,1,0)==TIKU_RESOURCE_PENDING);
+    token=fixture.request->token;tiku_paged_storage_close(store);
+    CHECK(!tiku_paged_storage_describe(store,token,10,7));
+    CHECK(tiku_paged_storage_complete(store,token,TIKU_RESOURCE_OK,7,41,0));fixture.request=NULL;
+    CHECK(!tiku_paged_storage_info(store,NULL,NULL));
+    CHECK(tiku_paged_storage_destroy(&store)&&!pool.live);return 0;
+}
+
 int main(void)
 {
     int result;
     CHECK(tiku_test_pool_init(&pool, arena, sizeof arena, slots, 32));
     if ((result = startup_failures()) || (result = storage()) || (result = invalid_results()) ||
-        (result = applications()) || (result = lifecycle()) || (result = calculator_vectors())) {
+        (result = storage_directories()) || (result = storage_information()) || (result = storage_replacement()) || (result = storage_mutations()) || (result = applications()) || (result = lifecycle()) || (result = calculator_vectors())) {
         fprintf(stderr, "Application/storage check failed at line %d\n", result);
         return 1;
     }

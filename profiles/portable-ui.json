@@ -80,6 +80,13 @@
     "word-calculator",
     "text-field-provider",
     "text-field-events",
-    "word-checksum-input"
+    "word-checksum-input",
+    "paged-storage-mutation",
+    "paged-storage-replacement",
+    "paged-storage-info",
+    "paged-storage-directories",
+    "paged-storage-subtrees",
+    "paged-storage-volume-features",
+    "paged-storage-tree-copy"
   ]
 }
