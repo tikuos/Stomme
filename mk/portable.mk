@@ -147,3 +147,12 @@ check-field-event: $(BUILD)/field-event
 	$(BUILD)/field-event
 test: check-field check-field-event
 endif
+
+ifeq ($(FOUNDATION_TARGET),host-test)
+$(BUILD)/word-checksum: tests/portable/word_checksum.c tests/portable/heap_trap.c $(PORTABLE_LIBRARIES)
+	$(CC) $(CFLAGS) -Ipackages/apps/models $< tests/portable/heap_trap.c $(PORTABLE_LIBRARIES) -Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=free,--wrap=strdup -o $@
+.PHONY: check-word-checksum
+check-word-checksum: $(BUILD)/word-checksum
+	$(BUILD)/word-checksum
+test: check-word-checksum
+endif

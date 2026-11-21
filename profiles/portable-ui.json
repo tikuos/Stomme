@@ -79,6 +79,7 @@
     "paged-storage-read",
     "word-calculator",
     "text-field-provider",
-    "text-field-events"
+    "text-field-events",
+    "word-checksum-input"
   ]
 }

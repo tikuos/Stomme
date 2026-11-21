@@ -36,3 +36,13 @@ int tiku_word_bytes(const char *text, unsigned char out[64], size_t *bytes)
     while (length <= 128 && text[length]) ++length;
     return length <= 128 && calc_bytes(text, out, bytes);
 }
+
+int tiku_word_checksum_bytes(const char *text,int hex,unsigned char out[255],size_t *bytes)
+{
+    if(!text||!out||!bytes||(hex!=0&&hex!=1))return 0;
+    size_t n=0;while(n<=255&&text[n])++n;
+    if(n>255)return 0;
+    if(hex){if(!calc_bytes(text,out,&n))return 0;}
+    else for(size_t i=0;i<n;++i)out[i]=(unsigned char)text[i];
+    *bytes=n;return 1;
+}

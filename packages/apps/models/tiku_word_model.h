@@ -21,4 +21,8 @@ uint32_t tiku_word_crc32(const unsigned char *data, size_t bytes);
 uint16_t tiku_word_crc16(const unsigned char *data, size_t bytes);
 /** @brief Parse at most 128 hex characters into 64 bytes; output unspecified on error. */
 int tiku_word_bytes(const char *, unsigned char out[64], size_t *bytes);
+/** @brief Decode at most 255 source bytes as hex pairs or literal bytes into 255 bytes.
+ * @return 1 on success; 0 for invalid arguments/input, preserving *bytes on failure.
+ * Output contents are unspecified on failure; hex must be 0 or 1. */
+int tiku_word_checksum_bytes(const char *, int hex, unsigned char out[255], size_t *bytes);
 #endif
