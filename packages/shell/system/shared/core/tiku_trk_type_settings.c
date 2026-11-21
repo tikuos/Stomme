@@ -22,6 +22,12 @@
 #include <time.h>
 #include <unistd.h>
 
+/* A build may poll the settings files less often: each interval below is
+ * multiplied by TIKU_SHELL_POLL_SCALE. */
+#ifndef TIKU_SHELL_POLL_SCALE
+#define TIKU_SHELL_POLL_SCALE 1
+#endif
+
 #define TYPE_FILE_MAX 65536u
 #define TYPE_PATH_MAX 4096
 #define TYPE_IDENTITIES_MAX 80
@@ -979,7 +985,7 @@ void tiku_trk_type_settings_poll(tiku_trk_type_settings_t *owner)
     strcpy(job->path, owner->path);
     atomic_init(&job->cancelled, 0);
     if (post(job)) { release(job); return; }
-    owner->reader = job; owner->next_poll = now + 500;
+    owner->reader = job; owner->next_poll = now + 500 * TIKU_SHELL_POLL_SCALE;
 }
 
 void tiku_trk_type_settings_close(tiku_trk_type_settings_t *owner)

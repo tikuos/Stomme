@@ -375,6 +375,21 @@ rows_secondary(desktop_t *app, folder_t *fl, tiku_window_t *w, int row,
     (void)tiku_trk_click_press(&app->click, NULL, 0, 0, 3u, 0u, now);
 }
 
+/** @brief When a press happened, for pairing it with the press before: its
+ *  event's time where the platform keeps it on the tiku_trk_now() clock,
+ *  else now.  Holding a press is still timed from when it is handled. */
+static int64_t
+press_time(const tiku_event_t *ev)
+{
+#if TIKU_SHELL_EVENT_TIME
+    if (ev->time_us > 0 && ev->time_us <= tiku_trk_now()) {
+        return ev->time_us;
+    }
+#endif
+    (void)ev;
+    return tiku_trk_now();
+}
+
 /** @brief A primary press on the rows: the click updates the selection,
  *         a band begins in empty space, the selection is armed to be
  *         carried, a name may begin a rename, a second click opens. */
@@ -386,6 +401,7 @@ rows_primary(desktop_t *app, folder_t *fl, tiku_window_t *w, int row,
         ? tiku_trk_poseview_at(fl->view, row) : NULL;
     unsigned mods = pose_mods(ev);
     unsigned click_flags = 0;
+    int64_t at = press_time(ev);
     int twice;
 
     if (ev->modifiers & TIKU_MOD_SHIFT) {
@@ -395,7 +411,7 @@ rows_primary(desktop_t *app, folder_t *fl, tiku_window_t *w, int row,
         click_flags |= TIKU_TRK_CLICK_EXTEND | TIKU_TRK_CLICK_CONTROL;
     }
     twice = tiku_trk_click_press(&app->click, clicked, ev->x, ev->y,
-                                 ev->button, click_flags, now);
+                                 ev->button, click_flags, at);
     {
         tiku_rect_t c = tiku_trk_folder_window_content(fl);
         int ox = 0, oy = 0;
@@ -415,7 +431,7 @@ rows_primary(desktop_t *app, folder_t *fl, tiku_window_t *w, int row,
         tiku_trk_band_controller_arm(&app->band_controller, fl, ev->x, ev->y,
                                      mods);
         (void)tiku_trk_click_press(&app->click, NULL, 0, 0, ev->button, 0u,
-                                   now);
+                                   at);
         return;
     }
     if (row >= 0) {
@@ -423,7 +439,7 @@ rows_primary(desktop_t *app, folder_t *fl, tiku_window_t *w, int row,
     }
     tiku_trk_drag_target_reset(&app->drag_target);
     if (row >= 0 && tiku_trk_folder_window_name_at(fl, row, ev->x, ev->y)) {
-        (void)tiku_trk_poseview_name_clicked(fl->view, row, now);
+        (void)tiku_trk_poseview_name_clicked(fl->view, row, at);
     }
     if (twice) {
         row_opened(app, fl, w, row, ev);

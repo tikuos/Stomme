@@ -127,8 +127,32 @@
  * apart by the window id the services carry. */
 #define TIKU_TRK_EMBED_WINDOWS 8
 
-#define DESK_W 1000
-#define DESK_H  680
+/* The desktop's screen in pixels.  The shell configuration header may set
+ * TIKU_SHELL_SCREEN_W and TIKU_SHELL_SCREEN_H for its display. */
+#ifndef TIKU_SHELL_SCREEN_W
+#define TIKU_SHELL_SCREEN_W 1000
+#endif
+#ifndef TIKU_SHELL_SCREEN_H
+#define TIKU_SHELL_SCREEN_H 680
+#endif
+/* Whether the desktop publishes its state as observed resources for other
+ * processes: the desktop, its menus and selection, the Deskbar, the
+ * session, the windows, and the host and device observations.  A desktop
+ * with no such readers sets TIKU_SHELL_RESOURCE_PUBLICATION to 0; the
+ * native settings stay in the registry either way. */
+#ifndef TIKU_SHELL_RESOURCE_PUBLICATION
+#define TIKU_SHELL_RESOURCE_PUBLICATION 1
+#endif
+/* Whether the platform's input events carry their time on the
+ * tiku_trk_now() clock.  Where they do, a press in a folder is timed by
+ * when it happened, so two taps pair as a double click although the loop
+ * handles the second after drawing a frame.  X11 and Cocoa event times use
+ * the window system's clock, so those builds leave it 0. */
+#ifndef TIKU_SHELL_EVENT_TIME
+#define TIKU_SHELL_EVENT_TIME 0
+#endif
+#define DESK_W TIKU_SHELL_SCREEN_W
+#define DESK_H TIKU_SHELL_SCREEN_H
 #define COUNT_H  16
 
 /* How many entries a turn asks whether they carry a picture of their own;

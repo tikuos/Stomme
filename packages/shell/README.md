@@ -10,6 +10,9 @@ labels. Existing settings files retain their paths. Application manifests and
 assets stay in the product. `TIKU_SHELL_APP_TYPES_MAX` declares the product's
 handler capacity.
 
+`TIKU_SHELL_SCREEN_W` and `TIKU_SHELL_SCREEN_H` set the desktop surface in
+pixels; without them it is 1000 by 680.
+
 Three boolean constants select supported optional behavior:
 
 | Constant | Enabled behavior |
@@ -27,6 +30,25 @@ supervisor retain application ABI and SDK-identity checks.
 A desktop built without board services takes the host panel jobs from
 `system/desktop/tiku_desktop_panel_jobs.c`, extracted from Kintsugi, and
 carries no copy of its own.
+
+Two more constants default to a desktop computer's behavior:
+
+| Constant | Default | Meaning |
+| --- | --- | --- |
+| `TIKU_SHELL_RESOURCE_PUBLICATION` | 1 | Publish the desktop, its menus and windows, the Deskbar, the session and host observations as resources for other processes; at 0 only the native settings are registered |
+| `TIKU_SHELL_EVENT_TIME` | 0 | At 1 the platform's input events carry their time on the `tiku_trk_now()` clock, and a press in a folder pairs with the press before by event time |
+
+A build may define smaller values for the sizes the shell and kits allocate:
+`TIKU_TRK_POSES_MAX` (entries one folder view holds, 4096),
+`TIKU_TRK_NAV_DEPTH` (navigation menu levels, 8),
+`TIKU_TRK_NATIVE_ENTRIES_MAX` (1800), `TIKU_TRK_RESOURCE_PROVIDERS` (512),
+`TIKU_TRK_KEPT_PIXELS_BYTES` (folder windows' kept rows, unbounded),
+`TIKU_WINDOW_CACHE_BYTES` (window content caches, 64 MiB),
+`TIKU_EVENTS_MAX` (notices per batch, 128), `TIKU_REMOTE_SESSIONS` (8) and
+`TIKU_STATE_UPDATE_BYTES` (4 MiB). `TIKU_SHELL_POLL_SCALE` multiplies the
+settings providers' poll intervals. A platform without job threads defines
+`TIKU_WORK_INLINE` as 1, and `kits/support/tiku_work_inline.c` runs the jobs
+on the loop thread.
 
 Product builds compile `build/foundation/system`. Its `shell-sources.json`
 records the selected source owner and hash. Matching tests are composed with

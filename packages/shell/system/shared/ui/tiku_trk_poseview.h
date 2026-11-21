@@ -26,8 +26,11 @@
 #include "tiku_trk_view_defs.h"
 #include <stdint.h>
 
-/** @brief Maximum number of entries held by one pose view. */
+/** @brief Maximum number of entries held by one pose view; a build may
+ *  define a smaller bound.  Each view allocates arrays of this length. */
+#ifndef TIKU_TRK_POSES_MAX
 #define TIKU_TRK_POSES_MAX 4096
+#endif
 
 /**
  * @brief The MIME type that names a copied column layout.

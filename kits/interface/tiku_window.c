@@ -698,10 +698,16 @@ draw_button(tiku_surface_t *surface, int x, int y, int zoom, int active,
         zoom ? TIKU_TAB_ZOOM : TIKU_TAB_CLOSE, face, down);
 }
 
+/* The window content caches together stay within this many bytes; a
+ * build may define a smaller budget. */
+#ifndef TIKU_WINDOW_CACHE_BYTES
+#define TIKU_WINDOW_CACHE_BYTES (64u * 1024u * 1024u)
+#endif
+
 /**
  * @brief Copy the content just drawn in @p r into slot @p slot's cache,
  *        when all of @p r is inside the clip and the caches stay within
- *        64 MiB.
+ *        TIKU_WINDOW_CACHE_BYTES.
  */
 static void cache_capture(tiku_workspace_t *ws, int slot, tiku_rect_t r,
                            int active)
@@ -717,7 +723,7 @@ static void cache_capture(tiku_workspace_t *ws, int slot, tiku_rect_t r,
         cache_free(ws, slot); p = NULL;
     }
     if (!p) {
-        if (bytes > 64u*1024u*1024u - ws->cache_bytes) return;
+        if (bytes > (size_t)TIKU_WINDOW_CACHE_BYTES - ws->cache_bytes) return;
         p = tiku_surface_new(r.w, r.h, 0);
         if (!p) return;
         if (sc > 1 && tiku_surface_rescale(p, sc, 0)) {

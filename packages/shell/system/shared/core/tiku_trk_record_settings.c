@@ -20,6 +20,12 @@
 #include <time.h>
 #include <unistd.h>
 
+/* A build may poll the settings files less often: each interval below is
+ * multiplied by TIKU_SHELL_POLL_SCALE. */
+#ifndef TIKU_SHELL_POLL_SCALE
+#define TIKU_SHELL_POLL_SCALE 1
+#endif
+
 /** @brief Metadata for one existing Deskbar setting. */
 typedef struct {
     const char *key;
@@ -704,7 +710,7 @@ void tiku_trk_record_settings_poll(tiku_trk_record_settings_t *owner,
     }
     if(owner->job || now<owner->next_poll)return;
     publish(owner);
-    owner->next_poll=now+500;job=calloc(1,sizeof *job);if(!job)return;
+    owner->next_poll=now+500*TIKU_SHELL_POLL_SCALE;job=calloc(1,sizeof *job);if(!job)return;
     if(post(owner,job))release(job);
 }
 

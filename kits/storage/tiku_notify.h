@@ -55,8 +55,12 @@ typedef struct {
     unsigned         fields;                   /* TIKU_EVF_*, or 0   */
 } tiku_node_event_t;
 
-/** @brief The most notices one batch holds. */
+/** @brief The most notices one batch holds; past it the batch is marked
+ *  overflowed and the folder is listed again.  A build may define a
+ *  smaller count. */
+#ifndef TIKU_EVENTS_MAX
 #define TIKU_EVENTS_MAX 128
+#endif
 
 /** @brief A batch of notices, in arrival order. */
 typedef struct {

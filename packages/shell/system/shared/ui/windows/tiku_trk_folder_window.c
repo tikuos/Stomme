@@ -947,6 +947,26 @@ draw_folder_icon(tiku_trk_folder_window_t *folder,
     (void)tiku_icon_paint(surface, art, icon.x, icon.y, icon.w);
 }
 
+/* Every folder window's kept pixels together stay within this many bytes;
+ * a build may define a budget.  A window past it paints its rows
+ * into the frame. */
+#ifndef TIKU_TRK_KEPT_PIXELS_BYTES
+#define TIKU_TRK_KEPT_PIXELS_BYTES SIZE_MAX
+#endif
+static size_t kept_total;       /* bytes of kept pixels across the windows */
+
+/** @brief The bytes @p folder's kept pixels take now. */
+static size_t
+kept_bytes(const tiku_trk_folder_window_t *folder)
+{
+    if (folder->kept.px == NULL) {
+        return 0;
+    }
+    return (size_t)folder->kept.w * (size_t)folder->kept.scale *
+           (size_t)folder->kept.h * (size_t)folder->kept.scale *
+           sizeof(tiku_rgb_t);
+}
+
 /**
  * @brief The window's own pixels, sized to the rows it shows.
  *
@@ -965,13 +985,19 @@ keep_pixels(tiku_trk_folder_window_t *folder, int w, int h, int scale)
     }
     if (folder->kept.px == NULL || folder->kept.w != w ||
         folder->kept.h != h || folder->kept.scale != scale) {
-        tiku_rgb_t *px = realloc(folder->kept.px,
-                                      (size_t)w * (size_t)scale *
-                                      (size_t)h * (size_t)scale * sizeof *px);
+        size_t had = kept_bytes(folder);
+        size_t want = (size_t)w * (size_t)scale * (size_t)h *
+                      (size_t)scale * sizeof(tiku_rgb_t);
+        tiku_rgb_t *px;
 
+        if (want > (size_t)TIKU_TRK_KEPT_PIXELS_BYTES - (kept_total - had)) {
+            return 0;               /* past the budget */
+        }
+        px = realloc(folder->kept.px, want);
         if (px == NULL) {
             return 0;
         }
+        kept_total = kept_total - had + want;
         folder->kept.px = px;
         folder->kept.w = w;
         folder->kept.h = h;
@@ -986,6 +1012,7 @@ void
 tiku_trk_folder_window_forget(tiku_trk_folder_window_t *folder)
 {
     if (folder != NULL) {
+        kept_total -= kept_bytes(folder);
         free(folder->kept.px);
         folder->kept.px = NULL;
         folder->kept.w = 0;

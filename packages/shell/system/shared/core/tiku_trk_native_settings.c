@@ -18,7 +18,18 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#define NATIVE_ENTRIES_MAX 1800
+
+/* A build may poll the settings files less often: each interval below is
+ * multiplied by TIKU_SHELL_POLL_SCALE. */
+#ifndef TIKU_SHELL_POLL_SCALE
+#define TIKU_SHELL_POLL_SCALE 1
+#endif
+/* Entries the native settings table holds; past it the table reports
+ * overflow.  A build may define a smaller bound. */
+#ifndef TIKU_TRK_NATIVE_ENTRIES_MAX
+#define TIKU_TRK_NATIVE_ENTRIES_MAX 1800
+#endif
+#define NATIVE_ENTRIES_MAX TIKU_TRK_NATIVE_ENTRIES_MAX
 #define NATIVE_BYTES_MAX 8192
 
 /** @brief Native attribute grammar or an alias to an existing setting owner.
@@ -834,7 +845,7 @@ void tiku_trk_native_settings_poll(tiku_trk_native_settings_t *owner,
         if (tiku_store_native_attributes(owner->entries[i].store)) count++;
         else native_cached(&owner->entries[i]);
     }
-    native_publish(owner); owner->next_poll = now + 1000;
+    native_publish(owner); owner->next_poll = now + 1000 * TIKU_SHELL_POLL_SCALE;
     if (!count) return;
     job = calloc(1,sizeof *job); if (!job) return;
     job->reads = calloc(count, sizeof *job->reads);

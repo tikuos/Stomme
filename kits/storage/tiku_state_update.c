@@ -17,7 +17,12 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define UPDATE_BYTES (4u * 1024u * 1024u)
+/* The largest state file an update reads, and the buffer it reads into; a
+ * build may define a smaller bound. */
+#ifndef TIKU_STATE_UPDATE_BYTES
+#define TIKU_STATE_UPDATE_BYTES (4u * 1024u * 1024u)
+#endif
+#define UPDATE_BYTES TIKU_STATE_UPDATE_BYTES
 #define UPDATE_RECORDS 4096u
 
 /** @brief A complete regular-file capture, including absence. */

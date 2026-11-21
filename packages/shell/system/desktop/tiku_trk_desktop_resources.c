@@ -12,6 +12,12 @@
 #include "tiku_trk_native_record.h"
 #include <unistd.h>
 
+/* A build may poll the settings files less often: each interval below is
+ * multiplied by TIKU_SHELL_POLL_SCALE. */
+#ifndef TIKU_SHELL_POLL_SCALE
+#define TIKU_SHELL_POLL_SCALE 1
+#endif
+
 #define INTEGER(object, key, value)                                           \
     trk_value_member(                                                         \
         object, key,                                                          \
@@ -556,7 +562,7 @@ static void native_resources_poll(desktop_t *app, uint64_t now)
         tiku_trk_native_settings_poll(app->native_settings, now);
         return;
     }
-    app->resource_next_native_scan = now + 500;
+    app->resource_next_native_scan = now + 500 * TIKU_SHELL_POLL_SCALE;
     native_view_records(app,tiku_trk_desktop_view_folder(&app->desktop_view),1);
     for (i = 0; i < app->folder_count; i++)
         if (app->folders[i].win && app->folders[i].win->open)
@@ -616,10 +622,6 @@ int desktop_resources_open(desktop_t *app)
 {
     tiku_resource_registry_t *registry =
         tiku_trk_resource_session_registry(app->resource_session);
-    int i;
-    static const char *const keys[] = {"session-identity", "session-restore",
-                                       "session-startup", "session-state",
-                                       "session-windows"};
     if (!registry) return 0;
     app->native_settings =
         tiku_trk_native_settings_open(registry, app->record_settings);
@@ -639,6 +641,11 @@ int desktop_resources_open(desktop_t *app)
     tiku_trk_native_settings_add(app->native_settings, TIKU_TRK_NATIVE_SESSION,
                                  app->store, TIKU_KEY_SESSION);
     native_resources_poll(app,1);
+#if TIKU_SHELL_RESOURCE_PUBLICATION
+    int i;
+    static const char *const keys[] = {"session-identity", "session-restore",
+                                       "session-startup", "session-state",
+                                       "session-windows"};
     {
         static const char *const desktop_keys[] = {
             "desktop", "desktop-layout", "desktop-selection", "desktop-menus"};
@@ -670,6 +677,7 @@ int desktop_resources_open(desktop_t *app)
         desktop_resources_close(app);
         return -1;
     }
+#endif
     return 0;
 }
 

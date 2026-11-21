@@ -19,8 +19,12 @@
 /** @brief How many entries one level holds. */
 #define TIKU_TRK_NAV_MAX 256
 
-/** @brief How many levels deep a walk may go. */
+/** @brief How many levels deep a walk may go; a build may define fewer.
+ *  The navigator holds a level of TIKU_TRK_NAV_MAX entries for
+ *  each. */
+#ifndef TIKU_TRK_NAV_DEPTH
 #define TIKU_TRK_NAV_DEPTH 8
+#endif
 
 /** @brief How many entries one fill step adds. */
 #define TIKU_TRK_NAV_CHUNK 20

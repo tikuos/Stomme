@@ -206,9 +206,12 @@ menu_invoke(desktop_t *app, folder_t *fl, int command)
 void
 desktop_press_hold(desktop_t *app)
 {
+    /* A press whose release is already queued was not held, however long
+     * the turn that handled the press took. */
     if (app->press.down && !app->press.menu && app->popup == NULL &&
         app->press.folder != NULL &&
-        tiku_trk_now() - app->press.at > TIKU_TRK_CLICK_SPEED_US) {
+        tiku_trk_now() - app->press.at > TIKU_TRK_CLICK_SPEED_US &&
+        !tiku_host_events_queued(app->host)) {
         folder_t *pfl = app->press.folder;
         tiku_trk_pose_t *p = (app->press.row >= 0)
             ? tiku_trk_poseview_at(pfl->view, app->press.row) : NULL;

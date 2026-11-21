@@ -17,6 +17,12 @@
 #include <time.h>
 #include <unistd.h>
 
+/* A build may poll the settings files less often: each interval below is
+ * multiplied by TIKU_SHELL_POLL_SCALE. */
+#ifndef TIKU_SHELL_POLL_SCALE
+#define TIKU_SHELL_POLL_SCALE 1
+#endif
+
 enum { BACKGROUND, ICON_SIZE, HAVE_BACKGROUND, DESKTOP_FIELDS };
 static const char *const paths[] = {"/settings/desktop/bg",
                                     "/settings/desktop/icon_size",
@@ -612,7 +618,7 @@ void tiku_trk_desktop_settings_poll(tiku_trk_desktop_settings_t *owner,
         return;
     }
     if (owner->job || now < owner->next_poll) return;
-    desktop_publish(owner); owner->next_poll = now + 500;
+    desktop_publish(owner); owner->next_poll = now + 500 * TIKU_SHELL_POLL_SCALE;
     job = calloc(1, sizeof *job); if (!job) return;
     if (desktop_post(owner, job)) desktop_release(job);
 }

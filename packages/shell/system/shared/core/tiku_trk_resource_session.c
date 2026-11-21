@@ -21,6 +21,12 @@
 #include <time.h>
 #include <unistd.h>
 
+/* Providers the desktop's resource registry holds; a build may define a
+ * smaller count.  The registry allocates a record for each. */
+#ifndef TIKU_TRK_RESOURCE_PROVIDERS
+#define TIKU_TRK_RESOURCE_PROVIDERS 512
+#endif
+
 /** @brief One authenticated local stream, broker and idle deadline. */
 typedef struct {
     struct tiku_trk_resource_session *session;
@@ -281,7 +287,7 @@ tiku_trk_resource_session_open(tiku_backend_t *namespace_backend,
     strcpy(session->mount, mount);
     for(i=0;i<8;i++){session->peers[i].fd=-1;session->peers[i].session=session;}
     {
-        tiku_resource_limits_t limits={.providers=512,.resources=16384};
+        tiku_resource_limits_t limits={.providers=TIKU_TRK_RESOURCE_PROVIDERS,.resources=16384};
         session->registry=tiku_resource_registry_new(&limits);
     }
     if (!session->registry ||

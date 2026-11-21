@@ -30,8 +30,11 @@
 
 /** @brief The session version; a HELLO naming another ends the session. */
 #define TIKU_REMOTE_VERSION   1
-/** @brief Sessions the desktop holds at once. */
+/** @brief Sessions the desktop holds at once; a build may define a smaller
+ *  count.  The listener holds a session record for each. */
+#ifndef TIKU_REMOTE_SESSIONS
 #define TIKU_REMOTE_SESSIONS  8
+#endif
 /** @brief Windows one out-of-process application may hold at once. */
 #define TIKU_REMOTE_WINDOWS   8
 /** @brief A window title's bytes on the wire, NUL included. */
