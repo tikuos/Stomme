@@ -12,6 +12,7 @@
 const tiku_font_t *tiku_font_plain(void) { return tiku_font_subset_face(0, 12); }
 const tiku_font_t *tiku_font_bold(void) { return tiku_font_subset_face(1, 12); }
 const tiku_font_t *tiku_font_at(int pixels) { return tiku_font_subset_face(0, pixels); }
+const tiku_font_t *tiku_font_mono(int pixels) { (void)pixels;return tiku_font_plain(); }
 int tiku_font_size(void) { return 12; }
 unsigned tiku_font_generation(void) { return 1; }
 
@@ -51,13 +52,26 @@ void tiku_text(tiku_surface_t *surface, const tiku_font_t *font, int x, int y,
 {
     int face = face_number(font), pen = x;
     if (!surface || !text || face < 0 || surface->scale > 1) return;
+    if (surface->clip.w <= 0 || surface->clip.h <= 0) return;
     while (*text) {
         const tiku_glyph_t *glyph = tiku_font_subset_glyph(face, utf8_next(&text));
-        int row, column;
-        for (row = 0; row < glyph->h; ++row) {
-            for (column = 0; column < glyph->w; ++column) {
-                blend(surface, 1, pen + glyph->ox + column, y + glyph->oy + row,
-                      color, font->bits[glyph->off + row * glyph->w + column]);
+        int64_t left = (int64_t)pen + glyph->ox, top = (int64_t)y + glyph->oy;
+        int64_t first_x = surface->clip.x - left;
+        int64_t first_y = surface->clip.y - top;
+        int64_t end_x = (int64_t)surface->clip.x + surface->clip.w - left;
+        int64_t end_y = (int64_t)surface->clip.y + surface->clip.h - top;
+        if (first_x < 0) first_x = 0;
+        if (first_y < 0) first_y = 0;
+        if (end_x > glyph->w) end_x = glyph->w;
+        if (end_y > glyph->h) end_y = glyph->h;
+        if (first_x < end_x && first_y < end_y) {
+            int x0 = (int)first_x, x1 = (int)end_x;
+            int y0 = (int)first_y, y1 = (int)end_y;
+            for (int row = y0; row < y1; ++row) {
+                for (int column = x0; column < x1; ++column) {
+                    blend(surface, 1, (int)(left + column), (int)(top + row),
+                          color, font->bits[glyph->off + row * glyph->w + column]);
+                }
             }
         }
         if (pen > INT_MAX - glyph->adv) return;

@@ -204,13 +204,18 @@ static void
 blended_rect(tiku_surface_t *s, tiku_rect_t r, tiku_rgb_t face,
              int down)
 {
+    if (s == NULL || (!s->record &&
+        (r.x >= s->clip.x + s->clip.w || r.y >= s->clip.y + s->clip.h ||
+         r.x + r.w <= s->clip.x || r.y + r.h <= s->clip.y))) {
+        return;
+    }
     tiku_rgb_t start = down ? tiku_tint(face, TIKU_DARKEN_1)
                                  : tiku_tint(face,
                                                   TIKU_LIGHTEN_MAX);
     tiku_rgb_t end = down ? tiku_tint(face, TIKU_LIGHTEN_1)
                                : face;
     tiku_rect_t fill = tiku_inset(r, 1);
-    int x, y, span;
+    int x, y, span, x0 = 0, y0 = 0, x1 = fill.w, y1 = fill.h;
 
     if (r.w < 2 || r.h < 2) {
         return;
@@ -219,8 +224,18 @@ blended_rect(tiku_surface_t *s, tiku_rect_t r, tiku_rgb_t face,
     if (span <= 0) {
         span = 1;
     }
-    for (y = 0; y < fill.h; y++) {
-        for (x = 0; x < fill.w; x++) {
+    if (!s->record) {
+        if (fill.x < s->clip.x) { x0 = s->clip.x - fill.x; }
+        if (fill.y < s->clip.y) { y0 = s->clip.y - fill.y; }
+        if (fill.x + x1 > s->clip.x + s->clip.w) {
+            x1 = s->clip.x + s->clip.w - fill.x;
+        }
+        if (fill.y + y1 > s->clip.y + s->clip.h) {
+            y1 = s->clip.y + s->clip.h - fill.y;
+        }
+    }
+    for (y = y0; y < y1; y++) {
+        for (x = x0; x < x1; x++) {
             int t = ((x + y) * 255) / span;
             unsigned cr = (((start >> 16) & 0xFFu) * (255 - t) +
                            ((end >> 16) & 0xFFu) * t) / 255u;
