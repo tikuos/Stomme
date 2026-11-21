@@ -53,9 +53,9 @@ tick_clock(void *ctx)
         strcmp(stamp, app->clock_stamp) != 0) {
         /* The first stamp seen is recorded without a repaint: the
          * settings and a test fixture's frozen clock arrive after the
-         * loop starts. */
+         * loop starts.  The clock is drawn in the Deskbar. */
         if (app->clock_stamp[0] != '\0') {
-            desktop_damage_all(app);
+            desktop_damage(app, tiku_trk_deskbar_frame(app->deskbar));
         }
         snprintf(app->clock_stamp, sizeof app->clock_stamp, "%s", stamp);
     }
@@ -160,36 +160,226 @@ desktop_damage_all(desktop_t *app)
     app->dirty = 1;
 }
 
-/** @brief Accumulate known damage without weakening a full invalidation. */
+/** @brief The pixels in @p r. */
+static int64_t
+rect_area(tiku_rect_t r)
+{
+    return (int64_t)r.w * r.h;
+}
+
+/** @brief @p rect widened by the reach of a window's shadow. */
+static tiku_rect_t
+shadow_reach(tiku_rect_t rect)
+{
+    rect.x -= TIKU_WINDOW_SHADOW; rect.y -= TIKU_WINDOW_SHADOW;
+    rect.w += 2 * TIKU_WINDOW_SHADOW; rect.h += 2 * TIKU_WINDOW_SHADOW;
+    return rect;
+}
+
+/**
+ * @brief Accumulate known damage without weakening a full invalidation.
+ *
+ * A rectangle whose union with the damage already asked for would cover
+ * more than twice their two areas is drawn in the frame after instead.
+ */
 void desktop_damage(desktop_t *app, tiku_rect_t rect)
 {
+    tiku_rect_t joined;
+
     if (rect.w <= 0 || rect.h <= 0) return;
     /* dirty == 1 asks for a full frame; bounded damage never turns it
      * into a partial one. */
     if (app->dirty && app->dirty != 2) return;
     /* A window's shadow reaches past its frame: what a move of it
      * dirties is that much more on every side. */
-    rect.x -= TIKU_WINDOW_SHADOW; rect.y -= TIKU_WINDOW_SHADOW;
-    rect.w += 2 * TIKU_WINDOW_SHADOW; rect.h += 2 * TIKU_WINDOW_SHADOW;
-    app->damage = app->dirty ? tiku_rect_union(app->damage, rect) : rect;
-    app->dirty = 2;
+    rect = shadow_reach(rect);
+    if (!app->dirty) {
+        app->damage = rect;
+        app->dirty = 2;
+        return;
+    }
+    joined = tiku_rect_union(app->damage, rect);
+    if (rect_area(joined) > 2 * (rect_area(app->damage) + rect_area(rect))) {
+        app->damage_next = app->damage_next.w > 0
+            ? tiku_rect_union(app->damage_next, rect) : rect;
+        return;
+    }
+    app->damage = joined;
+}
+
+void
+desktop_damage_window(desktop_t *app, tiku_window_t *window)
+{
+    if (window == NULL) {
+        return;
+    }
+    tiku_workspace_cache_forget(app->desk, window);
+    desktop_damage(app, window->frame);
+}
+
+/** @brief FNV-1a over @p n bytes at @p data, continuing from @p h. */
+static uint32_t
+scope_mix(uint32_t h, const void *data, size_t n)
+{
+    const unsigned char *b = data;
+    size_t i;
+
+    for (i = 0; i < n; i++) {
+        h = (h ^ b[i]) * 16777619u;
+    }
+    return h;
+}
+
+/** @brief Where the open menus are drawn: none with no menu, all while a
+ *         navigator walk shows, whose levels are placed as they are drawn. */
+static tiku_rect_t
+scope_menu_area(desktop_t *app)
+{
+    tiku_rect_t area;
+
+    if (app->nav_on || app->spring_nav_on) {
+        return tiku_trk_damage_all();
+    }
+    if (app->popup == NULL) {
+        return tiku_trk_damage_none();
+    }
+    area = app->popup_frame;
+    if (app->popup_sub != NULL) {
+        area = tiku_rect_union(area, app->popup_sub_frame);
+    }
+    if (app->gbar_open >= 0) {
+        area = tiku_rect_union(area, global_bar_rect(app));
+    }
+    if (app->bar_fl != NULL && app->bar_fl->win != NULL) {
+        area = tiku_rect_union(area, app->bar_fl->win->frame);
+    }
+    return area;
+}
+
+void
+desktop_scope_begin(desktop_t *app, desktop_scope_t *scope)
+{
+    uint32_t h = 2166136261u;
+    const void *held[] = { app->popup, app->popup_sub, app->bar_fl,
+                           app->popup_fl };
+    int menus[] = { app->bar_open, app->gbar_open, app->gbar.open,
+                    app->menus.bar.open, app->nav_on, app->spring_nav_on,
+                    app->popup != NULL ? app->popup->hot : -1,
+                    app->popup_sub != NULL ? app->popup_sub->hot : -1 };
+    const void *edited[] = { app->folder_edit.rename_folder };
+    int overlays[] = { app->folder_edit.renaming, app->finding,
+                       app->qdrag_on, app->gbar_on, app->shot_pending,
+                       alert_model(app)->open,
+                       tiku_trk_drag_active(&app->drag),
+                       tiku_trk_titleview_tracking(&app->tstrip),
+                       tiku_trk_deskbar_raised(app->deskbar) };
+    int i, n = tiku_workspace_count(app->desk);
+
+    memset(scope, 0, sizeof *scope);
+    scope->count = n < TIKU_WINDOW_MAX ? n : TIKU_WINDOW_MAX;
+    scope->focused = tiku_workspace_focused(app->desk);
+    scope->bar_window = app->bar_fl != NULL ? app->bar_fl->win : NULL;
+    for (i = 0; i < scope->count; i++) {
+        tiku_window_t *w = tiku_workspace_at(app->desk, i);
+
+        scope->at[i].window = w;
+        scope->at[i].generation = w->generation;
+        scope->at[i].frame = w->frame;
+        scope->at[i].shown = (w->open != 0) | (w->minimized != 0) << 1 |
+                             (w->hidden != 0) << 2 | (w->plain != 0) << 3 |
+                             (w->auto_hide_tab != 0) << 4;
+        scope->at[i].pressed = w->pressed;
+        scope->at[i].title = scope_mix(h, w->title, strlen(w->title));
+    }
+    scope->menus = scope_mix(scope_mix(scope_mix(scope_mix(h, held,
+        sizeof held), menus, sizeof menus), &app->popup_frame,
+        sizeof app->popup_frame), &app->popup_sub_frame,
+        app->popup_sub != NULL ? sizeof app->popup_sub_frame : 0);
+    scope->menu_area = scope_menu_area(app);
+    scope->overlays = scope_mix(scope_mix(scope_mix(h, edited, sizeof edited),
+        overlays, sizeof overlays), app->status, strlen(app->status));
+}
+
+tiku_rect_t
+desktop_scope_bound(desktop_t *app, const desktop_scope_t *before,
+                    tiku_window_t *own, tiku_rect_t also, int menus)
+{
+    desktop_scope_t now;
+    tiku_rect_t damage = also;
+    int i, j;
+
+    desktop_scope_begin(app, &now);
+    if (app->dirty == 1 || now.count != before->count ||
+        now.overlays != before->overlays) {
+        return tiku_trk_damage_all();
+    }
+    if (now.menus != before->menus) {
+        if (!menus) {
+            return tiku_trk_damage_all();
+        }
+        /* A folder window draws its own menu bar in its content, the open
+         * menu's title lit, so its cached content no longer holds. */
+        if (before->bar_window != NULL) {
+            tiku_workspace_cache_forget(app->desk, before->bar_window);
+        }
+        if (now.bar_window != NULL) {
+            tiku_workspace_cache_forget(app->desk, now.bar_window);
+        }
+        damage = tiku_trk_damage_union(damage, before->menu_area);
+        damage = tiku_trk_damage_union(damage, now.menu_area);
+        if (tiku_trk_damage_is_all(damage)) {
+            return damage;
+        }
+    }
+    for (i = 0; i < now.count; i++) {
+        for (j = 0; j < before->count; j++) {
+            if (before->at[j].window == now.at[i].window) {
+                break;
+            }
+        }
+        if (j == before->count ||
+            before->at[j].generation != now.at[i].generation ||
+            before->at[j].shown != now.at[i].shown ||
+            memcmp(&before->at[j].frame, &now.at[i].frame,
+                   sizeof now.at[i].frame) != 0) {
+            return tiku_trk_damage_all();
+        }
+        if (j != i || before->at[j].pressed != now.at[i].pressed ||
+            before->at[j].title != now.at[i].title) {
+            damage = tiku_trk_damage_union(damage, now.at[i].frame);
+        }
+    }
+    if (now.focused != before->focused) {
+        if (before->focused != NULL) {
+            damage = tiku_trk_damage_union(damage, before->focused->frame);
+        }
+        if (now.focused != NULL) {
+            damage = tiku_trk_damage_union(damage, now.focused->frame);
+        }
+        damage = tiku_trk_damage_union(damage,
+                                       tiku_trk_deskbar_frame(app->deskbar));
+        if (app->gbar_on == 1) {
+            damage = tiku_trk_damage_union(damage, global_bar_rect(app));
+        }
+    }
+    if (own != NULL) {
+        tiku_workspace_cache_forget(app->desk, own);
+        damage = tiku_trk_damage_union(damage, own->frame);
+    }
+    return damage;
 }
 
 /**
- * @brief Draw a frame: only the damaged region after bounded damage, else
- *        the whole screen, from the backdrop up to the force-quit banner;
- *        and record what the frame cost.
+ * @brief Draw one frame at clock @p started: within @p damage, or the whole
+ *        screen when it is NULL, from the backdrop up to the force-quit
+ *        banner.
  */
-void
-draw_all(desktop_t *app)
+static void
+draw_frame(desktop_t *app, const tiku_rect_t *damage, int64_t started)
 {
-    follow_font(app);
-    int partial = app->dirty == 2;
-    int64_t started = tiku_trk_now();
-    /* The request is cleared before drawing, so an animation that asks
-     * for the next frame while this one is drawn keeps its request. */
-    app->dirty = 0;
-    tiku_clip_damage(app->surf, partial ? &app->damage : NULL);
+    int partial = damage != NULL;
+
+    tiku_clip_damage(app->surf, damage);
     app->frame_partial = partial;
     app->frame_damage = app->surf->clip;
     tiku_workspace_cache_mode(app->desk,
@@ -203,9 +393,8 @@ draw_all(desktop_t *app)
         (tiku_trk_titleview_tracking(&app->tstrip) != TIKU_TRK_TRACK_NONE)
             ? app->tstrip_fl : NULL;
 
-    tiku_fill(app->surf,
-                   (tiku_rect_t){ 0, 0, app->surf->w, app->surf->h },
-                   app->backdrop_color);
+    /* The workspace's draw begins by filling the clip with the backdrop,
+     * so the frame is not filled here as well. */
     desktop_publish_teams(app);    /* a row per application */
     /* Animations (a window rising as it opens) get the clock only with
      * a display and Reduce motion off; with no host the frames stay
@@ -238,6 +427,175 @@ draw_all(desktop_t *app)
     desktop_draw_splash(app);
     desktop_forcequit_overlay(app);
     tiku_clip_damage(app->surf, NULL);
+}
+
+#if TIKU_SHELL_DAMAGE_CHECK
+/** Comparisons made, after bounded frames and after input that drew no
+ *  frame, and those a full frame differed from. */
+static unsigned long damage_checked, damage_missed;
+
+/** @brief Print the check's totals as the process ends. */
+static void
+damage_summary(void)
+{
+    fprintf(stderr, "damage check: %lu checks, %lu missed\n",
+            damage_checked, damage_missed);
+}
+
+/**
+ * @brief Draw the frame just drawn within @p damage again in full, at the
+ *        same clock, and report the box of the pixels that differ.  The
+ *        full frame stays on the surface and is the one presented.
+ */
+static void
+damage_check(desktop_t *app, tiku_rect_t damage, int64_t started)
+{
+    tiku_surface_t *s = app->surf;
+    int sc = s->scale > 0 ? s->scale : 1;
+    size_t w = (size_t)s->w * sc, h = (size_t)s->h * sc, n = w * h;
+    tiku_rgb_t *bounded = malloc(n * sizeof *bounded);
+    int dirty = app->dirty, was_partial = app->frame_partial;
+    tiku_rect_t asked = app->damage, was_damage = app->frame_damage;
+    size_t x, y, differ = 0, x0 = w, y0 = h, x1 = 0, y1 = 0;
+
+    if (bounded == NULL) {
+        return;
+    }
+    if (damage_checked == 0) {
+        (void)atexit(damage_summary);
+    }
+    memcpy(bounded, s->px, n * sizeof *bounded);
+    draw_frame(app, NULL, started);
+    for (y = 0; y < h; y++) {
+        for (x = 0; x < w; x++) {
+            tiku_rect_t later = app->damage_next;
+            int put_off = later.w > 0 &&
+                (int)(x / sc) >= later.x && (int)(x / sc) < later.x + later.w &&
+                (int)(y / sc) >= later.y && (int)(y / sc) < later.y + later.h;
+
+            if (!put_off && bounded[y * w + x] != s->px[y * w + x]) {
+                differ++;
+                if (x < x0) { x0 = x; }
+                if (x > x1) { x1 = x; }
+                if (y < y0) { y0 = y; }
+                if (y > y1) { y1 = y; }
+            }
+        }
+    }
+    damage_checked++;
+    if (differ != 0) {
+        damage_missed++;
+        fprintf(stderr, "damage check: %zu pixels differ in %zu,%zu %zux%zu "
+                "after a frame bounded to %d,%d %dx%d (last input event %d "
+                "at %d,%d)\n", differ, x0 / sc, y0 / sc, (x1 - x0) / sc + 1,
+                (y1 - y0) / sc + 1, damage.x, damage.y, damage.w, damage.h,
+                (int)app->damage_check_event.type,
+                app->damage_check_event.x, app->damage_check_event.y);
+    }
+    free(bounded);
+    /* What the bounded frame asked of the next one, and what it drew,
+     * stand as they were. */
+    app->dirty = dirty;
+    app->damage = asked;
+    app->frame_partial = was_partial;
+    app->frame_damage = was_damage;
+}
+
+void
+desktop_damage_check_idle(desktop_t *app)
+{
+    tiku_surface_t *s = app->surf;
+    int sc = s->scale > 0 ? s->scale : 1;
+    size_t w = (size_t)s->w * sc, h = (size_t)s->h * sc, n = w * h;
+    tiku_rgb_t *shown = malloc(n * sizeof *shown);
+    size_t x, y, differ = 0, x0 = w, y0 = h, x1 = 0, y1 = 0;
+
+    if (shown == NULL) {
+        return;
+    }
+    if (damage_checked == 0) {
+        (void)atexit(damage_summary);
+    }
+    memcpy(shown, s->px, n * sizeof *shown);
+    draw_frame(app, NULL, tiku_trk_now());
+    for (y = 0; y < h; y++) {
+        for (x = 0; x < w; x++) {
+            if (shown[y * w + x] != s->px[y * w + x]) {
+                differ++;
+                if (x < x0) { x0 = x; }
+                if (x > x1) { x1 = x; }
+                if (y < y0) { y0 = y; }
+                if (y > y1) { y1 = y; }
+            }
+        }
+    }
+    damage_checked++;
+    if (differ != 0) {
+        damage_missed++;
+        fprintf(stderr, "damage check: %zu pixels differ in %zu,%zu %zux%zu "
+                "after input that drew no frame (event %d at %d,%d)\n",
+                differ, x0 / sc, y0 / sc, (x1 - x0) / sc + 1,
+                (y1 - y0) / sc + 1, (int)app->damage_check_event.type,
+                app->damage_check_event.x, app->damage_check_event.y);
+    }
+    free(shown);
+}
+#endif
+
+void
+desktop_damage_later(desktop_t *app, tiku_rect_t rect)
+{
+    if (rect.w <= 0 || rect.h <= 0) return;
+    rect = shadow_reach(rect);
+    app->damage_next = app->damage_next.w > 0
+        ? tiku_rect_union(app->damage_next, rect) : rect;
+}
+
+/** @brief Whether @p outer covers all of @p inner. */
+static int
+rect_covers(tiku_rect_t outer, tiku_rect_t inner)
+{
+    return inner.x >= outer.x && inner.y >= outer.y &&
+           inner.x + inner.w <= outer.x + outer.w &&
+           inner.y + inner.h <= outer.y + outer.h;
+}
+
+/**
+ * @brief Draw a frame: only the damaged region after bounded damage, else
+ *        the whole screen; and record what the frame cost.
+ */
+void
+draw_all(desktop_t *app)
+{
+    follow_font(app);
+    int partial = app->dirty == 2;
+    tiku_rect_t damage = app->damage;
+    int64_t started = tiku_trk_now();
+    /* The request is cleared before drawing, so an animation that asks
+     * for the next frame while this one is drawn keeps its request. */
+    app->dirty = 0;
+    draw_frame(app, partial ? &damage : NULL, started);
+#if TIKU_SHELL_DAMAGE_CHECK
+    if (partial) {
+        damage_check(app, damage, started);
+    }
+#endif
+    /* Damage put off to the frame after this one is drawn next, unless
+     * this frame covered it or a full frame is already asked for; it joins
+     * whatever else the next frame draws, so it is not put off again. */
+    if (app->damage_next.w > 0) {
+        tiku_rect_t later = app->damage_next;
+
+        app->damage_next = (tiku_rect_t){ 0, 0, 0, 0 };
+        if (partial && !rect_covers(app->frame_damage, later)) {
+            if (!app->dirty) {
+                app->damage = later;
+                app->dirty = 2;
+            } else if (app->dirty == 2) {
+                app->damage = tiku_rect_union(app->damage, later);
+            }
+        }
+    }
     int64_t elapsed = tiku_trk_now()-started;
     app->draw_us += elapsed;
     app->frame_samples[app->frame_sample_count++ % 128] = elapsed;

@@ -207,14 +207,16 @@ static int
 popup_press(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
 {
     desktop_t *app = self;
+    desktop_scope_t scope;
     tiku_window_t *fw;
     folder_t *ffl;
-    int pick = -1;
+    int pick = -1, chose = 0;
 
     *damage = tiku_trk_damage_all();
     if (app->nav_on && nav_press(app, ev)) {
         return 1;
     }
+    desktop_scope_begin(app, &scope);
 #if TIKU_SHELL_BOARD_SERVICES
 
     if (app->popup == &app->devtraymenu) {
@@ -235,6 +237,7 @@ popup_press(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
          * not highlighted.  pick stays set for a disabled row, so the
          * click dismisses the menus and does not reach the parent. */
         if (pick >= 0 && app->popup_sub->item[pick].enabled) {
+            chose = 1;
             if (app->popup_path[0] != '\0') {
                 (void)tiku_trk_folder_file_actions_invoke_path(
                     &app->file_actions, app->popup_path,
@@ -254,8 +257,11 @@ popup_press(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
                 app->popup_sub_frame = tiku_menu_place_sub(app->popup, pick,
                     app->popup_frame,
                     (tiku_rect_t){ 0, 0, app->surf->w, app->surf->h });
+                *damage = desktop_scope_bound(app, &scope, NULL,
+                                              tiku_trk_damage_none(), 1);
                 return 1;
             }
+            chose = 1;
             if (app->popup_path[0] != '\0') {
                 popup_path_pick(app, app->popup->item[pick].command);
             } else {
@@ -272,6 +278,12 @@ popup_press(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
     app->gbar_open = -1;
     app->gbar.open = -1;
     app->menus.bar.open = -1;
+    /* A choice may change anything; a dismissal clears where the menus
+     * were. */
+    if (!chose) {
+        *damage = desktop_scope_bound(app, &scope, NULL,
+                                      tiku_trk_damage_none(), 1);
+    }
     return 1;
 }
 
@@ -366,6 +378,7 @@ static int
 gbar_press(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
 {
     desktop_t *app = self;
+    desktop_scope_t scope;
     tiku_rect_t strip;
     int bi;
 
@@ -395,6 +408,7 @@ gbar_press(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
     if (bi < 0) {
         return 0;
     }
+    desktop_scope_begin(app, &scope);
     commit_rename(app, 1);
     app->gbar_open = bi;
     app->gbar.open = bi;
@@ -403,7 +417,8 @@ gbar_press(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
     app->popup_frame = tiku_menubar_panel(&app->gbar, strip,
         (tiku_rect_t){ 0, 0, app->surf->w, app->surf->h });
     app->nav_on = 0;
-    *damage = tiku_trk_damage_all();
+    /* The strip, whose title lights, and the panel that dropped. */
+    *damage = desktop_scope_bound(app, &scope, NULL, strip, 1);
     return 1;
 #if TIKU_SHELL_BOARD_SERVICES
 

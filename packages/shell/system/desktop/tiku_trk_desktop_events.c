@@ -82,6 +82,10 @@ deliver(desktop_t *app, const tiku_event_t *ev)
 
     (void)tiku_trk_responders_deliver(&app->responders, ev, &taken);
     desktop_take_damage(app, taken);
+#if TIKU_SHELL_DAMAGE_CHECK
+    app->damage_check_input = 1;
+    app->damage_check_event = *ev;
+#endif
 }
 
 /** @brief A button went down: the surface under the pointer answers. */
@@ -325,6 +329,14 @@ desktop_turn_end(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
         }
         desktop_screenshot_tick(app);
     }
+#if TIKU_SHELL_DAMAGE_CHECK
+    if (app->damage_check_input && !app->dirty) {
+        desktop_damage_check_idle(app);
+    }
+    if (!app->dirty) {
+        app->damage_check_input = 0;
+    }
+#endif
     desktop_progress_tick(app);
     if (o->deadline > 0 && tiku_trk_now() > o->deadline) {
         app->running = 0;

@@ -197,7 +197,7 @@ tab_box_move(desktop_t *app, const tiku_event_t *ev, tiku_rect_t *damage)
     on = tab_box_under(app, ev->x, ev->y);
     if ((app->box_press->pressed != 0) != on) {
         app->box_press->pressed = on ? app->box_hit : 0;
-        *damage = tiku_trk_damage_all();
+        *damage = app->box_press->frame;
     }
     return 1;
 }
@@ -210,18 +210,23 @@ static int
 tab_box_release(desktop_t *app, const tiku_event_t *ev, tiku_rect_t *damage)
 {
     tiku_window_t *w = app->box_press;
+    desktop_scope_t scope;
     int hit = app->box_hit, on;
 
     if (w == NULL) {
         return 0;
     }
     on = tab_box_under(app, ev->x, ev->y);
+    desktop_scope_begin(app, &scope);
     w->pressed = 0;
     app->box_press = NULL;
-    *damage = tiku_trk_damage_all();
     if (on && w->open) {
         tab_box_act(app, w, hit, app->box_mods);
     }
+    /* A box that acted closed, zoomed or shaded its window: all.  One let
+     * go off the box redraws only its own frame. */
+    *damage = on ? tiku_trk_damage_all()
+                 : desktop_scope_bound(app, &scope, NULL, w->frame, 0);
     return 1;
 }
 
@@ -395,6 +400,9 @@ windows_press(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
         return 0;               /* the desk itself is the folders' */
     }
     if (hit != TIKU_HIT_CONTENT) {
+        desktop_scope_t scope;
+
+        desktop_scope_begin(app, &scope);
         if (app->folder_edit.renaming &&
             app->folder_edit.rename_folder != NULL &&
             app->folder_edit.rename_folder->win != NULL &&
@@ -402,7 +410,6 @@ windows_press(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
             commit_rename(app, 1);
         }
         tiku_workspace_activate(app->desk, w);
-        *damage = tiku_trk_damage_all();
         if (hit == TIKU_HIT_ZOOM || hit == TIKU_HIT_CLOSE) {
             w->pressed = hit;
             app->box_press = w;
@@ -412,6 +419,9 @@ windows_press(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
             app->resize_track = (hit == TIKU_HIT_RESIZE) ? w : NULL;
             tiku_workspace_begin_track(app->desk, w, hit, ev->x, ev->y);
         }
+        /* A press on a frame raises the window and may hold a tab box down:
+         * the windows restacked and the two that traded the focus. */
+        *damage = desktop_scope_bound(app, &scope, NULL, w->frame, 0);
         return 1;
     }
 #if TIKU_SHELL_BOARD_SERVICES

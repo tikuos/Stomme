@@ -446,20 +446,172 @@ rows_primary(desktop_t *app, folder_t *fl, tiku_window_t *w, int row,
     }
 }
 
-/** @brief A press in a folder's content. */
+/** How many of a view's poses view_looks_note() records. */
+#define VIEW_LOOKS_MAX 256
+
+/** @brief How a folder's poses were drawn before a handler ran, and where
+ *         the view placed them. */
+typedef struct {
+    int count;                  /**< poses recorded, or -1 for too many */
+    int mode, scroll, hscroll, row_h, ox, oy;
+    tiku_rect_t content;        /**< the folder's content on the screen */
+    unsigned char look[VIEW_LOOKS_MAX]; /**< bit 0 selected, bit 1 held */
+} view_looks_t;
+
+/** @brief How pose @p k of @p fl is drawn: selected, and held under the
+ *         button as the folder window's drawing decides it. */
+static unsigned char
+view_look(desktop_t *app, folder_t *fl, int k)
+{
+    tiku_trk_pose_t *p = tiku_trk_poseview_at(fl->view, k);
+    int held = app->press.down && app->press.folder == fl &&
+               app->press.row == k;
+
+    return (unsigned char)(((p != NULL && p->selected) ? 1u : 0u) |
+                           (held ? 2u : 0u));
+}
+
+/** @brief Record how @p fl's poses are drawn and where. */
+static void
+view_looks_note(desktop_t *app, folder_t *fl, view_looks_t *v)
+{
+    int k, n = tiku_trk_poseview_count(fl->view);
+
+    v->count = (n <= VIEW_LOOKS_MAX) ? n : -1;
+    v->mode = tiku_trk_poseview_mode(fl->view);
+    v->scroll = tiku_trk_poseview_scroll(fl->view);
+    v->hscroll = tiku_trk_poseview_hscroll(fl->view);
+    v->row_h = tiku_trk_poseview_row_height(fl->view);
+    v->ox = v->oy = 0;
+    tiku_trk_poseview_origin(fl->view, &v->ox, &v->oy);
+    v->content = tiku_trk_folder_window_content(fl);
+    for (k = 0; k < v->count; k++) {
+        v->look[k] = view_look(app, fl, k);
+    }
+}
+
+/**
+ * @brief Where @p fl's poses changed look since view_looks_note(), on the
+ *        screen: their rows in list mode, their icons and labels in the
+ *        icon modes.  In a window (@p window nonzero) whose selection
+ *        changed, the count line is damaged for the frame after.
+ * @return all when poses came or went, when the view scrolled, changed mode
+ *         or row height, when its content moved, when more than
+ *         VIEW_LOOKS_MAX were there, or while a band is swept.
+ */
+static tiku_rect_t
+view_looks_damage(desktop_t *app, folder_t *fl, const view_looks_t *v,
+                  int window)
+{
+    tiku_rect_t damage = tiku_trk_damage_none();
+    tiku_rect_t c = tiku_trk_folder_window_content(fl);
+    int k, ox = 0, oy = 0, selection = 0;
+
+    tiku_trk_poseview_origin(fl->view, &ox, &oy);
+    if (v->count < 0 || v->count != tiku_trk_poseview_count(fl->view) ||
+        v->mode != tiku_trk_poseview_mode(fl->view) ||
+        v->scroll != tiku_trk_poseview_scroll(fl->view) ||
+        v->hscroll != tiku_trk_poseview_hscroll(fl->view) ||
+        v->row_h != tiku_trk_poseview_row_height(fl->view) ||
+        v->ox != ox || v->oy != oy ||
+        memcmp(&v->content, &c, sizeof c) != 0 ||
+        tiku_trk_poseview_band(fl->view)) {
+        return tiku_trk_damage_all();
+    }
+    for (k = 0; k < v->count; k++) {
+        tiku_trk_pose_t *p = tiku_trk_poseview_at(fl->view, k);
+        tiku_rect_t r;
+        unsigned char now;
+
+        if (p == NULL || (now = view_look(app, fl, k)) == v->look[k]) {
+            continue;
+        }
+        selection |= (now ^ v->look[k]) & 1u;
+        tiku_trk_poseview_pose_rect(fl->view, p, &r.x, &r.y, &r.w, &r.h);
+        if (v->mode == TIKU_TRK_MODE_LIST) {
+            /* A row spans the content; rows above the scroll are out of
+             * sight. */
+            r.x = c.x;
+            r.w = c.w;
+            r.y += c.y + 2 - v->scroll * v->row_h;
+        } else {
+            r.x += c.x + 2 - ox;
+            r.y += c.y + 2 - oy;
+        }
+        damage = tiku_trk_damage_union(damage, r);
+    }
+    if (window && selection) {
+        /* The count line says how many are selected; it follows the rows
+         * in the next frame, as their union would be most of the window. */
+        desktop_damage_later(app, (tiku_rect_t){
+            c.x, c.y + c.h - COUNT_H, c.w, COUNT_H });
+    }
+    return damage;
+}
+
+/**
+ * @brief The damage of a handler on folder @p fl, shown in window @p w or
+ *        on the desk, given what it changed in the view (@p looks) and
+ *        elsewhere (@p scope).  When only poses changed look, only they are
+ *        repainted, and the window's cached content is forgotten; when the
+ *        view changed otherwise, the whole window is.
+ */
+static tiku_rect_t
+folder_damage(desktop_t *app, const desktop_scope_t *scope, folder_t *fl,
+              tiku_window_t *w, const view_looks_t *looks)
+{
+    tiku_rect_t mine = view_looks_damage(app, fl, looks, w != NULL);
+
+    if (w != NULL && tiku_trk_damage_is_all(mine)) {
+        return desktop_scope_bound(app, scope, w, tiku_trk_damage_none(), 1);
+    }
+    if (w != NULL && !tiku_trk_damage_is_none(mine)) {
+        tiku_workspace_cache_forget(app->desk, w);
+    }
+    return desktop_scope_bound(app, scope, NULL, mine, 1);
+}
+
+static int folders_press_on(desktop_t *app, folder_t *fl, tiku_window_t *w,
+                            const tiku_event_t *ev, int *rows);
+
+/**
+ * @brief A press in a folder's content.  A press on the rows that changes
+ *        only how poses look repaints those poses, and the count line when
+ *        the selection changed; a press on the window's bars repaints the
+ *        window; menus it opens and windows it raises are added by the scope.
+ */
 static int
 folders_press(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
 {
     desktop_t *app = self;
     tiku_window_t *w;
     folder_t *fl = folder_under(app, ev->x, ev->y, &w);
-    int64_t now = tiku_trk_now();
-    int row;
+    desktop_scope_t scope;
+    view_looks_t looks;
+    int taken, rows = 0;
 
     *damage = tiku_trk_damage_all();
     if (fl == NULL || fl->view == NULL) {
         return 0;
     }
+    desktop_scope_begin(app, &scope);
+    view_looks_note(app, fl, &looks);
+    taken = folders_press_on(app, fl, w, ev, &rows);
+    *damage = (w != NULL && !rows)
+        ? desktop_scope_bound(app, &scope, w, tiku_trk_damage_none(), 1)
+        : folder_damage(app, &scope, fl, w, &looks);
+    return taken;
+}
+
+/** @brief Carry out a press on folder @p fl, in window @p w or on the desk;
+ *         *@p rows is set when the press went to the rows. */
+static int
+folders_press_on(desktop_t *app, folder_t *fl, tiku_window_t *w,
+                 const tiku_event_t *ev, int *rows)
+{
+    int64_t now = tiku_trk_now();
+    int row;
+
     if (w != NULL && ev->button == 1u) {
         if (icon_press(app, fl, w, ev) || bar_press(app, fl, w, ev) ||
             scrollbar_press(app, fl, ev) || strip_press(app, fl, w, ev)) {
@@ -475,6 +627,7 @@ folders_press(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
         return 1;
     }
     row = tiku_trk_folder_window_row_at(fl, ev->x, ev->y);
+    *rows = 1;
     if (ev->button == 3u) {
         rows_secondary(app, fl, w, row, ev, now);
     } else {
@@ -576,20 +729,47 @@ rows_menu(desktop_t *app, const tiku_event_t *ev)
         (tiku_rect_t){ 0, 0, app->surf->w, app->surf->h });
 }
 
+static int folders_release_on(desktop_t *app, const tiku_event_t *ev);
+
 /**
  * @brief A release: a tracked column title is released, a band ends, a
  *        drag drops (on a spring entry, the file panel, an Info icon or the
  *        folder under the pointer), a secondary press held still opens its
  *        menu, a press that did not become a drag raises its window, and
- *        the press ends.
+ *        the press ends.  A release that changes only how the pressed
+ *        folder's poses look repaints those poses, and the count line when
+ *        the selection changed; a band or a scroll bar let go repaints
+ *        everything.
  */
 static int
 folders_release(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
 {
     desktop_t *app = self;
+    tiku_window_t *w = app->press.window;
+    folder_t *fl = (app->press.folder != NULL &&
+                    app->press.folder->view != NULL) ? app->press.folder : NULL;
+    int swept = app->sbar_fl != NULL || app->band_controller.folder != NULL;
+    desktop_scope_t scope;
+    view_looks_t looks;
+    int taken;
+
+    desktop_scope_begin(app, &scope);
+    if (fl != NULL) {
+        view_looks_note(app, fl, &looks);
+    }
+    taken = folders_release_on(app, ev);
+    *damage = swept ? tiku_trk_damage_all()
+        : (fl != NULL) ? folder_damage(app, &scope, fl, w, &looks)
+        : desktop_scope_bound(app, &scope, NULL, tiku_trk_damage_none(), 1);
+    return taken;
+}
+
+/** @brief Carry out a release: see folders_release(). */
+static int
+folders_release_on(desktop_t *app, const tiku_event_t *ev)
+{
     int dropped = tiku_trk_drag_active(&app->drag);
 
-    *damage = tiku_trk_damage_all();
     if (tiku_trk_titleview_tracking(&app->tstrip) != TIKU_TRK_TRACK_NONE &&
         app->tstrip_fl != NULL) {
         tiku_rect_t st = tiku_trk_folder_window_title(app->tstrip_fl);

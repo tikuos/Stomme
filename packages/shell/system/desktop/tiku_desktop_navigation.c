@@ -220,9 +220,9 @@ desktop_spring_tick(desktop_t *app)
                 budget--;
                 /* The view marks only the pose's row, which keeps the
                  * damage a notice has recorded in it (PVL-075); the
-                 * desktop still asks for a full frame. */
+                 * desktop repaints that folder's window. */
                 tiku_trk_poseview_damage_row(fl->view, k);
-                desktop_damage_all(app);
+                desktop_damage_window(app, fl->win);
             }
         }
     }

@@ -50,6 +50,12 @@ settings providers' poll intervals and the resource discovery's refresh. A
 platform without job threads defines `TIKU_WORK_INLINE` as 1, and
 `kits/support/tiku_work_inline.c` runs the jobs on the loop thread.
 
+`TIKU_SHELL_DAMAGE_CHECK` at 1 draws every bounded frame again in full at the
+same clock and compares the two, and compares a turn that took input but drew
+no frame with a full frame. Damage put off to the next frame is not counted.
+At exit the desktop prints how many comparisons it made and how many found
+pixels that differ; each of those prints the box of the differing pixels.
+
 Product builds compile `build/foundation/system`. Its `shell-sources.json`
 records the selected source owner and hash. Matching tests are composed with
 the application test view, and their ownership is recorded in

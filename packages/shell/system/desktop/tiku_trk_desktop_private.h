@@ -151,6 +151,13 @@
 #ifndef TIKU_SHELL_EVENT_TIME
 #define TIKU_SHELL_EVENT_TIME 0
 #endif
+/* A check build draws every bounded frame a second time in full, at the
+ * same clock, and reports on standard error where the two differ: pixels
+ * outside the damage that a full frame would have changed.  The full frame
+ * is what is shown.  Test builds set it to 1. */
+#ifndef TIKU_SHELL_DAMAGE_CHECK
+#define TIKU_SHELL_DAMAGE_CHECK 0
+#endif
 #define DESK_W TIKU_SHELL_SCREEN_W
 #define DESK_H TIKU_SHELL_SCREEN_H
 #define COUNT_H  16
@@ -289,6 +296,8 @@ typedef struct desktop {
     int                  dirty;         /**< 1 full repaint, 2
                                          *   bounded repaint */
     tiku_rect_t          damage;        /**< the bounded repaint's area */
+    tiku_rect_t          damage_next;   /**< drawn in the frame after the
+                                         *   next, or zero width */
     int                  frame_partial; /**< the last frame was bounded */
     tiku_rect_t          frame_damage;  /**< the last frame's clip, which
                                          *   blit() presents when the
@@ -297,6 +306,10 @@ typedef struct desktop {
                                          *   monotonic microseconds */
     /** Frames drawn whole and bounded, and pixels drawn. */
     uint64_t             full_frames, partial_frames, frame_pixels;
+#if TIKU_SHELL_DAMAGE_CHECK
+    int                  damage_check_input; /**< this turn delivered input */
+    tiku_event_t         damage_check_event; /**< the last input delivered */
+#endif
     /** Microseconds spent drawing and presenting, and frames that took over
      * 16.7 ms to draw. */
     uint64_t             draw_us, present_us, slow_frames;
@@ -1203,9 +1216,71 @@ int desktop_devtray_tip(desktop_t *app, char *out, size_t max);
 
 /* tiku_trk_desktop_draw.c */
 int resize_desktop(desktop_t *app, int width, int height);
+
+/**
+ * @brief What is on the screen outside the content of any one window, as
+ *        desktop_scope_begin() found it: the windows in stacking order with
+ *        their frames and dress, the focus, and a hash of the menus and of
+ *        the status line, the alert, a rename, a drag and the other
+ *        overlays.
+ */
+typedef struct {
+    int count;                      /**< windows recorded, bottom first */
+    tiku_window_t *focused;         /**< the focused window, or NULL */
+    struct {
+        tiku_window_t *window;
+        uint64_t generation;        /**< tells a reused slot apart */
+        tiku_rect_t frame;
+        int shown;                  /**< open, minimized, hidden, plain */
+        int pressed;                /**< the tab box held down */
+        uint32_t title;             /**< a hash of the title */
+    } at[TIKU_WINDOW_MAX];
+    uint32_t menus;                 /**< the open menus */
+    tiku_rect_t menu_area;          /**< where they are drawn; all for a walk */
+    tiku_window_t *bar_window;      /**< the folder window whose own menu bar
+                                     *   has a menu open, or NULL */
+    uint32_t overlays;              /**< everything else outside the windows */
+} desktop_scope_t;
+
+/** @brief Record what a handler may change outside one window's content. */
+void desktop_scope_begin(desktop_t *app, desktop_scope_t *scope);
+/**
+ * @brief The damage of a handler that ran since desktop_scope_begin() and
+ *        changed the content of @p own (NULL for none) and the rectangle
+ *        @p also (empty for none).
+ *
+ * All, when the handler asked for a full frame, when a window opened,
+ * closed, moved, resized, hid or showed, or when an overlay changed.
+ * Otherwise @p own's frame and @p also, with the frames of the windows that
+ * were restacked or redressed and, when the focus moved, of the windows that
+ * lost and gained it, the Deskbar and the global bar.
+ * @note With @p menus nonzero the menus may have opened, closed or changed:
+ * the area they covered before and cover now is added, and the cached
+ * content of a folder window whose menu bar held a menu before or holds one
+ * now is forgotten; with it zero a change of the menus gives all.  @p own's
+ * cached content is forgotten.
+ */
+tiku_rect_t desktop_scope_bound(desktop_t *app, const desktop_scope_t *before,
+                                tiku_window_t *own, tiku_rect_t also,
+                                int menus);
+/** @brief Repaint @p window: its frame is damaged and its cached content
+ *         forgotten. */
+void desktop_damage_window(desktop_t *app, tiku_window_t *window);
+#if TIKU_SHELL_DAMAGE_CHECK
+/** @brief After a turn that delivered input and left no frame to draw, draw
+ *         a full frame and report where it differs from the last one. */
+void desktop_damage_check_idle(desktop_t *app);
+#endif
 int tick_clock(void *ctx);
 void blit(desktop_t *app);
 void desktop_damage(desktop_t *app, tiku_rect_t rect);
+/**
+ * @brief Damage @p rect in the frame after the next bounded one, so a small
+ *        change far from the main one is not drawn as their union.
+ *
+ * A full frame, or a bounded frame that contains it, takes it over.
+ */
+void desktop_damage_later(desktop_t *app, tiku_rect_t rect);
 void desktop_damage_all(desktop_t *app);
 void desktop_focus_paint(desktop_t *app);
 void desktop_idle_work(desktop_t *app);
