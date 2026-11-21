@@ -1587,7 +1587,7 @@ desktop_teardown(desktop_t *app, desktop_loop_t *lp)
 #if TIKU_SHELL_REMOTE_SERVICES
 
     tiku_print_rpc_close(&app->printing);
-#else
+#elif TIKU_SHELL_BOARD_SERVICES
 
     {
         int k;

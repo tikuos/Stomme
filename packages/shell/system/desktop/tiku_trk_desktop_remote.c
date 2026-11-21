@@ -682,7 +682,7 @@ remote_hear(desktop_t *app)
 #if TIKU_SHELL_REMOTE_SERVICES
 
     access_refresh(app);
-#else
+#elif TIKU_SHELL_BOARD_SERVICES
 
 }
 

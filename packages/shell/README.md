@@ -20,9 +20,13 @@ Three boolean constants select supported optional behavior:
 
 TikuDesktop enables board services and retains its board job, run, statistics,
 preferences, tray and VFS implementations as product extensions. Kintsugi enables
-remote services and Notes tabs and retains its host panel job implementation.
+remote services and Notes tabs.
 These choices preserve the products' existing behavior. The runner and
 supervisor retain application ABI and SDK-identity checks.
+
+A desktop built without board services takes the host panel jobs from
+`system/desktop/tiku_desktop_panel_jobs.c`, extracted from Kintsugi, and
+carries no copy of its own.
 
 Product builds compile `build/foundation/system`. Its `shell-sources.json`
 records the selected source owner and hash. Matching tests are composed with
