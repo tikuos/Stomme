@@ -160,11 +160,59 @@
 #endif
 #define DESK_W TIKU_SHELL_SCREEN_W
 #define DESK_H TIKU_SHELL_SCREEN_H
-#define COUNT_H  16
+#define COUNT_H  tiku_trk_folder_count_h()
 
 /* How many entries a turn asks whether they carry a picture of their own;
  * each ask opens the file. */
 #define HINTS_PER_TURN 24
+
+/* The touch lens: the size of its magnified view, in pixels; how many
+ * times it magnifies a small control, and a menu, whose rows are larger
+ * and whose names are wider; how near a close or zoom box a press opens
+ * it; how far the press that opened it may wander and stay a tap; how near
+ * that press a second tap leaves the lens open; and how long after the
+ * lens's click a press on its place is dropped. */
+#define DESKTOP_LENS_VIEW_W 192
+#define DESKTOP_LENS_VIEW_H 120
+#define DESKTOP_LENS_SCALE 3
+#define DESKTOP_LENS_MENU_SCALE 2
+#define DESKTOP_LENS_NEAR 16
+#define DESKTOP_LENS_SLOP 10
+#define DESKTOP_LENS_AGAIN 24
+#define DESKTOP_LENS_GUARD_US 400000
+
+/**
+ * @brief The touch lens.
+ * @note With TIKU_SHELL_TOUCH a tap on or near a window's close or zoom
+ *       box, or on the menu bar, the Deskbar, a folder's own menu bar, a
+ *       scroll bar arrow or a menu that shows is not delivered: it opens
+ *       the lens, which shows the area around it as the frame had it,
+ *       magnified, above the finger, and stays open when the finger lifts.
+ *       A press in the lens's view aims at the point under it, the aim
+ *       follows the finger, and the release clicks there and closes the
+ *       lens; a finger that leaves the view drops that pick.  A second tap on the
+ *       control leaves the lens open, and a press anywhere else closes it;
+ *       none of these reaches the surfaces.  A press that opens the lens
+ *       and then travels is a drag, and goes to the surfaces whole.
+ */
+typedef struct {
+    int          used;      /* the desktop opens lenses (TIKU_SHELL_TOUCH) */
+    int          shown;     /* the lens is on the screen */
+    int          held;      /* the lens took the press in progress */
+    int          opening;   /* that press opened the lens */
+    int          picking;   /* that press is in the view: its release clicks */
+    int          passing;   /* the lens is delivering a press of its own */
+    int          ox, oy;    /* where the press that opened the lens landed */
+    int          ax, ay;    /* the screen point a pick aims at */
+    int          scale;     /* how many times the view magnifies the area */
+    int64_t      clicked_at; /* when the lens last clicked, 0 before */
+    tiku_rect_t  area;      /* the part of the screen magnified */
+    tiku_rect_t  box;       /* where the lens is drawn */
+    tiku_event_t press;     /* the press in progress, as it came */
+    /* The area's pixels, row by row; the least scale gives the most. */
+    tiku_rgb_t   px[(DESKTOP_LENS_VIEW_W / DESKTOP_LENS_MENU_SCALE) *
+                    (DESKTOP_LENS_VIEW_H / DESKTOP_LENS_MENU_SCALE)];
+} desktop_lens_t;
 
 /** @brief How much of the count view's text a script can read. */
 #define TIKU_TRK_COUNT_TEXT_MAX 64
@@ -684,6 +732,7 @@ typedef struct desktop {
                                          *   press and drop */
     unsigned             drag_live_mods; /**< the modifiers as of
                                           *   the last move */
+    desktop_lens_t       lens;          /**< the touch lens */
     /** The column title strip's gesture, one at a time, in the folder window
      * the press was in (TS-063). */
     tiku_trk_titleview_t tstrip;

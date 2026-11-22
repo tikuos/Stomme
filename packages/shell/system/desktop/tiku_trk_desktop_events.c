@@ -88,11 +88,292 @@ deliver(desktop_t *app, const tiku_event_t *ev)
 #endif
 }
 
-/** @brief A button went down: the surface under the pointer answers. */
+/** @brief Whether (@p x, @p y) lies in @p r. */
+static int
+lens_in(tiku_rect_t r, int x, int y)
+{
+    return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
+}
+
+/** @brief @p v held to @p lo .. @p hi, or @p lo when the range is empty. */
+static int
+lens_clamp(int v, int lo, int hi)
+{
+    return (v > hi) ? ((hi > lo) ? hi : lo) : ((v < lo) ? lo : v);
+}
+
+/**
+ * @brief Whether a press at (@p x, @p y) opens the lens.
+ * @param menu Receives the menu the press is on, or an empty rectangle.
+ * @note While a menu shows, or a popup of the Deskbar, only a press on it
+ *       does: its rows are the small controls then, and a press off it
+ *       closes it as without the lens.  Otherwise a press does that is on
+ *       or near a window's close or zoom box (under it, or at one of the
+ *       points up to DESKTOP_LENS_NEAR pixels across and down from it, in
+ *       steps of half that), on the menu bar along the top of the screen,
+ *       on the Deskbar where no window covers it, or, in the folder window
+ *       under the press, on its own menu bar or an end of its scroll bar.
+ */
+static int
+lens_wanted(desktop_t *app, int x, int y, tiku_rect_t *menu)
+{
+    tiku_window_t *w = NULL;
+    tiku_hit_t under;
+    int dx, dy;
+
+    *menu = (tiku_rect_t){ 0, 0, 0, 0 };
+    if (app->popup != NULL) {
+        if (app->popup_sub != NULL && lens_in(app->popup_sub_frame, x, y)) {
+            *menu = app->popup_sub_frame;
+        } else if (lens_in(app->popup_frame, x, y)) {
+            *menu = app->popup_frame;
+        }
+        return menu->w > 0;
+    }
+    if (app->deskbar != NULL && tiku_trk_deskbar_menu_open(app->deskbar)) {
+        return tiku_trk_deskbar_popup_at(app->deskbar, x, y, menu);
+    }
+    under = tiku_workspace_hit(app->desk, x, y, &w);
+    for (dy = -DESKTOP_LENS_NEAR; dy <= DESKTOP_LENS_NEAR;
+         dy += DESKTOP_LENS_NEAR / 2) {
+        for (dx = -DESKTOP_LENS_NEAR; dx <= DESKTOP_LENS_NEAR;
+             dx += DESKTOP_LENS_NEAR / 2) {
+            tiku_window_t *near = NULL;
+            tiku_hit_t hit = tiku_workspace_hit(app->desk, x + dx, y + dy,
+                                                &near);
+
+            if (hit == TIKU_HIT_CLOSE || hit == TIKU_HIT_ZOOM) {
+                return 1;
+            }
+        }
+    }
+    if (lens_in(global_bar_rect(app), x, y)) {
+        return 1;
+    }
+    if (app->deskbar != NULL &&
+        lens_in(tiku_trk_deskbar_frame(app->deskbar), x, y) &&
+        (under == TIKU_HIT_NONE || tiku_trk_deskbar_raised(app->deskbar))) {
+        return 1;
+    }
+    if (under == TIKU_HIT_CONTENT && w != NULL) {
+        folder_t *fl = folder_of(app, w);
+
+        if (fl != NULL) {
+            tiku_rect_t sb = tiku_trk_folder_window_scrollbar(fl);
+
+            if (lens_in(tiku_trk_folder_window_bar(fl), x, y)) {
+                return 1;
+            }
+            if (lens_in(sb, x, y) &&
+                (y < sb.y + sb.w || y >= sb.y + sb.h - sb.w)) {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+/** @brief Whether (@p x, @p y) is within @p reach pixels of (@p ax, @p ay)
+ *         on both axes. */
+static int
+lens_within(int x, int y, int ax, int ay, int reach)
+{
+    return x - ax <= reach && ax - x <= reach &&
+           y - ay <= reach && ay - y <= reach;
+}
+
+/** @brief The part of the lens that shows the magnified area. */
+static tiku_rect_t
+lens_view(const desktop_lens_t *l)
+{
+    return tiku_inset(l->box, 2);
+}
+
+/**
+ * @brief Aim the pick at the screen point under (@p x, @p y) in the lens's
+ *        view.
+ * @return 1 when (@p x, @p y) is in the view, else 0 and the aim stays.
+ */
+static int
+lens_aim(desktop_t *app, int x, int y)
+{
+    desktop_lens_t *l = &app->lens;
+    tiku_rect_t in = lens_view(l);
+
+    if (!lens_in(in, x, y)) {
+        return 0;
+    }
+    l->ax = l->area.x + (x - in.x) / l->scale;
+    l->ay = l->area.y + (y - in.y) / l->scale;
+    return 1;
+}
+
+/** @brief Take the lens off the screen. */
+static void
+lens_close(desktop_t *app)
+{
+    desktop_lens_t *l = &app->lens;
+
+    if (l->shown) {
+        desktop_damage(app, l->box);
+    }
+    l->shown = l->picking = 0;
+}
+
+/**
+ * @brief A press while the touch lens is used.
+ * @return 1 when the lens took the press, which then reaches no surface.
+ * @note With the lens open: a press in its view is a pick; a press
+ *       within DESKTOP_LENS_AGAIN pixels of the one that opened the lens,
+ *       a second tap on the control, changes nothing; any other closes
+ *       the lens.  With the lens closed: a press on the place the lens
+ *       had, within DESKTOP_LENS_GUARD_US of its click, is dropped, so a
+ *       second tap on the lens reaches nothing under it; a press
+ *       lens_wanted() names opens the lens, with the area around the press
+ *       as the frame has it, magnified above the finger, or below where
+ *       there is no room.  On a menu the lens magnifies less and the
+ *       area starts at the menu's left edge, where its rows' names begin.
+ */
+static int
+lens_open(desktop_t *app, const tiku_event_t *ev)
+{
+    desktop_lens_t *l = &app->lens;
+    tiku_surface_t *s = app->surf;
+    int bw = DESKTOP_LENS_VIEW_W + 4;
+    int bh = DESKTOP_LENS_VIEW_H + 4;
+    tiku_rect_t menu;
+    int i, j, aw, ah;
+
+    if (!l->used || l->passing || s == NULL) {
+        return 0;
+    }
+    if (l->shown) {
+        l->held = 1;
+        l->opening = 0;
+        l->press = *ev;
+        l->picking = lens_aim(app, ev->x, ev->y);
+        if (!l->picking &&
+            !lens_within(ev->x, ev->y, l->ox, l->oy, DESKTOP_LENS_AGAIN)) {
+            lens_close(app);
+        }
+        return 1;
+    }
+    if (l->clicked_at != 0 &&
+        ev->time_us - l->clicked_at < DESKTOP_LENS_GUARD_US &&
+        lens_in(l->box, ev->x, ev->y)) {
+        l->held = 1;
+        l->opening = l->picking = 0;
+        return 1;
+    }
+    if (!lens_wanted(app, ev->x, ev->y, &menu)) {
+        return 0;
+    }
+    l->scale = (menu.w > 0) ? DESKTOP_LENS_MENU_SCALE : DESKTOP_LENS_SCALE;
+    aw = DESKTOP_LENS_VIEW_W / l->scale;
+    ah = DESKTOP_LENS_VIEW_H / l->scale;
+    l->area = (tiku_rect_t){
+        lens_clamp((menu.w > 0) ? menu.x : ev->x - aw / 2, 0, s->w - aw),
+        lens_clamp(ev->y - ah / 2, 0, s->h - ah), aw, ah };
+    for (j = 0; j < ah; j++) {
+        for (i = 0; i < aw; i++) {
+            l->px[j * aw + i] = tiku_peek(s, l->area.x + i, l->area.y + j);
+        }
+    }
+    l->box = (tiku_rect_t){ lens_clamp(ev->x - bw / 2, 0, s->w - bw),
+                            ev->y - 28 - bh, bw, bh };
+    if (l->box.y < 0) {
+        l->box.y = lens_clamp(ev->y + 28, 0, s->h - bh);
+    }
+    l->held = l->shown = l->opening = 1;
+    l->picking = 0;
+    l->clicked_at = 0;
+    l->ox = l->ax = ev->x;
+    l->oy = l->ay = ev->y;
+    l->press = *ev;
+    desktop_damage(app, l->box);
+    return 1;
+}
+
+/**
+ * @brief A move during a press the lens took.
+ * @return 1 when the lens took the move.
+ * @note The press that opened the lens, once it has travelled more than
+ *       DESKTOP_LENS_SLOP pixels, is a drag: the lens closes, the press
+ *       goes to the surfaces as it came, and this move and the rest of the
+ *       drag follow it there.  A pick's aim follows the finger in the
+ *       view, and leaving the view drops the pick.
+ */
+static int
+lens_move(desktop_t *app, const tiku_event_t *ev, desktop_loop_t *lp)
+{
+    desktop_lens_t *l = &app->lens;
+
+    if (!l->held || l->passing) {
+        return 0;
+    }
+    if (l->opening) {
+        tiku_event_t press = l->press;
+
+        if (lens_within(ev->x, ev->y, l->ox, l->oy, DESKTOP_LENS_SLOP)) {
+            return 1;
+        }
+        l->held = l->opening = 0;
+        lens_close(app);
+        l->passing = 1;
+        desktop_pointer_down(app, &press, lp);
+        l->passing = 0;
+        return 0;
+    }
+    if (l->picking && !lens_aim(app, ev->x, ev->y)) {
+        l->picking = 0;
+    }
+    return 1;
+}
+
+/**
+ * @brief The release of a press the lens took: after a pick, a click at
+ *        its aim and the lens closes; after the press that opened the
+ *        lens, it stays open for the pick.
+ * @return 1 when the lens took the release.
+ */
+static int
+lens_release(desktop_t *app, const tiku_event_t *ev, desktop_loop_t *lp)
+{
+    desktop_lens_t *l = &app->lens;
+    tiku_event_t down, up;
+
+    if (!l->held || l->passing) {
+        return 0;
+    }
+    l->held = l->opening = 0;
+    if (!l->picking) {
+        return 1;
+    }
+    lens_close(app);
+    l->clicked_at = ev->time_us != 0 ? ev->time_us : 1;
+    down = l->press;
+    up = *ev;
+    down.x = up.x = app->ptr_x = l->ax;
+    down.y = up.y = app->ptr_y = l->ay;
+    down.time_us = up.time_us;
+    l->passing = 1;
+    desktop_pointer_down(app, &down, lp);
+    desktop_pointer_up(app, &up, lp);
+    l->passing = 0;
+    return 1;
+}
+
+/** @brief A button went down: the touch lens takes a press on a small
+ *         control, every press while it is open and one on its place
+ *         just after its click; else the surface under the pointer
+ *         answers. */
 void
 desktop_pointer_down(desktop_t *app, const tiku_event_t *ev, desktop_loop_t *lp)
 {
     (void)lp;
+    if (lens_open(app, ev)) {
+        return;
+    }
     deliver(app, ev);
 }
 
@@ -100,7 +381,8 @@ desktop_pointer_down(desktop_t *app, const tiku_event_t *ev, desktop_loop_t *lp)
  * @brief The pointer moved: record where it is, choose the cursor's shape
  *        for what is under it, hand the move to the responders, show or
  *        hide a device tray cell's tip, and damage where a dragged icon was
- *        and is.
+ *        and is.  During a press the touch lens took, the lens answers
+ *        instead, until that press proves a drag.
  */
 void
 desktop_pointer_move(desktop_t *app, const tiku_event_t *ev, desktop_loop_t *lp)
@@ -110,7 +392,9 @@ desktop_pointer_move(desktop_t *app, const tiku_event_t *ev, desktop_loop_t *lp)
     int dragging = tiku_trk_drag_active(&app->drag);
     tiku_rect_t drag_was = desktop_drag_box(app->drag.x, app->drag.y);
 
-    (void)lp;
+    if (lens_move(app, ev, lp)) {
+        return;
+    }
     app->ptr_x = ev->x;
     app->ptr_y = ev->y;
     desktop_pointer_says(app, ev->x, ev->y);
@@ -139,11 +423,14 @@ desktop_pointer_move(desktop_t *app, const tiku_event_t *ev, desktop_loop_t *lp)
     }
 }
 
-/** @brief A button came up: the holder of the capture answers first. */
+/** @brief A button came up: the touch lens answers for a press it took,
+ *         else the holder of the capture answers first. */
 void
 desktop_pointer_up(desktop_t *app, const tiku_event_t *ev, desktop_loop_t *lp)
 {
-    (void)lp;
+    if (lens_release(app, ev, lp)) {
+        return;
+    }
     deliver(app, ev);
     /* A resize may have ended: choose the pointer's shape again. */
     desktop_pointer_says(app, ev->x, ev->y);

@@ -16,7 +16,7 @@
 #include <string.h>
 
 /* The height of a folder window's count view, under its list. */
-#define COUNT_HEIGHT 16
+#define COUNT_HEIGHT tiku_trk_folder_count_h()
 
 void
 tiku_trk_script_adapter_init(tiku_trk_script_adapter_t *adapter,

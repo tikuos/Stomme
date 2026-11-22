@@ -31,6 +31,41 @@ static int follow(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
     return 1;
 }
 
+/* The presses and releases that reach the surfaces, for the lens test. */
+static int lens_downs, lens_ups, lens_x, lens_y;
+/** @brief The Deskbar is not linked: it has no frame here. */
+tiku_rect_t tiku_trk_deskbar_frame(const tiku_trk_deskbar_t *db)
+{ (void)db; return (tiku_rect_t){ 0, 0, 0, 0 }; }
+int tiku_trk_deskbar_raised(const tiku_trk_deskbar_t *db)
+{ (void)db; return 0; }
+int tiku_trk_deskbar_menu_open(const tiku_trk_deskbar_t *db)
+{ (void)db; return 0; }
+int tiku_trk_deskbar_popup_at(const tiku_trk_deskbar_t *db, int x, int y,
+                              tiku_rect_t *frame)
+{ (void)db; (void)x; (void)y; (void)frame; return 0; }
+/** @brief The global menu bar is not linked: it is off here. */
+tiku_rect_t global_bar_rect(desktop_t *app)
+{ (void)app; return (tiku_rect_t){ 0, 0, 0, 0 }; }
+/** @brief A surface that takes every press. */
+static int everywhere(void *self, int x, int y)
+{ (void)self; (void)x; (void)y; return 1; }
+/** @brief Count a press and where it landed. */
+static int seen_down(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
+{
+    (void)self;
+    lens_downs++; lens_x = ev->x; lens_y = ev->y;
+    *damage = tiku_trk_damage_none();
+    return 1;
+}
+/** @brief Count a release and where it landed. */
+static int seen_up(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
+{
+    (void)self;
+    lens_ups++; lens_x = ev->x; lens_y = ev->y;
+    *damage = tiku_trk_damage_none();
+    return 1;
+}
+
 /** @brief Whether two rectangles are the same. */
 static int same(tiku_rect_t a, tiku_rect_t b)
 {
@@ -235,6 +270,173 @@ int main(void)
     tiku_trk_select_window_refit(&app->select_window);
     assert(sel->frame.h == fits && sel->frame.y + sel->frame.h == 600);
     puts("PASS: an open Select window follows the face's height");
+
+    /* The touch lens opens on a tap near a window's close box and stays
+     * open when the finger lifts; a second press in its view picks the
+     * point under it, the aim follows the finger, and the release clicks
+     * there. */
+    folder.win = NULL;   /* the stub folder has no view to measure */
+    tiku_trk_responder_t clicks = { .name = "clicks", .self = app,
+                                    .hit = everywhere, .press = seen_down,
+                                    .release = seen_up };
+    tiku_trk_responders_init(&app->responders);
+    assert(tiku_trk_responders_push(&app->responders, &clicks) == 0);
+    app->lens.used = 1;
+    int bx = -1, by = -1, rx = -1, ry = -1;
+    for (int y = 0; y < 480; y++) {
+        for (int x = 0; x < 800; x++) {
+            tiku_window_t *hw = NULL;
+            tiku_hit_t hit = tiku_workspace_hit(app->desk, x, y, &hw);
+
+            if (hit == TIKU_HIT_CLOSE && bx < 0) {
+                bx = x;
+                by = y;
+            }
+            if (hit == TIKU_HIT_RESIZE && rx < 0) {
+                rx = x;
+                ry = y;
+            }
+        }
+    }
+    assert(bx >= 0 && rx >= 0);
+    tiku_event_t tap = { .type = TIKU_EVENT_POINTER_DOWN, .button = 1,
+                         .x = bx + 6, .y = by + 6 };
+    moved = (tiku_rect_t){ 0, 0, 0, 0 };
+    desktop_pointer_down(app, &tap, NULL);
+    assert(app->lens.shown && lens_downs == 0);
+    assert(same(moved, app->lens.box) && moved.w > 0);
+    /* A wander inside the slop leaves it a tap. */
+    tap.type = TIKU_EVENT_POINTER_MOVE;
+    tap.x += DESKTOP_LENS_SLOP;
+    desktop_pointer_move(app, &tap, NULL);
+    assert(app->lens.shown && lens_downs == 0);
+    tap.type = TIKU_EVENT_POINTER_UP;
+    desktop_pointer_up(app, &tap, NULL);
+    assert(app->lens.shown && lens_downs == 0 && lens_ups == 0);
+    /* A second tap on the control leaves the lens open. */
+    tap = (tiku_event_t){ .type = TIKU_EVENT_POINTER_DOWN, .button = 1,
+                          .x = bx + 6 + DESKTOP_LENS_AGAIN, .y = by + 6 };
+    desktop_pointer_down(app, &tap, NULL);
+    tap.type = TIKU_EVENT_POINTER_UP;
+    desktop_pointer_up(app, &tap, NULL);
+    assert(app->lens.shown && lens_downs == 0 && lens_ups == 0);
+    tiku_rect_t view = tiku_inset(app->lens.box, 2);
+    int lens_s = DESKTOP_LENS_SCALE;
+    /* The pick lands three view pixels to the right of the close box and
+     * slides back onto it. */
+    tap = (tiku_event_t){ .type = TIKU_EVENT_POINTER_DOWN, .button = 1,
+        .x = view.x + (bx + 3 - app->lens.area.x) * lens_s + 1,
+        .y = view.y + (by - app->lens.area.y) * lens_s + 1 };
+    desktop_pointer_down(app, &tap, NULL);
+    assert(app->lens.picking && app->lens.ax == bx + 3 &&
+           app->lens.ay == by && lens_downs == 0);
+    tap.type = TIKU_EVENT_POINTER_MOVE;
+    tap.x -= 3 * lens_s;
+    desktop_pointer_move(app, &tap, NULL);
+    assert(app->lens.ax == bx && app->lens.ay == by);
+    tap.type = TIKU_EVENT_POINTER_UP;
+    tap.time_us = 1000000;
+    desktop_pointer_up(app, &tap, NULL);
+    assert(!app->lens.shown && !app->lens.held);
+    assert(lens_downs == 1 && lens_ups == 1 && lens_x == bx && lens_y == by);
+    /* A second tap on the lens's place, soon after its click, reaches
+     * nothing; a later one does. */
+    tap.type = TIKU_EVENT_POINTER_DOWN;
+    tap.time_us = 1000000 + DESKTOP_LENS_GUARD_US - 1;
+    desktop_pointer_down(app, &tap, NULL);
+    tap.type = TIKU_EVENT_POINTER_UP;
+    desktop_pointer_up(app, &tap, NULL);
+    assert(!app->lens.shown && lens_downs == 1 && lens_ups == 1);
+    tap.type = TIKU_EVENT_POINTER_DOWN;
+    tap.time_us = 1000000 + DESKTOP_LENS_GUARD_US;
+    desktop_pointer_down(app, &tap, NULL);
+    tap.type = TIKU_EVENT_POINTER_UP;
+    desktop_pointer_up(app, &tap, NULL);
+    assert(!app->lens.shown && lens_downs == 2 && lens_ups == 2);
+    /* A pick that slides out of the view clicks nothing; the lens stays. */
+    tap = (tiku_event_t){ .type = TIKU_EVENT_POINTER_DOWN, .button = 1,
+                          .x = bx, .y = by };
+    desktop_pointer_down(app, &tap, NULL);
+    tap.type = TIKU_EVENT_POINTER_UP;
+    desktop_pointer_up(app, &tap, NULL);
+    view = tiku_inset(app->lens.box, 2);
+    tap = (tiku_event_t){ .type = TIKU_EVENT_POINTER_DOWN, .button = 1,
+                          .x = view.x + 4, .y = view.y + 4 };
+    desktop_pointer_down(app, &tap, NULL);
+    assert(app->lens.picking);
+    tap.type = TIKU_EVENT_POINTER_MOVE;
+    tap.x = view.x + view.w + 20;
+    desktop_pointer_move(app, &tap, NULL);
+    assert(!app->lens.picking);
+    tap.type = TIKU_EVENT_POINTER_UP;
+    desktop_pointer_up(app, &tap, NULL);
+    assert(app->lens.shown && lens_downs == 2 && lens_ups == 2);
+    /* A press away from the lens and from the control closes it and
+     * reaches nothing. */
+    tap = (tiku_event_t){ .type = TIKU_EVENT_POINTER_DOWN, .button = 1,
+                          .x = view.x + view.w + 20, .y = view.y + 4 };
+    desktop_pointer_down(app, &tap, NULL);
+    assert(!app->lens.shown);
+    tap.type = TIKU_EVENT_POINTER_UP;
+    desktop_pointer_up(app, &tap, NULL);
+    assert(!app->lens.held && lens_downs == 2 && lens_ups == 2);
+    /* A press that opens the lens and then travels is a drag: the lens
+     * closes and the press reaches the surfaces where it landed. */
+    tap = (tiku_event_t){ .type = TIKU_EVENT_POINTER_DOWN, .button = 1,
+                          .x = bx + 6, .y = by + 6 };
+    desktop_pointer_down(app, &tap, NULL);
+    assert(app->lens.shown && lens_downs == 2);
+    tap.type = TIKU_EVENT_POINTER_MOVE;
+    tap.x += DESKTOP_LENS_SLOP + 1;
+    desktop_pointer_move(app, &tap, NULL);
+    assert(!app->lens.shown && !app->lens.held);
+    assert(lens_downs == 3 && lens_x == bx + 6 && lens_y == by + 6);
+    tap.type = TIKU_EVENT_POINTER_UP;
+    desktop_pointer_up(app, &tap, NULL);
+    assert(lens_ups == 3);
+    /* The resize corner is dragged, not clicked: no lens.  Nor one for a
+     * press away from small controls. */
+    tap = (tiku_event_t){ .type = TIKU_EVENT_POINTER_DOWN, .button = 1,
+                          .x = rx, .y = ry };
+    desktop_pointer_down(app, &tap, NULL);
+    assert(!app->lens.shown && !app->lens.held && lens_downs == 4);
+    tap.type = TIKU_EVENT_POINTER_UP;
+    desktop_pointer_up(app, &tap, NULL);
+    tiku_rect_t inside = tiku_window_content(two);
+    tap = (tiku_event_t){ .type = TIKU_EVENT_POINTER_DOWN, .button = 1,
+                          .x = inside.x + inside.w / 2,
+                          .y = inside.y + inside.h / 2 };
+    desktop_pointer_down(app, &tap, NULL);
+    assert(!app->lens.shown && !app->lens.held && lens_downs == 5);
+    tap.type = TIKU_EVENT_POINTER_UP;
+    desktop_pointer_up(app, &tap, NULL);
+    /* While a menu shows, a press on it opens the lens from the menu's
+     * left edge, where the rows' names begin; a press off the menu, a
+     * close box included, opens none and reaches the menu's dismissal. */
+    static tiku_menu_t rows;
+    app->popup = &rows;
+    app->popup_frame = (tiku_rect_t){ 300, 200, 150, 100 };
+    tap = (tiku_event_t){ .type = TIKU_EVENT_POINTER_DOWN, .button = 1,
+                          .x = 400, .y = 250 };
+    desktop_pointer_down(app, &tap, NULL);
+    assert(app->lens.shown && app->lens.area.x == 300 && lens_downs == 5);
+    assert(app->lens.scale == DESKTOP_LENS_MENU_SCALE &&
+           app->lens.area.w == DESKTOP_LENS_VIEW_W / DESKTOP_LENS_MENU_SCALE);
+    tap.type = TIKU_EVENT_POINTER_UP;
+    desktop_pointer_up(app, &tap, NULL);
+    tap = (tiku_event_t){ .type = TIKU_EVENT_POINTER_DOWN, .button = 1,
+                          .x = 700, .y = 450 };
+    desktop_pointer_down(app, &tap, NULL);
+    tap.type = TIKU_EVENT_POINTER_UP;
+    desktop_pointer_up(app, &tap, NULL);
+    assert(!app->lens.shown && lens_downs == 5);
+    tap = (tiku_event_t){ .type = TIKU_EVENT_POINTER_DOWN, .button = 1,
+                          .x = bx + 6, .y = by + 6 };
+    desktop_pointer_down(app, &tap, NULL);
+    assert(!app->lens.shown && !app->lens.held && lens_downs == 6);
+    app->popup = NULL;
+    puts("PASS: the touch lens stays open for a second press that picks the "
+         "point under it");
     tiku_workspace_free(app->desk);
     tiku_surface_free(app->surf);
     free(app);

@@ -599,6 +599,53 @@ tiku_trk_deskbar_tip(const tiku_trk_deskbar_t *db)
     return (db != NULL && db->tip_y >= 0) ? db->tip : "";
 }
 
+/** @brief Whether (@p x, @p y) lies in @p r; on a hit @p r goes to @p out. */
+static int
+popup_has(tiku_rect_t r, int x, int y, tiku_rect_t *out)
+{
+    if (x < r.x || x >= r.x + r.w || y < r.y || y >= r.y + r.h) {
+        return 0;
+    }
+    if (out != NULL) {
+        *out = r;
+    }
+    return 1;
+}
+
+int
+tiku_trk_deskbar_popup_at(const tiku_trk_deskbar_t *db, int x, int y,
+                          tiku_rect_t *frame)
+{
+    tiku_rect_t m;
+    int rowh;
+
+    if (db == NULL) {
+        return 0;
+    }
+    rowh = tiku_font_plain()->height + 6;
+    if (db->menu_open) {
+        m = db_leaf_menu_rect(db, rowh, db->leaf_count);
+        if (popup_has(m, x, y, frame) ||
+            (db->sub_of >= 0 && db->sub_count > 0 &&
+             popup_has(db_sub_menu_rect(db, m, rowh), x, y, frame))) {
+            return 1;
+        }
+    }
+    if (db->win_menu_team >= 0) {
+        const char *items[4];
+        int enabled[4];
+        int n = db_win_menu_items(db, db->win_menu_team, items, enabled);
+
+        if (popup_has(db_win_menu_rect(db, n, rowh), x, y, frame)) {
+            return 1;
+        }
+    }
+    return (db->clock_menu_open &&
+            popup_has(db_clock_menu_rect(db), x, y, frame)) ||
+           (db->calendar_open &&
+            popup_has(db_calendar_rect(db), x, y, frame));
+}
+
 int
 tiku_trk_deskbar_menu_bottom(const tiku_trk_deskbar_t *db)
 {

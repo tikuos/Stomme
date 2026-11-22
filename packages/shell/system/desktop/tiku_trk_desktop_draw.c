@@ -23,6 +23,7 @@ void desktop_draw_overlays(desktop_t *app);
 void desktop_draw_popup(desktop_t *app);
 void desktop_draw_bars(desktop_t *app);
 void desktop_draw_drag(desktop_t *app);
+void desktop_draw_lens(desktop_t *app);
 void desktop_draw_strip_drag(desktop_t *app);
 /* End of the forward declarations. */
 
@@ -426,6 +427,7 @@ draw_frame(desktop_t *app, const tiku_rect_t *damage, int64_t started)
     desktop_draw_bars(app);
     desktop_draw_popup(app);
     desktop_draw_overlays(app);
+    desktop_draw_lens(app);
     desktop_draw_splash(app);
     desktop_forcequit_overlay(app);
     tiku_clip_damage(app->surf, NULL);
@@ -1052,6 +1054,34 @@ desktop_draw_drag(desktop_t *app)
                                              1, 7 };
                 tiku_fill(app->surf, stroke, TIKU_C_TEXT);
             }
+        }
+    }
+}
+
+/**
+ * @brief Draw the touch lens while it is shown: the area it holds, each
+ *        pixel as a square of the lens's scale, in a dark frame with a
+ *        white edge.
+ */
+void
+desktop_draw_lens(desktop_t *app)
+{
+    const desktop_lens_t *l = &app->lens;
+    const int s = l->scale;
+    tiku_rect_t in;
+    int i, j;
+
+    if (!l->shown) {
+        return;
+    }
+    tiku_fill(app->surf, l->box, TIKU_C_TEXT);
+    tiku_frame(app->surf, tiku_inset(l->box, 1), TIKU_RGB(255, 255, 255));
+    in = tiku_inset(l->box, 2);
+    for (j = 0; j < l->area.h; j++) {
+        for (i = 0; i < l->area.w; i++) {
+            tiku_fill(app->surf, (tiku_rect_t){ in.x + i * s, in.y + j * s,
+                                                s, s },
+                      l->px[j * l->area.w + i]);
         }
     }
 }

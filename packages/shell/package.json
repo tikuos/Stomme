@@ -369,6 +369,7 @@
     "tests/system/test_switcher_keys.c",
     "tests/system/test_task.c",
     "tests/system/test_title.c",
+    "tests/system/test_touch_sizes.c",
     "tests/system/test_tracker_audit.c",
     "tests/system/test_tracker_columns.c",
     "tests/system/test_tracker_image.c",

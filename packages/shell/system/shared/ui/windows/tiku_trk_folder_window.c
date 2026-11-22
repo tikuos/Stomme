@@ -49,7 +49,7 @@ static void fw_draw_rows(tiku_window_t *window, tiku_surface_t *surface,
                          int slide, int slide_y);
 /* End of the forward declarations. */
 
-#define COUNT_HEIGHT 16     /* the count line along the bottom */
+#define COUNT_HEIGHT tiku_trk_folder_count_h() /* the count line along the bottom */
 #define TITLE_HEIGHT TIKU_TRK_TITLE_HEIGHT
 /* The list's mini icon follows the row height, which follows the face: at
  * the 12 px face the row is 20 and the icon 16 (IV-013). */
@@ -1194,7 +1194,7 @@ tiku_trk_folder_window_draw(tiku_window_t *window,
         list.y += TITLE_HEIGHT;
         list.h -= TITLE_HEIGHT;
         /* Room for the scroll bar, in list mode only (PVL-051). */
-        list.w -= 15;
+        list.w -= tiku_trk_folder_scrollbar_w();
     }
     list.h -= COUNT_HEIGHT;
     icons = tiku_trk_poseview_mode(folder->view) != TIKU_TRK_MODE_LIST;
@@ -1261,8 +1261,9 @@ tiku_trk_folder_window_scrollbar(const tiku_trk_folder_window_t *folder)
         return none;
     }
     content = tiku_trk_folder_window_content(folder);
-    return (tiku_rect_t){ content.x + content.w - 15, content.y,
-                               15, content.h - COUNT_HEIGHT };
+    return (tiku_rect_t){ content.x + content.w - tiku_trk_folder_scrollbar_w(),
+                               content.y, tiku_trk_folder_scrollbar_w(),
+                               content.h - COUNT_HEIGHT };
 }
 
 int
@@ -1435,7 +1436,7 @@ fw_draw_finish(tiku_window_t *window, tiku_surface_t *surface,
     if (!icons) {
         /* The scroll bar is drawn from its own state in sbar, which
          * holds a grip across frames (PVL-051). */
-        tiku_rect_t sb = { list.x + list.w, list.y, 15, list.h };
+        tiku_rect_t sb = { list.x + list.w, list.y, tiku_trk_folder_scrollbar_w(), list.h };
         int tpos = 0, tlen = 0;
         float frac, pos;
 

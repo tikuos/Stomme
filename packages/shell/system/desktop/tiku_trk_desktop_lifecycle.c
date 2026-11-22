@@ -666,6 +666,7 @@ boot_deskbar(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
     tiku_sound_play(TIKU_SOUND_STARTUP);
     splash_stage(app, "storage");
     app->row_h = tiku_font_plain()->height + 5;
+    app->lens.used = TIKU_SHELL_TOUCH;
     app->desk = tiku_workspace_new(app->surf);
     app->deskbar = tiku_trk_deskbar_new(app->backend);
     desktop_responders_attach(app);

@@ -13,6 +13,7 @@
 #define TIKU_TRK_FOLDER_WINDOW_H_
 
 #include "tiku_field.h"
+#include "tiku_font.h"
 #include "tiku_query.h"
 #include "tiku_scroll.h"
 #include "tiku_thumb.h"
@@ -25,7 +26,32 @@
 #include "tiku_trk_prefs.h"
 #include "tiku_trk_services.h"
 #include "tiku_window.h"
+#include "tiku_shell_product.h"
 #include <stddef.h>
+
+#ifndef TIKU_SHELL_TOUCH
+/** @brief 1 for a touch panel: a folder window's count line and scroll bar
+ *  grow with the face, and the desktop starts a face size up. */
+#define TIKU_SHELL_TOUCH 0
+#endif
+
+/** @brief Height of a folder window's count line: 16 pixels, or on a touch
+ *  panel the plain face's height and 3 when that is more. */
+static inline int tiku_trk_folder_count_h(void)
+{
+    int fit = tiku_font_plain()->height + 3;
+
+    return (TIKU_SHELL_TOUCH && fit > 16) ? fit : 16;
+}
+
+/** @brief Width of a list folder's scroll bar: 15 pixels, or on a touch
+ *  panel the plain face's height and 3 when that is more. */
+static inline int tiku_trk_folder_scrollbar_w(void)
+{
+    int fit = tiku_font_plain()->height + 3;
+
+    return (TIKU_SHELL_TOUCH && fit > 15) ? fit : 15;
+}
 
 /**
  * @brief Row slots whose signatures a window keeps.

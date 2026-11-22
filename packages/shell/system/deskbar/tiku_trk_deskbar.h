@@ -305,6 +305,15 @@ const char *tiku_trk_deskbar_tip(const tiku_trk_deskbar_t *db);
 int tiku_trk_deskbar_menu_bottom(const tiku_trk_deskbar_t *db);
 
 /**
+ * @brief Whether (@p x, @p y) is on a popup of the bar that is open: the
+ *        leaf menu, its submenu, a window menu, the clock menu or the
+ *        calendar.  The mini dock's running-apps menu is not looked at.
+ * @param frame When not NULL, receives that popup's rectangle on a hit.
+ */
+int tiku_trk_deskbar_popup_at(const tiku_trk_deskbar_t *db, int x, int y,
+                              tiku_rect_t *frame);
+
+/**
  * @brief Whether (@p x, @p y) is within 20 pixels of the open leaf menu or
  *        its open submenu: the margin the pointer may cross without the
  *        menu closing (DB-036).

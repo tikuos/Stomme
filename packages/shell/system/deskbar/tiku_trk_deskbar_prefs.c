@@ -10,9 +10,14 @@
  */
 
 #include "tiku_font.h"
+#include "tiku_shell_product.h"
 #include "tiku_trk_deskbar_prefs.h"
 #include <stdint.h>
 #include <string.h>
+
+#ifndef TIKU_SHELL_TOUCH
+#define TIKU_SHELL_TOUCH 0
+#endif
 
 #define PREF_VERSION 6
 #define PREF_FIELDS  23
@@ -71,7 +76,9 @@ tiku_trk_deskbar_settings_default(tiku_trk_deskbar_settings_t *settings)
     }
     settings->always_on_top = 1;
     settings->show_clock = 1;
-    settings->font_size = 12;
+    /* A touch panel starts a face size up, so text and the controls laid
+     * out from it are a third larger. */
+    settings->font_size = TIKU_SHELL_TOUCH ? 16 : 12;
     settings->show_replicants = 1;
 }
 

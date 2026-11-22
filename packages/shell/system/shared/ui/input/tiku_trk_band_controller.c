@@ -15,7 +15,7 @@
 #define AUTOSCROLL_BAND 6
 #define AUTOSCROLL_FAST 30
 #define AUTOSCROLL_DELAY_US 600000
-#define COUNT_HEIGHT 16
+#define COUNT_HEIGHT tiku_trk_folder_count_h()
 
 void
 tiku_trk_band_controller_init(tiku_trk_band_controller_t *controller,

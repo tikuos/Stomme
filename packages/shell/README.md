@@ -13,17 +13,19 @@ handler capacity.
 `TIKU_SHELL_SCREEN_W` and `TIKU_SHELL_SCREEN_H` set the desktop surface in
 pixels; without them it is 1000 by 680.
 
-Three boolean constants select supported optional behavior:
+Four boolean constants select supported optional behavior:
 
 | Constant | Enabled behavior |
 | --- | --- |
 | `TIKU_SHELL_BOARD_SERVICES` | Board namespace, channel and device integration |
 | `TIKU_SHELL_REMOTE_SERVICES` | Remote preedit/caret, accessibility, links and native print routing |
 | `TIKU_SHELL_NOTE_TABS` | Notes placement and automatic window tab hiding |
+| `TIKU_SHELL_TOUCH` | The 16 px face at first start, a folder count line and scroll bar sized from the face, and the lens for presses on small controls |
 
 TikuDesktop enables board services and retains its board job, run, statistics,
 preferences, tray and VFS implementations as product extensions. Kintsugi enables
-remote services and Notes tabs.
+remote services and Notes tabs. TikuSurface enables touch with its panel's
+touch mode.
 These choices preserve the products' existing behavior. The runner and
 supervisor retain application ABI and SDK-identity checks.
 
