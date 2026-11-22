@@ -1275,6 +1275,16 @@ int tick_clock(void *ctx);
 void blit(desktop_t *app);
 void desktop_damage(desktop_t *app, tiku_rect_t rect);
 /**
+ * @brief The box desktop_draw_drag() covers with the pointer at (@p x,
+ *        @p y): up to four 32-pixel icons, each 6 pixels down and right of
+ *        the one before and the first centred on the pointer, with the copy
+ *        badge inside them.
+ */
+static inline tiku_rect_t desktop_drag_box(int x, int y)
+{
+    return (tiku_rect_t){ x - 16, y - 16, 32 + 3 * 6, 32 + 3 * 6 };
+}
+/**
  * @brief Damage @p rect in the frame after the next bounded one, so a small
  *        change far from the main one is not drawn as their union.
  *

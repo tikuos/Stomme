@@ -2,10 +2,40 @@
  * SPDX-License-Identifier: Apache-2.0 */
 #include <assert.h>
 #include "../../system/desktop/tiku_trk_desktop_events.c"
+#include "../../system/shared/ui/tiku_trk_responder.c"
 /** @brief The painter is not linked: a full frame is the flag, as before. */
 void desktop_damage_all(desktop_t *app) { app->dirty = 1; }
 
 static folder_t folder;
+
+/** @brief The damage moves asked for, joined as the painter joins it. */
+static tiku_rect_t moved;
+void desktop_damage(desktop_t *app, tiku_rect_t rect)
+{ (void)app; moved = tiku_rect_union(moved, rect); }
+void desktop_take_damage(desktop_t *app, tiku_rect_t damage)
+{ (void)app; (void)damage; }
+void desktop_pointer_says(desktop_t *app, int x, int y)
+{ (void)app; (void)x; (void)y; }
+#if TIKU_SHELL_BOARD_SERVICES
+void desktop_devtray_hover(desktop_t *app, int was_x, int was_y)
+{ (void)app; (void)was_x; (void)was_y; }
+#endif
+
+/** @brief A folder's move handler: the drag goes where the pointer is. */
+static int follow(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
+{
+    desktop_t *app = self;
+
+    (void)tiku_trk_drag_moved(&app->drag, ev->x, ev->y);
+    *damage = tiku_trk_damage_none();
+    return 1;
+}
+
+/** @brief Whether two rectangles are the same. */
+static int same(tiku_rect_t a, tiku_rect_t b)
+{
+    return a.x == b.x && a.y == b.y && a.w == b.w && a.h == b.h;
+}
 
 struct embed_win *embed_win_of_window(desktop_t *app, const tiku_window_t *w)
 { (void)app; (void)w; return NULL; }
@@ -167,6 +197,27 @@ int main(void)
     tiku_form_key(&app->panels[0].form, TIKU_KEY_BACKSPACE, 0);
     assert(!strcmp(app->panels[0].form.row[0].edit, "caf"));
     puts("PASS: rename/value ownership and described entries edit without external writes");
+
+    /* A move in a file drag damages the drag image's old and new boxes;
+     * the move that starts the drag damages the new one. */
+    tiku_trk_responder_t folders = { .name = "folders", .self = app,
+                                     .move = follow };
+    tiku_trk_responders_init(&app->responders);
+    assert(tiku_trk_responders_push(&app->responders, &folders) == 0);
+    tiku_trk_drag_arm(&app->drag, 100, 100, 1u, 0u, 1, NULL, "/tmp");
+    assert(tiku_trk_drag_add(&app->drag, "/tmp/a.txt") == 0);
+    tiku_event_t mv = { .type = TIKU_EVENT_POINTER_MOVE, .x = 120, .y = 100 };
+    desktop_pointer_move(app, &mv, NULL);
+    assert(tiku_trk_drag_active(&app->drag));
+    assert(same(moved, (tiku_rect_t){ 104, 84, 50, 50 }));
+    moved = (tiku_rect_t){ 0, 0, 0, 0 };
+    mv.x = 160; mv.y = 130;
+    desktop_pointer_move(app, &mv, NULL);
+    assert(same(moved, (tiku_rect_t){ 104, 84, 90, 80 }));
+    moved = (tiku_rect_t){ 0, 0, 0, 0 };
+    desktop_pointer_move(app, &mv, NULL);
+    assert(moved.w == 0);
+    puts("PASS: a file drag's moves damage the drag image where it was and is");
     tiku_workspace_free(app->desk);
     tiku_surface_free(app->surf);
     free(app);

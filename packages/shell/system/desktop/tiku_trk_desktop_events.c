@@ -98,13 +98,17 @@ desktop_pointer_down(desktop_t *app, const tiku_event_t *ev, desktop_loop_t *lp)
 
 /**
  * @brief The pointer moved: record where it is, choose the cursor's shape
- *        for what is under it, hand the move to the responders, and show
- *        or hide a device tray cell's tip.
+ *        for what is under it, hand the move to the responders, show or
+ *        hide a device tray cell's tip, and damage where a dragged icon was
+ *        and is.
  */
 void
 desktop_pointer_move(desktop_t *app, const tiku_event_t *ev, desktop_loop_t *lp)
 {
     int was_x = app->ptr_x, was_y = app->ptr_y;
+    /* The drag image as drawn before the responders move the drag. */
+    int dragging = tiku_trk_drag_active(&app->drag);
+    tiku_rect_t drag_was = desktop_drag_box(app->drag.x, app->drag.y);
 
     (void)lp;
     app->ptr_x = ev->x;
@@ -121,6 +125,17 @@ desktop_pointer_move(desktop_t *app, const tiku_event_t *ev, desktop_loop_t *lp)
         desktop_damage(app, tiku_rect_union(
             (tiku_rect_t){ was_x - 16, was_y - 16, 32, 32 },
             (tiku_rect_t){ ev->x - 16, ev->y - 16, 32, 32 }));
+    }
+    if (tiku_trk_drag_active(&app->drag)) {
+        /* The drag image follows the drag: its old and new boxes, or only
+         * the new one when this move started the drag. */
+        tiku_rect_t drag_now = desktop_drag_box(app->drag.x, app->drag.y);
+
+        if (!dragging) {
+            desktop_damage(app, drag_now);
+        } else if (drag_now.x != drag_was.x || drag_now.y != drag_was.y) {
+            desktop_damage(app, tiku_rect_union(drag_was, drag_now));
+        }
     }
 }
 
