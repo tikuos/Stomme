@@ -57,6 +57,12 @@ tiku_window_t *tiku_trk_select_window_handle(
  */
 void tiku_trk_select_window_open(tiku_trk_select_window_t *controller,
                                  void *target, int x, int y);
+/**
+ * @brief Give an open Select window the height its rows take at the current
+ *        plain face, keeping its top edge unless that would leave its foot
+ *        below the screen.
+ */
+void tiku_trk_select_window_refit(tiku_trk_select_window_t *controller);
 
 /**
  * @brief A key for the focused Select window: Return applies, Escape

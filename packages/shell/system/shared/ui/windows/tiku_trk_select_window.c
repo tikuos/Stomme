@@ -225,6 +225,26 @@ event(tiku_window_t *window, const tiku_event_t *event,
 }
 
 void
+tiku_trk_select_window_refit(tiku_trk_select_window_t *controller)
+{
+    tiku_window_t *window = controller->window;
+
+    if (window == NULL || !window->open ||
+        window->frame.h == select_height()) {
+        return;
+    }
+    window->frame.h = select_height();
+    if (window->frame.y + window->frame.h > controller->screen_h) {
+        window->frame.y = controller->screen_h - window->frame.h;
+        if (window->frame.y < 0) {
+            window->frame.y = 0;
+        }
+    }
+    controller->model.y = window->frame.y;
+    mark_dirty(controller);
+}
+
+void
 tiku_trk_select_window_init(tiku_trk_select_window_t *controller,
     tiku_workspace_t *workspace, int screen_w, int screen_h,
     int *dirty, tiku_trk_select_apply_fn apply_callback,

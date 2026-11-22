@@ -128,7 +128,8 @@ resize_desktop(desktop_t *app, int width, int height)
 /**
  * @brief Keep the row height in step with the plain font: when the font's
  *        height changes, set the new row height in every controller that
- *        keeps a copy, and repaint.
+ *        keeps a copy, give an open Select window its new height, and
+ *        repaint.
  * @note Called at the start of every frame, so a font changed from any
  *       window is followed.
  */
@@ -150,6 +151,7 @@ follow_font(desktop_t *app)
      * The open views are not set here: each folder sets its view's row
      * height from folder_render when it draws, after this runs.
      */
+    tiku_trk_select_window_refit(&app->select_window);
     desktop_damage_all(app);
 }
 

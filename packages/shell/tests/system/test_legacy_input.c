@@ -218,6 +218,23 @@ int main(void)
     desktop_pointer_move(app, &mv, NULL);
     assert(moved.w == 0);
     puts("PASS: a file drag's moves damage the drag image where it was and is");
+
+    /* An open Select window left with a smaller face's height takes the
+     * current face's again, its foot kept on the screen. */
+    tiku_trk_select_window_init(&app->select_window, app->desk, 800, 600,
+                                &app->dirty, NULL, NULL);
+    tiku_trk_select_window_open(&app->select_window, &folder, 100, 100);
+    tiku_window_t *sel = tiku_trk_select_window_handle(&app->select_window);
+    assert(sel);
+    int fits = sel->frame.h;
+    sel->frame.h = fits - 20;
+    tiku_trk_select_window_refit(&app->select_window);
+    assert(sel->frame.h == fits && sel->frame.y == app->select_window.model.y);
+    sel->frame.h = fits - 20;
+    sel->frame.y = 600 - sel->frame.h;
+    tiku_trk_select_window_refit(&app->select_window);
+    assert(sel->frame.h == fits && sel->frame.y + sel->frame.h == 600);
+    puts("PASS: an open Select window follows the face's height");
     tiku_workspace_free(app->desk);
     tiku_surface_free(app->surf);
     free(app);
