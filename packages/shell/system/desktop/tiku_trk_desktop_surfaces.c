@@ -653,4 +653,6 @@ desktop_responders_attach(desktop_t *app)
     (void)tiku_trk_responders_push(&app->responders, &app->status_responder);
     (void)tiku_trk_responders_push(&app->responders,
                                    &app->forcequit_responder);
+    /* Last, so above every other surface. */
+    desktop_calibrate_attach(app);
 }

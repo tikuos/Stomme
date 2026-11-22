@@ -66,6 +66,7 @@
 #include "tiku_trk_desktop_view.h"
 #include "tiku_trk_drag.h"
 #include "tiku_trk_drag_target.h"
+#include "tiku_trk_pointer_fit.h"
 #include "tiku_trk_drop_controller.h"
 #include "tiku_trk_find.h"
 #include "tiku_trk_find_window.h"
@@ -213,6 +214,59 @@ typedef struct {
     tiku_rgb_t   px[(DESKTOP_LENS_VIEW_W / DESKTOP_LENS_MENU_SCALE) *
                     (DESKTOP_LENS_VIEW_H / DESKTOP_LENS_MENU_SCALE)];
 } desktop_lens_t;
+
+/* The touch calibration page: how many targets it asks for, how long a
+ * fitted map waits to be kept, and how long a closing line stays. */
+#define DESKTOP_CALIBRATE_TAPS 9
+#define DESKTOP_CALIBRATE_KEEP_US 10000000
+#define DESKTOP_CALIBRATE_NOTE_US 3000000
+
+/** @brief What the calibration page is doing. */
+enum {
+    DESKTOP_CALIBRATE_OFF,      /* not on the screen */
+    DESKTOP_CALIBRATE_ASK,      /* asking for a tap on a target */
+    DESKTOP_CALIBRATE_CONFIRM,  /* the fitted map is in force, not yet kept */
+    DESKTOP_CALIBRATE_NOTE      /* one closing line */
+};
+
+/**
+ * @brief The product's pointer map, which the calibration page corrects.
+ * @note A product built with TIKU_SHELL_TOUCH supplies the three as
+ *       tiku_shell_touch_fit(), tiku_shell_touch_keep() and
+ *       tiku_shell_touch_revert(); fit is NULL in a desktop without them,
+ *       which then has no calibration page.
+ */
+typedef struct {
+    /** Correct the map so that the positions it now reports at the
+     *  screen's left, right, top and bottom edges become those edges.
+     *  The corrected map is in force at once and stored nowhere.
+     *  Returns 0, or -1 and no change when the product refuses it. */
+    int (*fit)(int x0, int x1, int y0, int y1);
+    /** Store the map in force.  Returns 0, or -1 when it was not stored. */
+    int (*keep)(void);
+    /** Put the stored map back in force. */
+    void (*revert)(void);
+} desktop_pointer_map_t;
+
+/**
+ * @brief The touch calibration page.
+ * @note While it shows it covers the screen and takes every press and key.
+ *       It asks for a tap on each of DESKTOP_CALIBRATE_TAPS crosses, fits a
+ *       line through the taps on each axis and hands the product the
+ *       result.  The corrected map then waits DESKTOP_CALIBRATE_KEEP_US for
+ *       a tap on the Keep box: with one it is stored, without one the
+ *       stored map comes back.  Taps that fit no line change nothing.
+ */
+typedef struct {
+    desktop_pointer_map_t map;  /* the product's map; fit NULL without one */
+    int          phase;         /* DESKTOP_CALIBRATE_* */
+    int          step;          /* the target being asked for */
+    int          x[DESKTOP_CALIBRATE_TAPS]; /* where each tap was reported */
+    int          y[DESKTOP_CALIBRATE_TAPS];
+    int64_t      until;         /* when the wait or the closing line ends */
+    int          left;          /* the seconds the page last showed */
+    const char  *note;          /* the closing line */
+} desktop_calibrate_t;
 
 /** @brief How much of the count view's text a script can read. */
 #define TIKU_TRK_COUNT_TEXT_MAX 64
@@ -733,6 +787,7 @@ typedef struct desktop {
     unsigned             drag_live_mods; /**< the modifiers as of
                                           *   the last move */
     desktop_lens_t       lens;          /**< the touch lens */
+    desktop_calibrate_t  calibrate;     /**< the touch calibration page */
     /** The column title strip's gesture, one at a time, in the folder window
      * the press was in (TS-063). */
     tiku_trk_titleview_t tstrip;
@@ -841,6 +896,7 @@ typedef struct desktop {
     tiku_trk_responder_t  status_responder; /**< the alert and the
                                              *   progress window */
     tiku_trk_responder_t  forcequit_responder; /**< the Force Quit window */
+    tiku_trk_responder_t  calibrate_responder; /**< the calibration page */
     tiku_trk_responder_t  windows_responder; /**< the window frames */
     tiku_trk_responder_t  folders_responder; /**< the folders' content */
     tiku_trk_responder_t  infowin_responder; /**< the Info windows */
@@ -1341,6 +1397,27 @@ static inline tiku_rect_t desktop_drag_box(int x, int y)
  */
 void desktop_damage_later(desktop_t *app, tiku_rect_t rect);
 void desktop_damage_all(desktop_t *app);
+/** @brief Put the calibration page on the responder list, above the
+ *         surfaces already there. */
+void desktop_calibrate_attach(desktop_t *app);
+/** @brief Show the touch calibration page, when the product has a pointer
+ *         map to correct; it starts at its first target. */
+void desktop_calibrate_begin(desktop_t *app);
+/** @brief The point of target @p i of the calibration page: a three by
+ *         three grid an eighth of the screen in from its edges. */
+void desktop_calibrate_target(const desktop_t *app, int i, int *x, int *y);
+/** @brief The calibration page's Cancel box. */
+tiku_rect_t desktop_calibrate_cancel_box(const desktop_t *app);
+/** @brief The calibration page's Keep box. */
+tiku_rect_t desktop_calibrate_keep_box(const desktop_t *app);
+/** @brief Draw the calibration page over the finished frame while it shows. */
+void desktop_draw_calibrate(desktop_t *app);
+#if TIKU_SHELL_TOUCH
+/* The product's pointer map; desktop_pointer_map_t says what each does. */
+int tiku_shell_touch_fit(int x0, int x1, int y0, int y1);
+int tiku_shell_touch_keep(void);
+void tiku_shell_touch_revert(void);
+#endif
 void desktop_focus_paint(desktop_t *app);
 void desktop_idle_work(desktop_t *app);
 void desktop_screenshot_tick(desktop_t *app);

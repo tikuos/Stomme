@@ -88,6 +88,227 @@ deliver(desktop_t *app, const tiku_event_t *ev)
 #endif
 }
 
+/* the touch calibration page */
+
+void
+desktop_calibrate_target(const desktop_t *app, int i, int *x, int *y)
+{
+    int w = app->surf->w, h = app->surf->h;
+    int col = i % 3, row = i / 3;
+
+    *x = (col == 0) ? w / 8 : (col == 1) ? w / 2 : w - w / 8;
+    *y = (row == 0) ? h / 8 : (row == 1) ? h / 2 : h - h / 8;
+}
+
+tiku_rect_t
+desktop_calibrate_cancel_box(const desktop_t *app)
+{
+    return (tiku_rect_t){ app->surf->w / 2 - 70, app->surf->h * 70 / 100,
+                          140, 44 };
+}
+
+tiku_rect_t
+desktop_calibrate_keep_box(const desktop_t *app)
+{
+    return (tiku_rect_t){ app->surf->w / 2 - 120, app->surf->h * 52 / 100,
+                          240, 90 };
+}
+
+/** @brief Whether (@p x, @p y) lies in @p r. */
+static int
+calibrate_in(tiku_rect_t r, int x, int y)
+{
+    return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
+}
+
+/** @brief Leave the page with one closing line, or at once with none. */
+static void
+calibrate_end(desktop_t *app, const char *note)
+{
+    desktop_calibrate_t *c = &app->calibrate;
+
+    c->note = note;
+    c->phase = (note != NULL) ? DESKTOP_CALIBRATE_NOTE : DESKTOP_CALIBRATE_OFF;
+    c->until = tiku_trk_now() + DESKTOP_CALIBRATE_NOTE_US;
+    desktop_damage_all(app);
+}
+
+void
+desktop_calibrate_begin(desktop_t *app)
+{
+    desktop_calibrate_t *c = &app->calibrate;
+
+    if (c->map.fit == NULL || c->phase != DESKTOP_CALIBRATE_OFF) {
+        return;
+    }
+    /* The lens does not open over the page, and one left open would lie
+     * over it. */
+    app->lens.shown = app->lens.held = app->lens.picking = 0;
+    c->phase = DESKTOP_CALIBRATE_ASK;
+    c->step = 0;
+    c->note = NULL;
+    desktop_damage_all(app);
+}
+
+/**
+ * @brief The taps are in: fit a line on each axis and hand the product the
+ *        positions it reports at the screen's edges.  A fit that fails, or
+ *        one the product refuses, changes nothing.
+ */
+static void
+calibrate_fit(desktop_t *app)
+{
+    desktop_calibrate_t *c = &app->calibrate;
+    int tx[DESKTOP_CALIBRATE_TAPS], ty[DESKTOP_CALIBRATE_TAPS];
+    int x0, x1, y0, y1, i;
+
+    for (i = 0; i < DESKTOP_CALIBRATE_TAPS; i++) {
+        desktop_calibrate_target(app, i, &tx[i], &ty[i]);
+    }
+    if (tiku_trk_pointer_fit(tx, c->x, DESKTOP_CALIBRATE_TAPS,
+                             app->surf->w - 1, &x0, &x1) != 0 ||
+        tiku_trk_pointer_fit(ty, c->y, DESKTOP_CALIBRATE_TAPS,
+                             app->surf->h - 1, &y0, &y1) != 0 ||
+        c->map.fit(x0, x1, y0, y1) != 0) {
+        calibrate_end(app, "The taps did not fit a calibration. "
+                           "Nothing was changed.");
+        return;
+    }
+    c->phase = DESKTOP_CALIBRATE_CONFIRM;
+    c->until = tiku_trk_now() + DESKTOP_CALIBRATE_KEEP_US;
+    c->left = -1;
+    desktop_damage_all(app);
+}
+
+/** @brief The page takes every press while it shows. */
+static int
+calibrate_hit(void *self, int x, int y)
+{
+    desktop_t *app = self;
+
+    (void)x; (void)y;
+    return app->calibrate.phase != DESKTOP_CALIBRATE_OFF;
+}
+
+/**
+ * @brief A press on the page: a tap for the target asked for, Cancel, Keep,
+ *        or the end of a closing line.
+ */
+static int
+calibrate_press(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
+{
+    desktop_t *app = self;
+    desktop_calibrate_t *c = &app->calibrate;
+
+    *damage = tiku_trk_damage_none();
+    switch (c->phase) {
+    case DESKTOP_CALIBRATE_ASK:
+        if (calibrate_in(desktop_calibrate_cancel_box(app), ev->x, ev->y)) {
+            calibrate_end(app, NULL);
+            break;
+        }
+        c->x[c->step] = ev->x;
+        c->y[c->step] = ev->y;
+        c->step++;
+        if (c->step == DESKTOP_CALIBRATE_TAPS) {
+            calibrate_fit(app);
+        } else {
+            desktop_damage_all(app);
+        }
+        break;
+    case DESKTOP_CALIBRATE_CONFIRM:
+        /* Only the Keep box answers: a tap elsewhere may be the new map
+         * landing wrong, and the wait ends by itself. */
+        if (calibrate_in(desktop_calibrate_keep_box(app), ev->x, ev->y)) {
+            calibrate_end(app, (c->map.keep() == 0)
+                ? "The touch calibration was saved."
+                : "The calibration is in use but could not be saved.");
+        }
+        break;
+    case DESKTOP_CALIBRATE_NOTE:
+        calibrate_end(app, NULL);
+        break;
+    default:
+        return 0;
+    }
+    return 1;
+}
+
+/** @brief Moves and releases over the page go nowhere. */
+static int
+calibrate_swallow(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
+{
+    desktop_t *app = self;
+
+    (void)ev;
+    *damage = tiku_trk_damage_none();
+    return app->calibrate.phase != DESKTOP_CALIBRATE_OFF;
+}
+
+/** @brief Escape leaves the page, putting the stored map back when a
+ *         fitted one waits; the page takes every other key too. */
+static int
+calibrate_key(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
+{
+    desktop_t *app = self;
+    desktop_calibrate_t *c = &app->calibrate;
+
+    *damage = tiku_trk_damage_none();
+    if (c->phase == DESKTOP_CALIBRATE_OFF) {
+        return 0;
+    }
+    if (ev->type == TIKU_EVENT_KEY_DOWN && ev->key == TIKU_KEY_ESCAPE) {
+        if (c->phase == DESKTOP_CALIBRATE_CONFIRM) {
+            c->map.revert();
+        }
+        calibrate_end(app, NULL);
+    }
+    return 1;
+}
+
+/** @brief The clock: a fitted map not kept in time gives way to the stored
+ *         one, the seconds left are shown again as they change, and a
+ *         closing line ends. */
+static int
+calibrate_tick(void *self, int64_t now, tiku_rect_t *damage)
+{
+    desktop_t *app = self;
+    desktop_calibrate_t *c = &app->calibrate;
+
+    *damage = tiku_trk_damage_none();
+    if (c->phase == DESKTOP_CALIBRATE_CONFIRM) {
+        int left = (int)((c->until - now + 999999) / 1000000);
+
+        if (now >= c->until) {
+            c->map.revert();
+            calibrate_end(app, "Not kept: the earlier calibration is back.");
+            return 1;
+        }
+        if (left != c->left) {
+            c->left = left;
+            desktop_damage_all(app);
+            return 1;
+        }
+    } else if (c->phase == DESKTOP_CALIBRATE_NOTE && now >= c->until) {
+        calibrate_end(app, NULL);
+        return 1;
+    }
+    return 0;
+}
+
+void
+desktop_calibrate_attach(desktop_t *app)
+{
+    app->calibrate_responder = (tiku_trk_responder_t){
+        .name = "calibrate", .self = app, .hit = calibrate_hit,
+        .press = calibrate_press, .move = calibrate_swallow,
+        .release = calibrate_swallow, .key = calibrate_key,
+        .tick = calibrate_tick
+    };
+    (void)tiku_trk_responders_push(&app->responders,
+                                   &app->calibrate_responder);
+}
+
 /** @brief Whether (@p x, @p y) lies in @p r. */
 static int
 lens_in(tiku_rect_t r, int x, int y)
@@ -221,7 +442,8 @@ lens_close(desktop_t *app)
 }
 
 /**
- * @brief A press while the touch lens is used.
+ * @brief A press while the touch lens is used and the calibration page is
+ *        not showing.
  * @return 1 when the lens took the press, which then reaches no surface.
  * @note With the lens open: a press in its view is a pick; a press
  *       within DESKTOP_LENS_AGAIN pixels of the one that opened the lens,
@@ -244,7 +466,8 @@ lens_open(desktop_t *app, const tiku_event_t *ev)
     tiku_rect_t menu;
     int i, j, aw, ah;
 
-    if (!l->used || l->passing || s == NULL) {
+    if (!l->used || l->passing || s == NULL ||
+        app->calibrate.phase != DESKTOP_CALIBRATE_OFF) {
         return 0;
     }
     if (l->shown) {

@@ -110,7 +110,8 @@ enum {
     /* Query-icon drop menu (Q-034) */
     TIKU_TRK_CMD_CREATE_QUERY,
     TIKU_TRK_CMD_CREATE_QUERY_TPL,
-    TIKU_TRK_CMD_CANCEL
+    TIKU_TRK_CMD_CANCEL,
+    TIKU_TRK_CMD_CALIBRATE_TOUCH     /* the system menu's calibration page */
 };
 
 /*

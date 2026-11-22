@@ -418,6 +418,12 @@ rebuild_global_bar(desktop_t *app)
                         (void)tiku_menu_add(&app->sysmenu,
                                     tiku_str("cmd.preferences"),
                                     TIKU_TRK_CMD_PREFERENCES, 0, 0u, 1);
+            if (app->calibrate.map.fit != NULL) {
+                /* Only a product with a pointer map to correct has the
+                 * page. */
+                (void)tiku_menu_add(&app->sysmenu, "Calibrate Touch...",
+                                    TIKU_TRK_CMD_CALIBRATE_TOUCH, 0, 0u, 1);
+            }
             (void)tiku_menu_add_separator(&app->sysmenu);
             (void)tiku_menu_add(&app->sysmenu,
                                     tiku_str("cmd.screenshot"),
@@ -576,6 +582,9 @@ system_invoke(desktop_t *app, int command)
     case TIKU_TRK_CMD_SCREENSHOT:
         /* Taken from the next frame drawn, after the menu has closed. */
         app->shot_pending = 1;
+        return 1;
+    case TIKU_TRK_CMD_CALIBRATE_TOUCH:
+        desktop_calibrate_begin(app);
         return 1;
     case TIKU_TRK_CMD_APP_HELP:
         /* The focused window's help page, which rebuild_global_bar() put

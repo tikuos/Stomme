@@ -20,12 +20,20 @@ Four boolean constants select supported optional behavior:
 | `TIKU_SHELL_BOARD_SERVICES` | Board namespace, channel and device integration |
 | `TIKU_SHELL_REMOTE_SERVICES` | Remote preedit/caret, accessibility, links and native print routing |
 | `TIKU_SHELL_NOTE_TABS` | Notes placement and automatic window tab hiding |
-| `TIKU_SHELL_TOUCH` | The 16 px face at first start, a folder count line and scroll bar sized from the face, and the lens for presses on small controls |
+| `TIKU_SHELL_TOUCH` | The 16 px face at first start, a folder count line and scroll bar sized from the face, the lens for presses on small controls, and the touch calibration page |
 
 TikuDesktop enables board services and retains its board job, run, statistics,
 preferences, tray and VFS implementations as product extensions. Kintsugi enables
 remote services and Notes tabs. TikuSurface enables touch with its panel's
 touch mode.
+
+A product that enables touch supplies its pointer map as three functions:
+`tiku_shell_touch_fit()` corrects the map from the positions it reports at
+the screen's four edges and stores nothing, `tiku_shell_touch_keep()` stores
+the map in force, and `tiku_shell_touch_revert()` puts the stored map back.
+The Tiku menu's "Calibrate Touch..." opens a page that asks for nine taps,
+fits a line through them on each axis, hands the product the result and
+keeps it only when its Keep box is tapped within ten seconds.
 These choices preserve the products' existing behavior. The runner and
 supervisor retain application ABI and SDK-identity checks.
 

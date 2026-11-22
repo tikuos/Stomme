@@ -24,6 +24,7 @@ void desktop_draw_popup(desktop_t *app);
 void desktop_draw_bars(desktop_t *app);
 void desktop_draw_drag(desktop_t *app);
 void desktop_draw_lens(desktop_t *app);
+void desktop_draw_calibrate(desktop_t *app);
 void desktop_draw_strip_drag(desktop_t *app);
 /* End of the forward declarations. */
 
@@ -428,6 +429,7 @@ draw_frame(desktop_t *app, const tiku_rect_t *damage, int64_t started)
     desktop_draw_popup(app);
     desktop_draw_overlays(app);
     desktop_draw_lens(app);
+    desktop_draw_calibrate(app);
     desktop_draw_splash(app);
     desktop_forcequit_overlay(app);
     tiku_clip_damage(app->surf, NULL);
@@ -1083,6 +1085,74 @@ desktop_draw_lens(desktop_t *app)
                                                 s, s },
                       l->px[j * l->area.w + i]);
         }
+    }
+}
+
+/** @brief Draw @p text in @p font with its middle at @p cx and its
+ *         baseline at @p y. */
+static void
+calibrate_line(desktop_t *app, const tiku_font_t *font, int cx, int y,
+               const char *text)
+{
+    tiku_text(app->surf, font, cx - tiku_text_width(font, text) / 2, y, text,
+              TIKU_C_TEXT);
+}
+
+/** @brief Draw a raised box with @p label in its middle. */
+static void
+calibrate_box(desktop_t *app, tiku_rect_t r, const char *label)
+{
+    const tiku_font_t *font = tiku_font_bold();
+
+    tiku_fill(app->surf, r, TIKU_C_PANEL);
+    tiku_bevel(app->surf, r, tiku_tint(TIKU_C_PANEL, TIKU_LIGHTEN_2),
+               tiku_tint(TIKU_C_PANEL, TIKU_DARKEN_2));
+    tiku_frame(app->surf, r, TIKU_C_TEXT);
+    calibrate_line(app, font, r.x + r.w / 2,
+                   r.y + (r.h - font->height) / 2 + font->ascent, label);
+}
+
+/**
+ * @brief Draw the calibration page while it shows: a plain page with its
+ *        title and one line of instruction, and by its phase the cross to
+ *        tap with the Cancel box, the Keep box with the seconds left, or
+ *        the closing line.
+ */
+void
+desktop_draw_calibrate(desktop_t *app)
+{
+    const desktop_calibrate_t *c = &app->calibrate;
+    int w = app->surf->w, h = app->surf->h, y = h * 24 / 100;
+    char line[96];
+
+    if (c->phase == DESKTOP_CALIBRATE_OFF) {
+        return;
+    }
+    tiku_fill(app->surf, (tiku_rect_t){ 0, 0, w, h }, TIKU_C_PANEL);
+    calibrate_line(app, tiku_font_bold(), w / 2, y, "Touch Calibration");
+    y += tiku_font_plain()->height + 10;
+    if (c->phase == DESKTOP_CALIBRATE_ASK) {
+        int x, ty;
+
+        snprintf(line, sizeof line, "Tap the centre of the cross (%d of %d)",
+                 c->step + 1, DESKTOP_CALIBRATE_TAPS);
+        calibrate_line(app, tiku_font_plain(), w / 2, y, line);
+        desktop_calibrate_target(app, c->step, &x, &ty);
+        tiku_frame(app->surf, (tiku_rect_t){ x - 16, ty - 16, 33, 33 },
+                   TIKU_C_TEXT);
+        tiku_fill(app->surf, (tiku_rect_t){ x - 24, ty - 1, 49, 3 },
+                  TIKU_C_TEXT);
+        tiku_fill(app->surf, (tiku_rect_t){ x - 1, ty - 24, 3, 49 },
+                  TIKU_C_TEXT);
+        calibrate_box(app, desktop_calibrate_cancel_box(app), "Cancel");
+    } else if (c->phase == DESKTOP_CALIBRATE_CONFIRM) {
+        snprintf(line, sizeof line,
+                 "Tap the box within %d s to keep this calibration",
+                 (c->left > 0) ? c->left : 0);
+        calibrate_line(app, tiku_font_plain(), w / 2, y, line);
+        calibrate_box(app, desktop_calibrate_keep_box(app), "Keep");
+    } else if (c->note != NULL) {
+        calibrate_line(app, tiku_font_plain(), w / 2, y, c->note);
     }
 }
 

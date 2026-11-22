@@ -66,6 +66,40 @@ static int seen_up(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
     return 1;
 }
 
+/* The product's pointer map, as the calibration page drives it. */
+static int cal_fits, cal_keeps, cal_reverts, cal_edge[4], cal_refuse;
+static int cal_fit(int x0, int x1, int y0, int y1)
+{
+    cal_fits++;
+    cal_edge[0] = x0; cal_edge[1] = x1; cal_edge[2] = y0; cal_edge[3] = y1;
+    return cal_refuse ? -1 : 0;
+}
+static int cal_keep(void) { cal_keeps++; return 0; }
+static void cal_revert(void) { cal_reverts++; }
+/** @brief Tap the calibration page at (@p x, @p y). */
+static void cal_tap(desktop_t *app, int x, int y)
+{
+    tiku_event_t e = { .type = TIKU_EVENT_POINTER_DOWN, .button = 1,
+                       .x = x, .y = y };
+
+    desktop_pointer_down(app, &e, NULL);
+    e.type = TIKU_EVENT_POINTER_UP;
+    desktop_pointer_up(app, &e, NULL);
+}
+/** @brief Tap each target as a panel that reports 17 pixels far at pixel 0
+ *         and about 2 near at the last pixel would report it; with
+ *         @p stuck every tap lands on one point. */
+static void cal_taps(desktop_t *app, int stuck)
+{
+    for (int i = 0; i < DESKTOP_CALIBRATE_TAPS; i++) {
+        int x, y;
+
+        desktop_calibrate_target(app, i, &x, &y);
+        cal_tap(app, stuck ? 300 : (x * 976 + 500) / 1000 + 17,
+                stuck ? 200 : (y * 967 + 500) / 1000 + 17);
+    }
+}
+
 /** @brief Whether two rectangles are the same. */
 static int same(tiku_rect_t a, tiku_rect_t b)
 {
@@ -437,6 +471,76 @@ int main(void)
     app->popup = NULL;
     puts("PASS: the touch lens stays open for a second press that picks the "
          "point under it");
+
+    /* The calibration page shows only for a product with a pointer map.
+     * It takes every press: none reaches the surfaces and no lens opens.
+     * Nine taps give the product the positions it reports at the screen's
+     * edges; the fitted map is kept by a tap on the Keep box and by
+     * nothing else. */
+    tiku_rect_t page_damage;
+    int before;
+    tap.type = TIKU_EVENT_POINTER_UP;
+    desktop_pointer_up(app, &tap, NULL);
+    before = lens_downs;
+    desktop_calibrate_attach(app);
+    desktop_calibrate_begin(app);
+    assert(app->calibrate.phase == DESKTOP_CALIBRATE_OFF);
+    app->calibrate.map = (desktop_pointer_map_t){ cal_fit, cal_keep,
+                                                  cal_revert };
+    desktop_calibrate_begin(app);
+    assert(app->calibrate.phase == DESKTOP_CALIBRATE_ASK);
+    cal_tap(app, bx + 6, by + 6);
+    assert(!app->lens.shown && lens_downs == before &&
+           app->calibrate.step == 1);
+    app->calibrate.step = 0;
+    cal_taps(app, 0);
+    assert(app->calibrate.phase == DESKTOP_CALIBRATE_CONFIRM &&
+           cal_fits == 1 && lens_downs == before);
+    assert(cal_edge[0] >= 15 && cal_edge[0] <= 19 &&
+           cal_edge[1] >= app->surf->w - 4 && cal_edge[1] <= app->surf->w &&
+           cal_edge[2] >= 15 && cal_edge[2] <= 19);
+    cal_tap(app, 5, 5);
+    assert(app->calibrate.phase == DESKTOP_CALIBRATE_CONFIRM && !cal_keeps);
+    tiku_rect_t keep = desktop_calibrate_keep_box(app);
+    cal_tap(app, keep.x + keep.w / 2, keep.y + keep.h / 2);
+    assert(cal_keeps == 1 && !cal_reverts &&
+           app->calibrate.phase == DESKTOP_CALIBRATE_NOTE);
+    cal_tap(app, 5, 5);
+    assert(app->calibrate.phase == DESKTOP_CALIBRATE_OFF);
+    /* A fitted map that is not kept in time gives way to the stored one. */
+    desktop_calibrate_begin(app);
+    cal_taps(app, 0);
+    assert(app->calibrate.phase == DESKTOP_CALIBRATE_CONFIRM && cal_fits == 2);
+    assert(app->calibrate_responder.tick(app, app->calibrate.until - 1,
+                                         &page_damage));
+    assert(app->calibrate.phase == DESKTOP_CALIBRATE_CONFIRM && !cal_reverts);
+    assert(app->calibrate_responder.tick(app, app->calibrate.until,
+                                         &page_damage));
+    assert(cal_reverts == 1 && cal_keeps == 1 &&
+           app->calibrate.phase == DESKTOP_CALIBRATE_NOTE);
+    assert(app->calibrate_responder.tick(app, app->calibrate.until,
+                                         &page_damage));
+    assert(app->calibrate.phase == DESKTOP_CALIBRATE_OFF);
+    /* Taps that fit no line, or a map the product refuses, change
+     * nothing; Cancel leaves at once. */
+    desktop_calibrate_begin(app);
+    cal_taps(app, 1);
+    assert(app->calibrate.phase == DESKTOP_CALIBRATE_NOTE && cal_fits == 2);
+    cal_tap(app, 5, 5);
+    cal_refuse = 1;
+    desktop_calibrate_begin(app);
+    cal_taps(app, 0);
+    assert(app->calibrate.phase == DESKTOP_CALIBRATE_NOTE && cal_fits == 3 &&
+           cal_keeps == 1 && cal_reverts == 1);
+    cal_tap(app, 5, 5);
+    cal_refuse = 0;
+    desktop_calibrate_begin(app);
+    tiku_rect_t cancel = desktop_calibrate_cancel_box(app);
+    cal_tap(app, cancel.x + 4, cancel.y + 4);
+    assert(app->calibrate.phase == DESKTOP_CALIBRATE_OFF && cal_fits == 3 &&
+           lens_downs == before);
+    puts("PASS: the calibration page fits nine taps and keeps the map only "
+         "on a tap in its Keep box");
     tiku_workspace_free(app->desk);
     tiku_surface_free(app->surf);
     free(app);

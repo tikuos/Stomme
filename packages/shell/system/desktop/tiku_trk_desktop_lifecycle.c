@@ -667,6 +667,10 @@ boot_deskbar(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
     splash_stage(app, "storage");
     app->row_h = tiku_font_plain()->height + 5;
     app->lens.used = TIKU_SHELL_TOUCH;
+#if TIKU_SHELL_TOUCH
+    app->calibrate.map = (desktop_pointer_map_t){
+        tiku_shell_touch_fit, tiku_shell_touch_keep, tiku_shell_touch_revert };
+#endif
     app->desk = tiku_workspace_new(app->surf);
     app->deskbar = tiku_trk_deskbar_new(app->backend);
     desktop_responders_attach(app);
