@@ -1231,11 +1231,22 @@ tiku_trk_folder_window_draw(tiku_window_t *window,
     tiku_trk_poseview_set_row_height(folder->view, render->row_h);
     fw_draw_icons(window, surface, content, context, folder, render, list,
                   paint, &area, &rows, &scroll, &total, icons);
-    draw_transients(folder, paint, area, list.x - area.x, list.y - area.y,
-                    icons, rows, scroll);
     tiku_clip_reset(paint);
     fw_draw_finish(window, surface, content, context, &folder, list, paint,
                    rows, scroll, total, icons);
+    /* The band and the rename field go over the frame, inside the rows'
+     * area, never into the kept pixels: the next frame repaints only the
+     * rows that changed, and a band painted into them would stay or be
+     * tinted again (PVL-070). */
+    {
+        tiku_rect_t shown = (paint != surface)
+            ? (tiku_rect_t){ list.x + area.x, list.y + area.y, area.w, area.h }
+            : area;
+
+        tiku_clip_set(surface, tiku_inset(shown, 2));
+        draw_transients(folder, surface, shown, 0, 0, icons, rows, scroll);
+        tiku_clip_reset(surface);
+    }
     draw_count(folder, surface, content, total);
 }
 

@@ -105,6 +105,13 @@ on_name(tiku_trk_folder_window_t *fl, int x)
     return tiku_trk_folder_window_name_at(fl, 0, x, content.y + 5);
 }
 
+/** @brief The pixel of @p s at (@p x, @p y). */
+static tiku_rgb_t
+pixel(const tiku_surface_t *s, int x, int y)
+{
+    return s->px[y * s->w + x];
+}
+
 /** @brief Paint the visible rows of @p fl onto @p s, from a clean ground. */
 static void
 paint_rows(tiku_trk_folder_window_t *fl, tiku_surface_t *s, tiku_rect_t list)
@@ -125,6 +132,8 @@ main(void)
     static tiku_trk_band_controller_t band;
     static tiku_trk_drag_target_t drop;
     static tiku_trk_prefs_t prefs;
+    static char shown_status[256], count_line[64], find_text[64];
+    static int finding;
     tiku_trk_folder_render_t render;
     tiku_trk_folder_lifecycle_t life;
     tiku_backend_t *b = tiku_backend_posix_open();
@@ -151,6 +160,12 @@ main(void)
     render.row_h = 18;
     render.screen_w = 1000;
     render.screen_h = 700;
+    /* The count line a whole window draws reads these. */
+    render.status = shown_status;
+    render.count_text = count_line;
+    render.count_text_size = sizeof count_line;
+    render.finding = &finding;
+    render.find_text = find_text;
     tiku_trk_folder_lifecycle_init(&life, folders, TIKU_WINDOW_MAX, &count,
         &cx, &cy, ws, b, st, &prefs, &render, status, sizeof status,
         &dirty, 1000, 700);
@@ -243,6 +258,36 @@ main(void)
     }
     edit.renaming = 0;
     tiku_field_stop(&edit.rename_edit);
+
+    printf("\nIcon view: a growing band is tinted once (PVL-070)\n");
+    {
+        tiku_rect_t c = tiku_trk_folder_window_content(fl);
+        /* As band.script sweeps: anchored low, then up and to the right
+         * twice; (x0 + 10, y0 + 70) is under both bands, (x0 + 30, y0 + 70)
+         * under the second only. */
+        int x0 = c.x + 150, y0 = c.y + 60;
+        tiku_rgb_t ground, inside, grown;
+
+        tiku_trk_poseview_set_mode(fl->view, TIKU_TRK_MODE_ICON);
+        tiku_trk_band_controller_init(&band, 18, &dirty);
+        tiku_workspace_draw(ws);
+        ground = pixel(surf, x0 + 10, y0 + 70);
+        tiku_trk_band_controller_arm(&band, fl, x0, y0 + 100, 0u);
+        (void)tiku_trk_band_controller_motion(&band, x0 + 20, y0 + 40, 0u);
+        tiku_workspace_draw(ws);
+        (void)tiku_trk_band_controller_motion(&band, x0 + 40, y0 - 8, 0u);
+        tiku_workspace_draw(ws);
+        inside = pixel(surf, x0 + 10, y0 + 70);
+        grown = pixel(surf, x0 + 30, y0 + 70);
+        check(inside != ground && inside == grown, "PVL-070",
+              "the part the band covered before is tinted as the part it "
+              "grew over, not twice");
+        (void)tiku_trk_band_controller_finish(&band);
+        tiku_workspace_draw(ws);
+        check(pixel(surf, x0 + 10, y0 + 70) == ground &&
+              pixel(surf, x0 + 30, y0 + 70) == ground, "PVS-024",
+              "a finished band leaves the ground as it was");
+    }
 
     tiku_trk_folder_lifecycle_close(&life, fl);
     snprintf(cmd, sizeof cmd, "rm -rf %s", work);
