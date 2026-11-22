@@ -17,6 +17,14 @@ static tiku_surface_t snapshot;
 /** @brief Paint each window with its supplied content colour. */
 static void paint(tiku_window_t *w,tiku_surface_t *s,tiku_rect_t r,void *context)
 { (void)w;tiku_fill(s,r,*(tiku_rgb_t *)context); }
+/** @brief Paint the content, then, after a clip ended by a reset, a band
+ *  reaching 8 pixels below the content. */
+static void overhang(tiku_window_t *w,tiku_surface_t *s,tiku_rect_t r,void *context)
+{
+    (void)w;tiku_fill(s,r,*(tiku_rgb_t *)context);
+    tiku_clip_set(s,(tiku_rect_t){r.x,r.y,10,10});tiku_clip_reset(s);
+    tiku_fill(s,(tiku_rect_t){r.x,r.y+r.h-4,r.w,12},0x20c040);
+}
 /** @brief Count close notifications without changing workspace state. */
 static void destroy(tiku_window_t *w,void *context)
 { (void)w;(void)context;++destroyed; }
@@ -87,6 +95,18 @@ int main(void)
     CHECK(captured==1&&released==0);
     CHECK(tiku_workspace_open(ws,"Second",(tiku_rect_t){10,10,200,150},paint,&red,NULL));
     tiku_workspace_deinit(ws);CHECK(captured==1&&released==1);
+    /* A callback that resets its own clip still draws only in its content,
+     * so a frame that reuses the window's cache matches a full frame. */
+    ws=tiku_workspace_init(storage.bytes,sizeof storage.bytes,&s,NULL);
+    a=tiku_workspace_open(ws,"Overhang",(tiku_rect_t){40,40,200,120},overhang,&red,NULL);
+    tiku_rect_t content=tiku_window_content(a),below={content.x,content.y+content.h-4,content.w,12};
+    tiku_workspace_cache_mode(ws,TIKU_CACHE_REFRESH);tiku_workspace_draw(ws);
+    CHECK(pixels[(content.y+content.h-1)*320+content.x+5]==0x20c040);
+    CHECK(pixels[(content.y+content.h+2)*320+content.x+5]!=0x20c040);
+    memcpy(reference,pixels,sizeof pixels);
+    tiku_workspace_cache_mode(ws,TIKU_CACHE_REUSE);tiku_clip_damage(&s,&below);tiku_workspace_draw(ws);
+    tiku_clip_damage(&s,NULL);CHECK(!memcmp(reference,pixels,sizeof pixels));
+    tiku_workspace_deinit(ws);
     ws=tiku_workspace_init(storage.bytes,sizeof storage.bytes,&s,NULL);
     for(int i=0;i<TIKU_WINDOW_MAX;++i)CHECK(tiku_workspace_open(ws,"Window",(tiku_rect_t){0,0,180,90},NULL,NULL,NULL));
     CHECK(!tiku_workspace_open(ws,"Full",(tiku_rect_t){0},NULL,NULL,NULL));

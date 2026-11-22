@@ -59,7 +59,11 @@ typedef enum {
 typedef struct tiku_window tiku_window_t;
 typedef struct tiku_workspace tiku_workspace_t;
 
-/** @brief Draws a window's content into @p content of @p surface. */
+/**
+ * @brief Draws a window's content into @p content of @p surface.
+ * @note On a surface that is not recording, drawing is cut to @p content,
+ *       through the callback's own tiku_clip_set() and tiku_clip_reset().
+ */
 typedef void (*tiku_window_draw_fn)(tiku_window_t *window,
     tiku_surface_t *surface, tiku_rect_t content, void *context);
 /** @brief Handles an event sent to a window; nonzero when it was used. */

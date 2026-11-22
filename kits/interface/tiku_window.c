@@ -741,6 +741,8 @@ static void cache_capture(tiku_workspace_t *ws, int slot, tiku_rect_t r,
  *        TIKU_CACHE_REUSE when the cache matches, otherwise through its
  *        draw callback, caching the result unless caching is off.  A
  *        recording surface always draws.
+ * @note The callback draws with the repaint region narrowed to @p r, so a
+ *       clip it sets or resets stays inside the rectangle the cache holds.
  */
 static void draw_content(tiku_workspace_t *ws, tiku_window_t *w,
                           tiku_rect_t r, int active)
@@ -757,8 +759,13 @@ static void draw_content(tiku_workspace_t *ws, tiku_window_t *w,
         p->scale == (s->scale > 0 ? s->scale : 1)) {
         tiku_blit(s, r.x, r.y, p); ws->cache_hits++;
     } else {
+        int bounded = s->damage_active;
+        tiku_rect_t region = s->damage, inside = s->clip;
+
         ws->content_draws++;
+        if (!s->record) tiku_clip_damage(s, &inside);
         w->draw(w, s, r, w->context);
+        if (!s->record) tiku_clip_damage(s, bounded ? &region : NULL);
         tiku_clip_set(s, r);
         if (!s->record && ws->cache_mode != TIKU_CACHE_OFF)
             cache_capture(ws, slot, r, active);
