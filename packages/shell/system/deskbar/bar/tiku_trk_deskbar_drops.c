@@ -10,6 +10,7 @@
  */
 
 #include "tiku_trk_deskbar_private.h"
+#include "tiku_trk_deskbar_clock.h"
 
 tiku_trk_db_drop_t
 tiku_trk_deskbar_drop_at(const tiku_trk_deskbar_t *db, int x, int y,
@@ -257,6 +258,7 @@ tiku_trk_deskbar_clock_stamp(const tiku_trk_deskbar_t *db, char *out,
 {
     time_t now;
     struct tm tmv;
+    size_t used;
 
     if (db == NULL || out == NULL || max == 0u || !db->settings.show_clock) {
         if (out != NULL && max > 0u) {
@@ -266,10 +268,13 @@ tiku_trk_deskbar_clock_stamp(const tiku_trk_deskbar_t *db, char *out,
     }
     now = (db->fixed_now != 0) ? db->fixed_now : time(NULL);
     (void)localtime_r(&now, &tmv);
-    /* The fields the rendering can vary with: a repaint is owed only when
-     * one of them turns over (DB-044). */
-    (void)strftime(out, max, db->settings.show_seconds
-                                 ? "%a %e %b %H:%M:%S %Z"
-                                 : "%a %e %b %H:%M %Z", &tmv);
+    /* The fields the rendering can vary with, the clock's standing first: a
+     * repaint is owed only when one of them turns over (DB-044). */
+    used = (size_t)snprintf(out, max, "%d ", db_clock_state());
+    if (used < max) {
+        (void)strftime(out + used, max - used, db->settings.show_seconds
+                                                  ? "%a %e %b %H:%M:%S %Z"
+                                                  : "%a %e %b %H:%M %Z", &tmv);
+    }
     return 1;
 }

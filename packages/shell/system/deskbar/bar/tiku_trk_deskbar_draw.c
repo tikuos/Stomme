@@ -10,12 +10,11 @@
  */
 #include "tiku_shell_product.h"
 #include "tiku_trk_deskbar_private.h"
+#include "tiku_trk_deskbar_clock.h"
 #include "tiku_deskbar_paint.h"
 #include <strings.h>
 
 /* Used before they are defined. */
-static void clock_text(const tiku_trk_deskbar_t *db, char *clock,
-                       size_t cap);
 static void fit_label(const tiku_font_t *f, const char *src, int budget,
                       char *out, size_t max);
 void db_draw_calendar(tiku_trk_deskbar_t *db, tiku_surface_t *s,
@@ -353,12 +352,22 @@ tiku_trk_deskbar_motion(tiku_trk_deskbar_t *db, int x, int y)
             y >= db->frame.y + db->frame.h - db_clock_row() - PAD &&
             y < db->frame.y + db->frame.h) {
             /* The clock's tip is the long-form date (DB-044), from the
-             * clock the display reads, frozen or not. */
+             * clock the display reads, frozen or not, and the clock's
+             * standing when it is not current. */
             time_t now = (db->fixed_now != 0) ? db->fixed_now : time(NULL);
             struct tm tmv;
+            int state = db_clock_state();
 
             (void)localtime_r(&now, &tmv);
-            (void)strftime(tip, sizeof tip, "%A, %B %-e, %Y", &tmv);
+            if (state == TIKU_TRK_CLOCK_UNSET) {
+                snprintf(tip, sizeof tip, "Clock not set");
+            } else {
+                size_t used = strftime(tip, sizeof tip, "%A, %B %-e, %Y", &tmv);
+
+                if (state == TIKU_TRK_CLOCK_RESUMED && used < sizeof tip) {
+                    snprintf(tip + used, sizeof tip - used, " (not current)");
+                }
+            }
             tip_y = db->frame.y + db->frame.h - db_clock_row() - PAD;
         } else if (tip_y < 0 && !db->menu_open && db->win_menu_team < 0 &&
             !db->clock_menu_open && x >= db->frame.x &&
@@ -1232,7 +1241,7 @@ db_draw_clock(tiku_trk_deskbar_t *db, tiku_surface_t *s, const tiku_font_t *f,
               int *y)
 {
     char clock[64];
-    int cw;
+    int cw, state;
 
     if (tiku_trk_deskbar_vertical(db->dock)) {
         (*y) += SWITCH_ROW;
@@ -1240,7 +1249,9 @@ db_draw_clock(tiku_trk_deskbar_t *db, tiku_surface_t *s, const tiku_font_t *f,
     if (!db->settings.show_clock) {
         return;
     }
-    clock_text(db, clock, sizeof clock);
+    state = db_clock_state();
+    db_clock_text(&db->settings, db->fixed_now != 0 ? db->fixed_now : time(NULL),
+                  state, clock, sizeof clock);
     cw = tiku_text_width(f, clock);
     if (!tiku_trk_deskbar_vertical(db->dock)) {
         /* Along an edge: inside the bar, after the tray's icons and
@@ -1248,54 +1259,12 @@ db_draw_clock(tiku_trk_deskbar_t *db, tiku_surface_t *s, const tiku_font_t *f,
         tiku_text(s, f, db->frame.x + db->frame.w - (SWITCH_W + 14) -
                   db_hclock_w(db) + 6, db->frame.y +
                   (db->frame.h - f->height) / 2 + f->ascent, clock,
-                  TIKU_C_TEXT);
+                  db_clock_ink(state));
         return;
     }
     tiku_text(s, f, db->frame.x + (db->frame.w - cw) / 2,
               (*y) + (db_clock_row() - f->height) / 2 + f->ascent,
-              clock, TIKU_C_TEXT);
-}
-
-/** @brief The clock's words: the date, the time and, when asked for, the
- *         seconds, the weekday and the zone, from the bar's own clock. */
-static void
-clock_text(const tiku_trk_deskbar_t *db, char *clock, size_t cap)
-{
-    time_t now = (db->fixed_now != 0) ? db->fixed_now : time(NULL);
-    struct tm tmv;
-    char date[32];
-    char time_text[32];
-    char time_fmt[16] = "%H:%M";
-
-    (void)localtime_r(&now, &tmv);
-    if (db->settings.show_seconds) {
-        snprintf(time_fmt, sizeof time_fmt, "%%H:%%M:%%S");
-    }
-    if (strftime(date, sizeof date,
-                 db->settings.show_day_of_week ? "%a %e %b" : "%e %b",
-                 &tmv) == 0) {
-        snprintf(date, sizeof date, "%d", tmv.tm_mday);
-    }
-    if (strftime(time_text, sizeof time_text, time_fmt, &tmv) == 0) {
-        snprintf(time_text, sizeof time_text, "%02d:%02d",
-                 tmv.tm_hour, tmv.tm_min);
-    }
-    if (db->settings.show_timezone) {
-        char zone[16];
-        size_t used;
-
-        if (strftime(zone, sizeof zone, "%Z", &tmv) == 0 ||
-            zone[0] == '\0') {
-            snprintf(zone, sizeof zone, "local");
-        }
-        snprintf(clock, cap, "%s %s", date, time_text);
-        used = strlen(clock);
-        if (used + 1u < cap) {
-            snprintf(clock + used, cap - used, " %s", zone);
-        }
-    } else {
-        snprintf(clock, cap, "%s %s", date, time_text);
-    }
+              clock, db_clock_ink(state));
 }
 
 /** @brief The room the clock takes along a top or bottom edge, with its
@@ -1309,7 +1278,8 @@ db_hclock_w(const tiku_trk_deskbar_t *db)
     if (tiku_trk_deskbar_vertical(db->dock) || !db->settings.show_clock) {
         return 0;
     }
-    clock_text(db, clock, sizeof clock);
+    db_clock_text(&db->settings, db->fixed_now != 0 ? db->fixed_now : time(NULL),
+                  db_clock_state(), clock, sizeof clock);
     return tiku_text_width(tiku_font_plain(), clock) + 12;
 }
 

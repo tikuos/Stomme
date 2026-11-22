@@ -425,9 +425,25 @@ tiku_trk_deskbar_t *tiku_trk_deskbar_new(tiku_backend_t *backend);
  */
 void tiku_trk_deskbar_set_clock(tiku_trk_deskbar_t *db, time_t at);
 
+/** @brief The wall clock's standing, as a product's hook reports it. */
+enum {
+    TIKU_TRK_CLOCK_CURRENT = 0, /**< the time shown is current */
+    TIKU_TRK_CLOCK_UNSET,       /**< never set: no date or time is shown */
+    TIKU_TRK_CLOCK_RESUMED      /**< set before a restart and carried over
+                                 *   it: shown dimmed, with a question mark */
+};
+
+/**
+ * @brief Product hook: the wall clock's standing, a TIKU_TRK_CLOCK_* value.
+ *
+ * Called while drawing the clock when the product's tiku_shell_product.h
+ * defines TIKU_SHELL_CLOCK_STATE as 1; without it the clock is current.
+ */
+int tiku_shell_clock_state(void);
+
 /**
  * @brief The clock's date, time and zone as one string, which changes when
- *        the shown time turns over (DB-044).
+ *        the shown time turns over (DB-044) or the clock's standing does.
  *
  * @return Nonzero while the clock is shown; otherwise @p out is empty.
  */

@@ -13,7 +13,7 @@ handler capacity.
 `TIKU_SHELL_SCREEN_W` and `TIKU_SHELL_SCREEN_H` set the desktop surface in
 pixels; without them it is 1000 by 680.
 
-Four boolean constants select supported optional behavior:
+Five boolean constants select supported optional behavior:
 
 | Constant | Enabled behavior |
 | --- | --- |
@@ -21,11 +21,12 @@ Four boolean constants select supported optional behavior:
 | `TIKU_SHELL_REMOTE_SERVICES` | Remote preedit/caret, accessibility, links and native print routing |
 | `TIKU_SHELL_NOTE_TABS` | Notes placement and automatic window tab hiding |
 | `TIKU_SHELL_TOUCH` | The 16 px face at first start, a folder count line and scroll bar sized from the face, the lens for presses on small controls, and the touch calibration page |
+| `TIKU_SHELL_CLOCK_STATE` | The Deskbar clock asks the product whether its time is current, unset or carried over a restart |
 
 TikuDesktop enables board services and retains its board job, run, statistics,
 preferences, tray and VFS implementations as product extensions. Kintsugi enables
 remote services and Notes tabs. TikuSurface enables touch with its panel's
-touch mode.
+touch mode, and the clock's state.
 
 A product that enables touch supplies its pointer map as three functions:
 `tiku_shell_touch_fit()` corrects the map from the positions it reports at
@@ -34,6 +35,13 @@ the map in force, and `tiku_shell_touch_revert()` puts the stored map back.
 The Tiku menu's "Calibrate Touch..." opens a page that asks for nine taps,
 fits a line through them on each axis, hands the product the result and
 keeps it only when its Keep box is tapped within ten seconds.
+
+A product that enables the clock's state supplies `tiku_shell_clock_state()`,
+which returns `TIKU_TRK_CLOCK_CURRENT`, `TIKU_TRK_CLOCK_UNSET` or
+`TIKU_TRK_CLOCK_RESUMED` (`tiku_trk_deskbar.h`). Unset, the Deskbar shows
+dashes for the time and no date; resumed, the time with a question mark.
+Both are drawn in the dimmed ink of a disabled menu item, and the clock's
+tip names the state.
 These choices preserve the products' existing behavior. The runner and
 supervisor retain application ABI and SDK-identity checks.
 
