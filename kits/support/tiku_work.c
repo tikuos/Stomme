@@ -6,9 +6,10 @@
  *
  * tiku_work.c - workers for anything that waits.
  *
- * One table of slots under one lock.  A worker takes the oldest QUEUED
- * slot whose key has nothing RUNNING, and for a slow job only while fewer
- * than SLOW_MAX slow jobs run; it runs the job unlocked and marks it
+ * One table of slots under one lock and TIKU_WORK_WORKERS workers (4 unless
+ * the build sets it).  A worker takes the oldest QUEUED slot whose key has
+ * nothing RUNNING, and for a slow job only while fewer than SLOW_MAX slow
+ * jobs run; it runs the job unlocked and marks it
  * FINISHED.  The loop takes the FINISHED slots at collect and runs their
  * done unlocked.  Nothing here allocates: the slots are a fixed table,
  * and what a job needs it brought in its own context.  A build that
@@ -35,9 +36,15 @@
 /*---------------------------------------------------------------------------*/
 
 #define SLOTS    64
-#define WORKERS  4
-/* Slow jobs run on at most this many workers at once. */
-#define SLOW_MAX (WORKERS - 1)
+#ifndef TIKU_WORK_WORKERS
+#define TIKU_WORK_WORKERS 4
+#endif
+#define WORKERS  TIKU_WORK_WORKERS
+_Static_assert(WORKERS >= 1, "the pool has a worker");
+/* Slow jobs run on at most this many workers at once: all but one, which
+ * keeps a worker for fast jobs, except in a pool of one, where a fast job
+ * waits for a slow one to end. */
+#define SLOW_MAX (WORKERS > 1 ? WORKERS - 1 : 1)
 
 enum { FREE = 0, QUEUED, RUNNING, FINISHED };
 
