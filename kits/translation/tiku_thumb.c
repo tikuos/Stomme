@@ -45,8 +45,10 @@ blob_path(const char *path, char *out, size_t max)
     /* No mkdir here: tiku_thumb_load() calls this too, and a read must
      * not create the cache while thumbnails are switched off (TS-053).
      * tiku_thumb_landed() makes the directory when it writes. */
+    /* Thirty-two bits of the hash, so the name is eight digits and the
+     * argument an unsigned long wherever a long is 32 or 64 bits. */
     return (snprintf(out, max, "%s/.cache/tiku-tracker/%08lx.raw", home,
-                     h & 0xffffffffful) > 0) ? 0 : -1;
+                     h & 0xfffffffful) > 0) ? 0 : -1;
 }
 
 /** @brief Write @p n bytes to @p path.  @return 0 on success. */
