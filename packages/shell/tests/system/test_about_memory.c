@@ -1,4 +1,5 @@
-/* Corrected memory-map fixtures use the existing About parser unchanged. */
+/* Corrected memory-map fixtures use the existing About parser unchanged;
+ * the processor row's clock and name text and its chip. */
 #include <assert.h>
 #include "../../system/shared/ui/windows/tiku_trk_about_window.c"
 
@@ -86,5 +87,53 @@ int main(void)
     if (bad_edge) puts("FAIL D-042: bar edge must be sunken");
     if (bad_unused) puts("FAIL D-043: unused capacity must be lighter");
     if (bad_edge || bad_unused) return 1;
+
+    /* The clock in MHz, from 1 GHz in GHz to the hundredth, none for 0. */
+    char text[64];
+    rate_text(320000000UL, text, sizeof text);
+    assert(!strcmp(text, "320 MHz"));
+    rate_text(159999800UL, text, sizeof text);
+    assert(!strcmp(text, "160 MHz"));
+    rate_text(2795000000UL, text, sizeof text);
+    assert(!strcmp(text, "2.80 GHz"));
+    rate_text(0UL, text, sizeof text);
+    assert(text[0] == '\0');
+    /* The name, with the count when there is more than one, or the count
+     * alone. */
+    processor_text(1, "ESP32-S31 rev 0.0", text, sizeof text);
+    assert(!strcmp(text, "ESP32-S31 rev 0.0"));
+    processor_text(2, "ESP32-S31 rev 0.0", text, sizeof text);
+    assert(!strcmp(text, "2 x ESP32-S31 rev 0.0"));
+    processor_text(1, "", text, sizeof text);
+    assert(!strcmp(text, "1 processor"));
+    processor_text(4, "", text, sizeof text);
+    assert(!strcmp(text, "4 processors"));
+    /* A name wider than the column ends in an ellipsis within it. */
+    snprintf(text, sizeof text, "13th Gen Intel(R) Core(TM) i7-1360P with a long tail");
+    fit_text(tiku_font_plain(), text, 120);
+    assert(tiku_text_width(tiku_font_plain(), text) <= 120 &&
+           !strcmp(text + strlen(text) - 3, "..."));
+    snprintf(text, sizeof text, "short");
+    fit_text(tiku_font_plain(), text, 400);
+    assert(!strcmp(text, "short"));
+    /* The chip: pins on each side, the graphite body, the gold die, and
+     * nothing drawn outside its square. */
+    {
+        tiku_surface_t *s = tiku_surface_new(48, 48, TIKU_RGB(1, 2, 3));
+        int inset = CHIP / 6, pitch = (CHIP - 2 * inset) / 6;
+
+        paint_chip(s, 4, 4, CHIP);
+        assert(s->px[(4 + CHIP / 2) * 48 + 4 + CHIP / 2] == TIKU_RGB(0xc9, 0xa2, 0x3f));
+        assert(s->px[(4 + inset + 2) * 48 + 4 + CHIP - inset - 4] == TIKU_RGB(0x2a, 0x2e, 0x35));
+        assert(s->px[(4 + 2) * 48 + 4 + inset + pitch] == TIKU_RGB(0xb8, 0xbe, 0xc8));
+        assert(s->px[(4 + 2) * 48 + 4 + inset + 5 * pitch] == TIKU_RGB(0xb8, 0xbe, 0xc8));
+        assert(s->px[(4 + CHIP - 3) * 48 + 4 + inset + 3 * pitch] == TIKU_RGB(0xb8, 0xbe, 0xc8));
+        assert(s->px[(4 + inset + 2 * pitch) * 48 + 4 + 2] == TIKU_RGB(0xb8, 0xbe, 0xc8));
+        assert(s->px[(4 + inset + 2 * pitch) * 48 + 4 + CHIP - 3] == TIKU_RGB(0xb8, 0xbe, 0xc8));
+        for (int i = 0; i < 48; i++) {
+            assert(s->px[1 * 48 + i] == TIKU_RGB(1, 2, 3) && s->px[i * 48 + 46] == TIKU_RGB(1, 2, 3));
+        }
+        tiku_surface_free(s);
+    }
     return 0;
 }

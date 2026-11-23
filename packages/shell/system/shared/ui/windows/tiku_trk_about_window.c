@@ -6,8 +6,9 @@
  * tiku_trk_about_window.c - the About box.
  *
  * The identity column on the left holds the logo mark in its colour cycle
- * and the wordmark.  Beside it are the release, the processor count, free
- * memory over a gauge and a button naming the newest report; the footer
+ * and the wordmark.  Beside it are the release, the processor as a chip
+ * with its name and its clock, free memory over a gauge and a button naming
+ * the newest report; the footer
  * under both gives the licence and the build stamp.  The connected boards
  * follow, one at a time, and the reports section opens under them.  The
  * box is an application descriptor: it paints its own surface, asks the
@@ -36,6 +37,8 @@
 
 /* The narrowest body width; it holds the identity column's margins. */
 #define ABOUT_W 430
+/* The side of the processor's chip, beside its name and clock. */
+#define CHIP 40
 
 /* The release the box shows. */
 #define ABOUT_VERSION TIKU_SHELL_ABOUT_VERSION
@@ -893,11 +896,21 @@ paint_devices(about_state_t *st, int top)
  * @brief The body's height: the taller of the two columns, plus the
  *        two-line footer.
  */
+/** @brief The processor row's height: the chip, or its two lines of text
+ *  when the face makes them taller. */
+static int processor_row_h(void)
+{
+    int text = 2 * tiku_font_plain()->height + 2;
+
+    return text > CHIP ? text : CHIP;
+}
+
 static int about_body_h(void)
 {
     /* The facts column: 171 px at a 15 px line, growing by three line
-     * heights with the face. */
-    int facts = 171 + 3 * (tiku_font_plain()->height - 15);
+     * heights with the face, with the processor row in place of one. */
+    int facts = 171 + 3 * (tiku_font_plain()->height - 15) -
+                tiku_font_plain()->height + processor_row_h();
     /* The identity column: 16 above, the 80 px mark, the wordmark, its
      * rule, and the line under the rule. */
     int identity = 16 + 80 + 14 + tiku_font_at(28)->height + 6 + 3 + 14 +
@@ -938,6 +951,84 @@ count_cpus(void)
     long n = sysconf(_SC_NPROCESSORS_ONLN);
 
     return (n > 0) ? (int)n : 1;
+}
+
+/** @brief A clock rate as the box writes it: "320 MHz", or "2.80 GHz"
+ *  from 1 GHz; empty for 0. */
+static void
+rate_text(unsigned long hz, char *out, size_t max)
+{
+    if (hz == 0UL) {
+        out[0] = '\0';
+    } else if (hz >= 1000000000UL) {
+        unsigned long hundredths = (hz + 5000000UL) / 10000000UL;
+
+        snprintf(out, max, "%lu.%02lu GHz", hundredths / 100UL, hundredths % 100UL);
+    } else {
+        snprintf(out, max, "%lu MHz", (hz + 500000UL) / 1000000UL);
+    }
+}
+
+/** @brief The processor's line: how many there are and its name, or the
+ *  count alone where the host names none. */
+static void
+processor_text(int ncpu, const char *name, char *out, size_t max)
+{
+    if (name[0] == '\0') {
+        snprintf(out, max, "%d processor%s", ncpu, ncpu == 1 ? "" : "s");
+    } else if (ncpu > 1) {
+        snprintf(out, max, "%d x %s", ncpu, name);
+    } else {
+        snprintf(out, max, "%s", name);
+    }
+}
+
+/** @brief Cut @p text, ending it in "...", until it is at most @p w
+ *  pixels wide in @p font. */
+static void
+fit_text(const tiku_font_t *font, char *text, int w)
+{
+    size_t n = strlen(text);
+
+    while (n > 3u && tiku_text_width(font, text) > w) {
+        n--;
+        memcpy(text + n - 3u, "...", 4u);
+    }
+}
+
+/**
+ * @brief A processor chip, @p size pixels square at (@p x, @p y): a
+ *        graphite package with five pins on each side, a gold die and the
+ *        pin-one dot.  The same colours under every theme, as an icon.
+ */
+static void
+paint_chip(tiku_surface_t *s, int x, int y, int size)
+{
+    int inset = size / 6, body = size - 2 * inset;
+    int pitch = body / 6, pw = size >= 32 ? size / 16 : 2, plen = inset - 1;
+    int die = body / 2, dx = x + inset + (body - die) / 2;
+    int dy = y + inset + (body - die) / 2;
+    tiku_rgb_t pin = TIKU_RGB(0xb8, 0xbe, 0xc8);
+
+    for (int i = 1; i <= 5; i++) {
+        int at = inset + i * pitch - pw / 2;
+
+        tiku_fill(s, (tiku_rect_t){ x + at, y + 1, pw, plen }, pin);
+        tiku_fill(s, (tiku_rect_t){ x + at, y + size - 1 - plen, pw, plen }, pin);
+        tiku_fill(s, (tiku_rect_t){ x + 1, y + at, plen, pw }, pin);
+        tiku_fill(s, (tiku_rect_t){ x + size - 1 - plen, y + at, plen, pw }, pin);
+    }
+    tiku_fill_round(s, (tiku_rect_t){ x + inset, y + inset, body, body }, 3,
+                    TIKU_CORNER_ALL, TIKU_RGB(0x2a, 0x2e, 0x35));
+    tiku_frame_round(s, (tiku_rect_t){ x + inset, y + inset, body, body }, 3,
+                     TIKU_CORNER_ALL, TIKU_RGB(0x55, 0x5c, 0x68));
+    tiku_fill_round(s, (tiku_rect_t){ dx, dy, die, die }, 2, TIKU_CORNER_ALL,
+                    TIKU_RGB(0xc9, 0xa2, 0x3f));
+    tiku_frame_round(s, (tiku_rect_t){ dx, dy, die, die }, 2, TIKU_CORNER_ALL,
+                     TIKU_RGB(0x8a, 0x6a, 0x1e));
+    tiku_hline(s, dx + 2, dy + 2, die - 4, TIKU_RGB(0xec, 0xd5, 0x86));
+    tiku_fill_round(s, (tiku_rect_t){ x + inset + 3, y + inset + 3, 3, 3 }, 1,
+                    TIKU_CORNER_ALL, TIKU_RGB(0x78, 0x80, 0x8c));
 }
 
 /** @brief Total and available memory, in kilobytes. */
@@ -1220,10 +1311,30 @@ paint(about_state_t *st)
     tiku_text(surface, bold, facts_x, y + plain->ascent,
                    TIKU_SHELL_DESKTOP_NAME_SPACE ABOUT_VERSION, TIKU_C_TEXT);
     y += plain->height + 10;
-    snprintf(line, sizeof line, "Processors: %d", st->ncpu);
-    tiku_text(surface, plain, facts_x, y + plain->ascent, line,
-                   TIKU_C_TEXT);
-    y += plain->height + 10;
+    {   /* The processor: its chip, then its name over its clock, read on
+         * every paint so a rate changed while the box is open shows. */
+        char name[96] = "", rate[24];
+        unsigned long hz = 0;
+        int row = processor_row_h(), tx = facts_x + CHIP + 10;
+        int top = y + (row - (2 * plain->height + 2)) / 2;
+
+        if (tiku_sys_processor(name, sizeof name, &hz) != 0) {
+            name[0] = '\0';
+        }
+        paint_chip(surface, facts_x, y + (row - CHIP) / 2, CHIP);
+        processor_text(st->ncpu, name, line, sizeof line);
+        fit_text(plain, line, surface->w - 14 - tx);
+        rate_text(hz, rate, sizeof rate);
+        tiku_text(surface, rate[0] != '\0' ? plain : bold, tx,
+                  rate[0] != '\0' ? top + plain->ascent
+                                  : y + (row - plain->height) / 2 + plain->ascent,
+                  line, TIKU_C_TEXT);
+        if (rate[0] != '\0') {
+            tiku_text(surface, bold, tx, top + plain->height + 2 + plain->ascent, rate,
+                      TIKU_C_TEXT);
+        }
+        y += row + 10;
+    }
     {   /* Memory, with its gauge: what is in use, over what there is. */
         long total = 0, avail = 0;
         tiku_rect_t gauge = { facts_x, y + plain->height + 4,

@@ -199,6 +199,28 @@ tiku_sys_memory(long *total_kb, long *avail_kb)
     }
 }
 
+int
+tiku_sys_processor(char *name, size_t max, unsigned long *hz)
+{
+    uint64_t rate = 0;
+    size_t room = max;
+
+    *hz = 0;
+    if (max == 0u || sysctlbyname("machdep.cpu.brand_string", name, &room, NULL, 0) != 0) {
+        if (max != 0u) {
+            name[0] = '\0';
+        }
+        return -1;
+    }
+    name[max - 1u] = '\0';
+    /* Intel Macs give the clock; Apple silicon does not. */
+    room = sizeof rate;
+    if (sysctlbyname("hw.cpufrequency", &rate, &room, NULL, 0) == 0) {
+        *hz = (unsigned long)rate;
+    }
+    return 0;
+}
+
 long
 tiku_sys_uptime(void)
 {

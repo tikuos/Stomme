@@ -93,6 +93,15 @@ void tiku_sys_memory(long *total_kb, long *avail_kb);
 long tiku_sys_uptime(void);
 
 /**
+ * @brief The processor's name and its clock now, in Hz.
+ *
+ * @p hz is 0 where the host does not give the clock.
+ * @return 0 with @p name filled; -1, with @p name empty, where the host
+ *         names no processor
+ */
+int tiku_sys_processor(char *name, size_t max, unsigned long *hz);
+
+/**
  * @brief Put the path of this program's own executable, symbolic links
  *        resolved, in @p out.
  * @return 0 when @p out holds a path; -1, with @p out empty, otherwise.

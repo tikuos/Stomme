@@ -193,6 +193,63 @@ tiku_sys_processes(void (*fn)(const tiku_sys_process_t *process, void *ctx),
     return offered;
 }
 
+/** @brief The value after the colon of @p line's field @p key, trimmed,
+ *  into @p out; 1 when @p line holds that field. */
+static int
+cpuinfo_field(const char *line, const char *key, char *out, size_t max)
+{
+    size_t n = strlen(key), len;
+    const char *v;
+
+    if (strncmp(line, key, n) != 0 || (line[n] != ' ' && line[n] != '\t' && line[n] != ':')) {
+        return 0;
+    }
+    v = strchr(line + n, ':');
+    if (v == NULL) {
+        return 0;
+    }
+    for (v++; *v == ' ' || *v == '\t'; v++) {
+    }
+    len = strcspn(v, "\n");
+    snprintf(out, max, "%.*s", (int)len, v);
+    return out[0] != '\0';
+}
+
+int
+tiku_sys_processor(char *name, size_t max, unsigned long *hz)
+{
+    FILE *f = fopen("/proc/cpuinfo", "r");
+    char line[256], value[128];
+    unsigned long khz = 0;
+    double mhz = 0.0;
+
+    name[0] = '\0';
+    *hz = 0;
+    /* x86 and Arm give a model name; RISC-V its microarchitecture or ISA. */
+    while (f != NULL && fgets(line, sizeof line, f) != NULL) {
+        if (name[0] == '\0' && (cpuinfo_field(line, "model name", value, sizeof value) ||
+                                cpuinfo_field(line, "uarch", value, sizeof value) ||
+                                cpuinfo_field(line, "isa", value, sizeof value))) {
+            snprintf(name, max, "%s", value);
+        } else if (mhz == 0.0 && cpuinfo_field(line, "cpu MHz", value, sizeof value)) {
+            mhz = strtod(value, NULL);
+        }
+    }
+    if (f != NULL) {
+        (void)fclose(f);
+    }
+    /* The clock now, where the kernel scales it; else the one cpuinfo gives. */
+    f = fopen("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq", "r");
+    if (f != NULL) {
+        if (fscanf(f, "%lu", &khz) != 1) {
+            khz = 0;
+        }
+        (void)fclose(f);
+    }
+    *hz = khz != 0 ? khz * 1000UL : (unsigned long)(mhz * 1000000.0 + 0.5);
+    return name[0] != '\0' ? 0 : -1;
+}
+
 void
 tiku_sys_memory(long *total_kb, long *avail_kb)
 {
