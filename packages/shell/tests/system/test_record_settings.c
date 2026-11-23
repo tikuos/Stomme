@@ -38,6 +38,19 @@ static tiku_resource_error_t change(tiku_resource_registry_t *registry,const cha
     tiku_resource_job_info_clear(&job);tiku_resource_job_info_clear(&out);return error;
 }
 
+/** @brief Whether the file at @p path holds the bytes of @p text. */
+static int file_holds(const char *path, const char *text)
+{
+    static char bytes[65536];
+    FILE *f = fopen(path, "rb");
+    size_t n, k = strlen(text), i;
+    if (!f) return 0;
+    n = fread(bytes, 1, sizeof bytes, f);
+    fclose(f);
+    for (i = 0; i + k <= n; i++) if (!memcmp(bytes + i, text, k)) return 1;
+    return 0;
+}
+
 int main(void)
 {
     char directory[]="/tmp/stomme-records-XXXXXX",path[512];tiku_store_t *store;tiku_trk_prefs_t table;tiku_trk_deskbar_prefs_t bar;
@@ -104,6 +117,26 @@ int main(void)
         CHECK(!change(registry,"/settings/deskbar/recent_enabled",input,144));tiku_msg_free(input);CHECK(!bar.value.recent_enabled[0] && bar.value.recent_enabled[1] && !bar.value.recent_enabled[2]);
         snapshot=read_value(registry,"/settings/deskbar/profile");CHECK(tiku_msg_count(snapshot.desired,"member")==18 && !change(registry,"/settings/deskbar/profile",snapshot.desired,145));tiku_resource_snapshot_clear(&snapshot);
         snapshot=read_value(registry,"/settings/ui/font/profile");CHECK(tiku_msg_count(snapshot.desired,"member")==3 && !change(registry,"/settings/ui/font/profile",snapshot.desired,146));tiku_resource_snapshot_clear(&snapshot);
+    }
+    {
+        /* Unsaved session records wait for the autosave interval. */
+        char sidecar[512];
+        snprintf(sidecar, sizeof sidecar, "%s/tracker/devices/test.state", directory);
+        tiku_trk_record_settings_autosave(records, 3600000);
+        CHECK(!tiku_state_write(store, TIKU_KEY_SESSION, "_trk/test_autosave", "autosave-one", 12));
+        CHECK(tiku_store_unsaved(store));
+        tiku_trk_record_settings_poll(records, 10000);
+        drain();
+        CHECK(!tiku_store_unsaved(store) && file_holds(sidecar, "autosave-one"));
+        CHECK(!tiku_state_write(store, TIKU_KEY_SESSION, "_trk/test_autosave", "autosave-two", 12));
+        tiku_trk_record_settings_poll(records, 20000);
+        drain();
+        CHECK(tiku_store_unsaved(store) && file_holds(sidecar, "autosave-one") &&
+              !file_holds(sidecar, "autosave-two"));
+        tiku_trk_record_settings_poll(records, 10000 + 3600000);
+        drain();
+        CHECK(!tiku_store_unsaved(store) && file_holds(sidecar, "autosave-two"));
+        tiku_trk_record_settings_autosave(records, 0);
     }
     tiku_trk_record_settings_close(records);tiku_trk_settings_close(settings);tiku_resource_registry_free(registry);tiku_trk_prefs_free(&table);tiku_store_free(store);
     snprintf(path,sizeof path,"%s/tracker/devices/test.state",directory);CHECK(!unlink(path));snprintf(path,sizeof path,"%s/tracker/devices",directory);CHECK(!rmdir(path));snprintf(path,sizeof path,"%s/tracker",directory);CHECK(!rmdir(path) && !rmdir(directory));

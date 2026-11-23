@@ -315,6 +315,12 @@ tiku_store_free(tiku_store_t *s)
 }
 
 int
+tiku_store_unsaved(const tiku_store_t *s)
+{
+    return s != NULL && s->dirty;
+}
+
+int
 tiku_store_writable(const tiku_store_t *s)
 {
     return (s != NULL) ? s->writable : 0;

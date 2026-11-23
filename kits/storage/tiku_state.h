@@ -113,6 +113,9 @@ int tiku_store_native_attributes(const tiku_store_t *s);
  */
 int tiku_store_writable(const tiku_store_t *s);
 
+/** @brief Whether @p s holds changes it has not persisted: 0 or 1. */
+int tiku_store_unsaved(const tiku_store_t *s);
+
 /**
  * @brief Persist pending changes: a sidecar is written whole, and the other
  *        stores have nothing pending.

@@ -23,6 +23,12 @@ tiku_trk_record_settings_t *tiku_trk_record_settings_open(tiku_store_t *, tiku_t
 /** @brief Submit GUI proposals; font selects the Fonts model as the source.
  */
 int tiku_trk_record_settings_submit(tiku_trk_record_settings_t *, int font);
+/** @brief Write unsaved session records at most once every @p ms; 0, the
+ * default without TIKU_TRK_RECORD_AUTOSAVE_MS, writes them at every reload.
+ * A submit writes at once.
+ */
+void tiku_trk_record_settings_autosave(tiku_trk_record_settings_t *,
+                                       uint64_t ms);
 /** @brief Schedule bounded record reloads or retry cache reconciliation. */
 void tiku_trk_record_settings_poll(tiku_trk_record_settings_t *,
                                    uint64_t now_ms);

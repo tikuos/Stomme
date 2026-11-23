@@ -25,6 +25,12 @@
 #ifndef TIKU_SHELL_POLL_SCALE
 #define TIKU_SHELL_POLL_SCALE 1
 #endif
+/* A build may write unsaved session records less often than it reloads them:
+ * a reload that finds them unsaved writes them only this many milliseconds
+ * after the last such write.  0 writes them at every reload. */
+#ifndef TIKU_TRK_RECORD_AUTOSAVE_MS
+#define TIKU_TRK_RECORD_AUTOSAVE_MS 0
+#endif
 
 /** @brief Metadata for one existing Deskbar setting. */
 typedef struct {
@@ -89,7 +95,7 @@ struct tiku_trk_record_settings {
     record_job_t *job, *queued;
     char paths[RECORD_COUNT][96];
     void (*changed)(void *); void *context;
-    uint64_t next_poll;
+    uint64_t next_poll, autosave_ms, next_autosave;
     int resync;
     tiku_resource_error_t last_error;
 };
@@ -648,6 +654,7 @@ tiku_trk_record_settings_t *tiku_trk_record_settings_open(
     owner->font = font;
     owner->changed = changed;
     owner->context = context;
+    owner->autosave_ms = TIKU_TRK_RECORD_AUTOSAVE_MS;
     tiku_trk_deskbar_prefs_init(bar);
     tiku_trk_deskbar_prefs_load(bar, store);
     tiku_trk_fontprefs_load(font, store);
@@ -697,6 +704,12 @@ int tiku_trk_record_settings_submit(tiku_trk_record_settings_t *owner,int font)
     return 0;
 }
 
+void tiku_trk_record_settings_autosave(tiku_trk_record_settings_t *owner,
+                                       uint64_t ms)
+{
+    if (owner) owner->autosave_ms = ms;
+}
+
 void tiku_trk_record_settings_poll(tiku_trk_record_settings_t *owner,
                                    uint64_t now)
 {
@@ -710,7 +723,14 @@ void tiku_trk_record_settings_poll(tiku_trk_record_settings_t *owner,
     }
     if(owner->job || now<owner->next_poll)return;
     publish(owner);
-    owner->next_poll=now+500*TIKU_SHELL_POLL_SCALE;job=calloc(1,sizeof *job);if(!job)return;
+    owner->next_poll=now+500*TIKU_SHELL_POLL_SCALE;
+    /* A reload with unsaved records would write them: it waits for the
+     * autosave interval. */
+    if (owner->autosave_ms && tiku_store_unsaved(owner->store)) {
+        if (now < owner->next_autosave) return;
+        owner->next_autosave = now + owner->autosave_ms;
+    }
+    job=calloc(1,sizeof *job);if(!job)return;
     if(post(owner,job))release(job);
 }
 
