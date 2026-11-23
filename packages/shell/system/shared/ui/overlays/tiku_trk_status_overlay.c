@@ -239,6 +239,13 @@ tiku_trk_status_overlay_progress_finish(
     controller->progress_opened = 0;
 }
 
+tiku_rect_t
+tiku_trk_status_overlay_progress_frame(
+    const tiku_trk_status_overlay_t *controller)
+{
+    return progress_frame(controller);
+}
+
 int64_t
 tiku_trk_status_overlay_progress_opened(
     const tiku_trk_status_overlay_t *controller)

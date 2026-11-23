@@ -159,6 +159,65 @@ land_new_entry(desktop_t *app, folder_t *fl, const char *made, int seeded,
 }
 
 /**
+ * @brief Repaint the count line of every open folder window, where the
+ *        status text shows; each window's cached content is forgotten so
+ *        the line is drawn anew.
+ */
+static void
+count_lines_damage(desktop_t *app)
+{
+    int i;
+
+    for (i = 0; i < app->folder_count; i++) {
+        folder_t *fl = &app->folders[i];
+        tiku_rect_t c;
+
+        if (fl->win == NULL || !fl->win->open) {
+            continue;
+        }
+        c = tiku_trk_folder_window_content(fl);
+        tiku_workspace_cache_forget(app->desk, fl->win);
+        desktop_damage(app, (tiku_rect_t){ c.x, c.y + c.h - COUNT_H,
+                                           c.w, COUNT_H });
+    }
+}
+
+/**
+ * @brief Redraw what a running operation's progress changed: the folder
+ *        windows' count lines when the status text differs from the one
+ *        last drawn, and the progress panel at most every
+ *        DESKTOP_PROGRESS_REDRAW_US; neither within
+ *        DESKTOP_PROGRESS_QUIET_US of a key or pointer event.  With other
+ *        damage waiting the panel is drawn in the frame after it, so that
+ *        frame is not widened to their union.
+ */
+static void
+progress_damage(desktop_t *app)
+{
+    int64_t now = tiku_trk_now();
+
+    if (now - app->input_seen < DESKTOP_PROGRESS_QUIET_US) {
+        return;
+    }
+    if (strcmp(app->status, app->fs_status_drawn) != 0) {
+        snprintf(app->fs_status_drawn, sizeof app->fs_status_drawn, "%s",
+                 app->status);
+        count_lines_damage(app);
+    }
+    if (now - app->fs_progress_drawn >= DESKTOP_PROGRESS_REDRAW_US) {
+        tiku_rect_t panel = tiku_trk_status_overlay_progress_frame(
+            &app->status_overlay);
+
+        app->fs_progress_drawn = now;
+        if (app->dirty) {
+            desktop_damage_later(app, panel);
+        } else {
+            desktop_damage(app, panel);
+        }
+    }
+}
+
+/**
  * @brief Each turn: keep the file engine's operation going on a worker,
  *        raise its questions, update the status line and the progress
  *        window, select what a finished operation made, and give the focus
@@ -237,7 +296,7 @@ desktop_progress_tick(desktop_t *app)
             tiku_trk_progress_sample(progress_model(app), 0, pr->bytes,
                                      tiku_trk_now());
         }
-        desktop_damage_all(app);
+        progress_damage(app);
         if (tiku_trk_status_overlay_progress_opened(
                 &app->status_overlay) == 0) {
             tiku_trk_status_overlay_progress_start(&app->status_overlay,

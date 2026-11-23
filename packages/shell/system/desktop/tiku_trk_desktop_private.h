@@ -181,6 +181,12 @@
 #define DESKTOP_LENS_SLOP 10
 #define DESKTOP_LENS_AGAIN 24
 #define DESKTOP_LENS_GUARD_US 400000
+/* While a file operation runs, its progress panel is redrawn at most this
+ * often, in microseconds, and its status text when it changes; neither
+ * within DESKTOP_PROGRESS_QUIET_US of a key or pointer event, whose frames
+ * come first. */
+#define DESKTOP_PROGRESS_REDRAW_US 1000000
+#define DESKTOP_PROGRESS_QUIET_US 1000000
 
 /**
  * @brief The touch lens.
@@ -578,6 +584,13 @@ typedef struct desktop {
                                          *   stepping on a worker */
     int                      fs_was_busy; /**< the file engine was busy at the
                                            *   last progress tick */
+    char                     fs_status_drawn[200]; /**< the status text the
+                                                    *   last progress frame
+                                                    *   showed */
+    int64_t                  fs_progress_drawn; /**< when the progress panel
+                                                 *   was last redrawn */
+    int64_t                  input_seen; /**< when the last key or pointer
+                                          *   event arrived */
     int                      thumb_job; /**< a picture is decoding */
     int                      volumes_job; /**< a volume scan is out */
     int                      unmount_job;

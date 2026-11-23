@@ -66,6 +66,9 @@ void tiku_trk_status_overlay_progress_finish(
 /** @brief The recorded opening time, or 0 when none is recorded. */
 int64_t tiku_trk_status_overlay_progress_opened(
     const tiku_trk_status_overlay_t *controller);
+/** @brief Where the progress panel is drawn, in screen pixels. */
+tiku_rect_t tiku_trk_status_overlay_progress_frame(
+    const tiku_trk_status_overlay_t *controller);
 
 /** @brief Draw the progress panel, then the alert above it. */
 void tiku_trk_status_overlay_draw(tiku_trk_status_overlay_t *controller);

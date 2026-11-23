@@ -252,6 +252,13 @@ tracker_run(int argc, char **argv)
                 continue;
             }
             desktop_host_vfs_event(&app,&ev);
+            if (ev.type == TIKU_EVENT_POINTER_DOWN ||
+                ev.type == TIKU_EVENT_POINTER_MOVE ||
+                ev.type == TIKU_EVENT_POINTER_UP ||
+                ev.type == TIKU_EVENT_KEY_DOWN ||
+                ev.type == TIKU_EVENT_TEXT_INPUT) {
+                app.input_seen = tiku_trk_now();
+            }
             if (ev.type != TIKU_EVENT_TEXT_INPUT)
                 (void)tiku_text_input_event(&app.legacy_commit, &ev);
             if (ev.type == TIKU_EVENT_KEY_DOWN ||
