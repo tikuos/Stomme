@@ -348,6 +348,7 @@
     "tests/system/test_poseview.c",
     "tests/system/test_poseview_layout.c",
     "tests/system/test_poseview_records.c",
+    "tests/system/test_posix_changes.c",
     "tests/system/test_prefs.c",
     "tests/system/test_query.c",
     "tests/system/test_reap.c",

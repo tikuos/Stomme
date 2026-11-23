@@ -35,6 +35,7 @@
 typedef struct {
     tiku_store_t *store;
     uint64_t mutations;     /* the platform's mutation count at the last changes */
+    uint64_t next;          /* its place in the platform's change records */
 } posix_impl_t;
 
 /*
@@ -44,6 +45,19 @@ typedef struct {
  * once the count moves, the backend cannot tell and views re-list.
  */
 extern int tiku_posix_mutations(uint64_t *count) __attribute__((weak));
+
+/*
+ * A platform whose file layer records which directory each change touches
+ * defines these.  tiku_posix_changes() copies the directories' ids after
+ * *next (UINT64_MAX: start at the end) and moves *next past them, clearing
+ * *complete when records were lost; tiku_posix_path_of() gives the path of
+ * an id.  The backend then reports each as a change under that directory,
+ * so only the views at or below it re-list.
+ */
+extern int tiku_posix_changes(uint64_t *next, uint64_t *dirs, int max,
+                              int *complete) __attribute__((weak));
+extern int tiku_posix_path_of(uint64_t id, char *out, size_t max)
+    __attribute__((weak));
 
 static tiku_store_t *px_store(tiku_backend_t *b);
 
@@ -693,8 +707,9 @@ px_mkdir(tiku_backend_t *b, const char *path, char *err, size_t errmax)
     return 0;
 }
 
-/** @brief No changes, complete, while the platform's mutation count stands
- *         still; -1 when it moved or the platform keeps none. */
+/** @brief The platform's change records, each a change under a directory;
+ *         without them, no changes while its mutation count stands still,
+ *         and -1 when it moved or the platform keeps none. */
 static int
 px_changes(tiku_backend_t *b, tiku_model_change_t *out, int max,
            int *complete)
@@ -702,8 +717,24 @@ px_changes(tiku_backend_t *b, tiku_model_change_t *out, int max,
     posix_impl_t *impl = (b != NULL) ? b->impl : NULL;
     uint64_t count;
 
-    (void)out;
-    (void)max;
+    if (impl != NULL && (uintptr_t)tiku_posix_changes != 0u &&
+        (uintptr_t)tiku_posix_path_of != 0u && out != NULL && max > 0) {
+        uint64_t dirs[32];
+        int whole = 1, n, i;
+
+        n = tiku_posix_changes(&impl->next, dirs, max < 32 ? max : 32, &whole);
+        if (n < 0) {
+            return -1;
+        }
+        for (i = 0; i < n; i++) {
+            out[i].id = dirs[i];
+            out[i].op = TIKU_CH_SUBTREE;
+        }
+        if (complete != NULL) {
+            *complete = whole;
+        }
+        return n;
+    }
     if (impl == NULL || (uintptr_t)tiku_posix_mutations == 0u ||
         tiku_posix_mutations(&count) != 0) {
         return -1;
@@ -718,12 +749,25 @@ px_changes(tiku_backend_t *b, tiku_model_change_t *out, int max,
     return -1;
 }
 
+/** @brief The path of directory id @p id, from the platform; -1 without
+ *         its records. */
+static int
+px_path_of_id(tiku_backend_t *b, uint64_t id, char *out, size_t max)
+{
+    (void)b;
+    if ((uintptr_t)tiku_posix_path_of == 0u) {
+        return -1;
+    }
+    return tiku_posix_path_of(id, out, max);
+}
+
 static const tiku_backend_ops_t POSIX_OPS = {
-    /* A local filesystem has no change ring: the view re-lists unless the
-     * platform's mutation count shows the tree has not changed.  With no
-     * change records there is no identity to resolve. */
+    /* A local filesystem has no change ring of its own: the platform's
+     * records name the directories that changed, or, without them, the
+     * view re-lists unless the platform's mutation count shows the tree
+     * has not changed. */
     "posix", px_stat, px_list,    px_read,  px_write, px_pump,
-    px_changes, NULL, px_setperm, px_store, px_close, px_mkdir};
+    px_changes, px_path_of_id, px_setperm, px_store, px_close, px_mkdir};
 
 tiku_backend_t *
 tiku_backend_posix_open(void)
@@ -736,6 +780,7 @@ tiku_backend_posix_open(void)
         free(impl);
         return NULL;
     }
+    impl->next = UINT64_MAX;
     b->ops = &POSIX_OPS;
     b->impl = impl;
     return b;
