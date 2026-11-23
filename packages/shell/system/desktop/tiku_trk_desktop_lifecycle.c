@@ -581,6 +581,25 @@ boot_namespace(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
     }
     /* From here a folder under /devices is listed by a worker. */
     desktop_wire_install(app);
+#ifdef TIKU_SHELL_LOCAL_BOARD
+    {
+        /*
+         * The product's own board, mounted as a device without serial
+         * discovery: TIKU_SHELL_LOCAL_BOARD(name, max) returns its backend
+         * and names its folder under /devices, or returns NULL.
+         */
+        char name[64], prefix[80];
+        tiku_backend_t *board = TIKU_SHELL_LOCAL_BOARD(name, sizeof name);
+
+        if (board != NULL) {
+            snprintf(prefix, sizeof prefix, "/devices/%s", name);
+            if (tiku_mount_add(app->backend, prefix, board, 1) != 0) {
+                fprintf(stderr, "tracker: %s is not mounted\n", prefix);
+                tiku_backend_close(board);
+            }
+        }
+    }
+#endif
 #if TIKU_SHELL_BOARD_SERVICES
 
     if (o->want_devices) {

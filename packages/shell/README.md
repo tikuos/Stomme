@@ -42,6 +42,11 @@ which returns `TIKU_TRK_CLOCK_CURRENT`, `TIKU_TRK_CLOCK_UNSET` or
 dashes for the time and no date; resumed, the time with a question mark.
 Both are drawn in the dimmed ink of a disabled menu item, and the clock's
 tip names the state.
+
+A product that runs on a board defines `TIKU_SHELL_LOCAL_BOARD` as a
+function `tiku_backend_t *f(char *name, size_t max)`: at start the desktop
+mounts the backend it returns at `/devices/<name>`, as a device found on a
+port is mounted, without the board services.
 These choices preserve the products' existing behavior. The runner and
 supervisor retain application ABI and SDK-identity checks.
 
