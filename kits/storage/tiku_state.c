@@ -26,7 +26,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#if defined(__linux__) || defined(__APPLE__)
+/* A target without a host's attribute calls may supply them, with Linux's
+ * signatures, and set TIKU_STATE_XATTR to 1. */
+#if defined(__linux__) || defined(__APPLE__) || \
+    (defined(TIKU_STATE_XATTR) && TIKU_STATE_XATTR)
 #include <sys/xattr.h>
 #define TIKU_HAVE_XATTR 1
 #endif

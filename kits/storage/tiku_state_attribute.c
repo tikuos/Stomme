@@ -15,7 +15,10 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#if defined(__linux__) || defined(__APPLE__)
+/* A target without a host's attribute calls may supply them, with Linux's
+ * signatures, and set TIKU_STATE_XATTR to 1. */
+#if defined(__linux__) || defined(__APPLE__) || \
+    (defined(TIKU_STATE_XATTR) && TIKU_STATE_XATTR)
 #include <sys/xattr.h>
 #endif
 
@@ -41,7 +44,7 @@ static ssize_t attribute_get(int fd, const char *name, void *bytes, size_t lengt
 {
 #if defined(__APPLE__)
     return fgetxattr(fd, name, bytes, length, 0, 0);
-#elif defined(__linux__)
+#elif defined(__linux__) || (defined(TIKU_STATE_XATTR) && TIKU_STATE_XATTR)
     return fgetxattr(fd, name, bytes, length);
 #else
     (void)fd; (void)name; (void)bytes; (void)length;
@@ -159,7 +162,7 @@ static int attribute_write(int fd, const tiku_state_attribute_update_t *update)
 #if defined(__APPLE__)
     return update->present ? fsetxattr(fd, update->baseline.name, update->bytes, update->length, 0, 0)
                            : fremovexattr(fd, update->baseline.name, 0);
-#elif defined(__linux__)
+#elif defined(__linux__) || (defined(TIKU_STATE_XATTR) && TIKU_STATE_XATTR)
     return update->present ? fsetxattr(fd, update->baseline.name, update->bytes, update->length, 0)
                            : fremovexattr(fd, update->baseline.name);
 #else
