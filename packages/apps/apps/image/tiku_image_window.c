@@ -32,8 +32,8 @@ struct tiku_image_window {
     uint64_t resource_document; /**< successful document adoption counter */
     tiku_workspace_t *workspace;
     tiku_window_t *window;
-    int *dirty, refs, busy, generation, fit, rotation, watching;
-    int dragging, drag_x, drag_y, hover, cache_valid;
+    int *dirty, refs, busy, generation, fit, rotation, watching, bounded;
+    int dragging, drag_x, drag_y, hover, cache_valid, cache_x, cache_y;
     double zoom, pan_x, pan_y;
     int64_t next;
     char path[TIKU_PATH_MAX], label[TIKU_PATH_MAX], status[256];
@@ -49,7 +49,7 @@ struct tiku_image_window {
  *         back. */
 struct image_job {
     tiku_image_window_t *owner;
-    int generation, same, unchanged, watch;
+    int generation, same, unchanged, watch, max_w, max_h, dropped;
     char path[TIKU_PATH_MAX], label[TIKU_PATH_MAX], error[256];
     unsigned char *data;
     size_t len;
@@ -59,6 +59,7 @@ struct image_job {
 
 static void image_menus(tiku_image_window_t *c);
 static void image_action(tiku_image_window_t *c, int id);
+static void image_layout(tiku_image_window_t *c, tiku_rect_t r);
 
 /** @brief Whether (@p x, @p y) lies in @p r, its right and bottom edges
  *         outside. */
@@ -289,6 +290,11 @@ void tiku_image_window_destroy(tiku_image_window_t *c)
     c->generation++; c->workspace = NULL; c->dirty = NULL;
     c->choose = NULL; c->ctx = NULL;
     image_unref(c);
+}
+
+void tiku_image_window_bound(tiku_image_window_t *c, int on)
+{
+    if (c) c->bounded = on != 0;
 }
 
 tiku_window_t *tiku_image_window_handle(tiku_image_window_t *c)

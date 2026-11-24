@@ -37,6 +37,11 @@ int tiku_image_window_file(tiku_image_window_t *c, const char *path);
  *  @note The bytes are one whole PNG, JPEG or BMP image. */
 int tiku_image_window_bytes(tiku_image_window_t *c,
     const char *label, const void *bytes, size_t len);
+/** @brief With @p on set, decode each image no larger than the view when it
+ *         is asked for, after letting the one shown go, and paint it with
+ *         no cache, for a computer whose memory holds one such picture;
+ *         Actual Size then shows the decoded pixels. */
+void tiku_image_window_bound(tiku_image_window_t *c, int on);
 /** @brief Each turn: while Watch is on, read the file again every two
  *         seconds; @p now is monotonic microseconds. */
 void tiku_image_window_tick(tiku_image_window_t *c, int64_t now);

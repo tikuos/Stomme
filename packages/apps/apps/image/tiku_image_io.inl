@@ -53,18 +53,23 @@ static void image_job_run(void *ctx)
     image_job_t *j = ctx;
     if (!j->data && !image_read_file(j)) {
         snprintf(j->error, sizeof j->error,
-            "Cannot read a stable regular file (limit 32 MiB). "
-            "Previous image kept; refresh paused.");
+            "Cannot read a stable regular file (limit 32 MiB). %s",
+            j->dropped ? "" : "Previous image kept; refresh paused.");
         return;
     }
     if (j->unchanged) return;
-    tiku_image_err_t rc = tiku_image_decode(j->data, j->len, &j->image);
+    tiku_image_err_t rc = tiku_image_decode_fit(j->data, j->len, j->max_w,
+                                                j->max_h, &j->image);
+    /* The file's bytes are not needed past the decode. */
+    free(j->data); j->data = NULL;
     if (rc != TIKU_IMG_OK) {
-        snprintf(j->error, sizeof j->error, "%s Previous image kept.",
+        snprintf(j->error, sizeof j->error, "%s%s",
             rc == TIKU_IMG_NOT_IMAGE ? "Not a PNG, JPEG or BMP image." :
             rc == TIKU_IMG_UNSUPPORTED ?
                 "Unsupported image variant (use baseline JPEG/8-bit PNG)." :
-                "Image is incomplete, invalid or exceeds 16 megapixels.");
+            rc == TIKU_IMG_NO_MEMORY ? "Not enough memory for this image." :
+                "Image is incomplete, invalid or exceeds 16 megapixels.",
+            j->dropped ? "" : " Previous image kept.");
     }
 }
 
@@ -134,9 +139,22 @@ static int image_request(tiku_image_window_t *c, const char *source,
     }
     image_job_t *j = calloc(1, sizeof *j);
     if (!j) return 0;
+    if (c->bounded && !watch && c->image.px) {
+        /* Memory for one picture: the one shown goes before the next is
+         * decoded, and a failure leaves none. */
+        tiku_image_free(&c->image); tiku_image_free(&c->cache);
+        image_changed(c);
+        j->dropped = 1;
+    }
     j->owner = c; j->generation = c->generation;
     j->same = c->image.px && !strcmp(source, c->label);
     j->watch = watch; j->before = c->stamp;
+    if (c->bounded && c->window) {
+        /* The view the image will fill, laid out now when it has not
+         * been drawn. */
+        image_layout(c, tiku_window_content(c->window));
+        j->max_w = c->viewport.w; j->max_h = c->viewport.h;
+    }
     snprintf(j->label, sizeof j->label, "%s", source);
     if (data) {
         j->data = malloc(len);
