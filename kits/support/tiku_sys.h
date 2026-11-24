@@ -89,6 +89,15 @@ int tiku_sys_processes(void (*fn)(const tiku_sys_process_t *process,
  */
 void tiku_sys_memory(long *total_kb, long *avail_kb);
 
+/**
+ * @brief This computer's memories as the maps a TikuOS board reports, each
+ *        line a board's sram_map or nvm_map line after "sram\t" or "nvm\t",
+ *        or after "psram\t" for the same kind of map of its PSRAM.
+ * @return the length written to @p out; 0, with nothing written, where the
+ *         platform has no maps.
+ */
+int tiku_sys_memory_map(char *out, size_t max);
+
 /** @brief Seconds since the machine came up, or 0 where it will not say. */
 long tiku_sys_uptime(void);
 

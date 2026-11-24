@@ -9,8 +9,9 @@
  * and the wordmark.  Beside it are the release, the processor as a chip
  * with its name and its clock, free memory over a gauge and a button naming
  * the newest report; the footer
- * under both gives the licence and the build stamp.  The connected boards
- * follow, one at a time, and the reports section opens under them.  The
+ * under both gives the licence and the build stamp.  When the platform
+ * maps this computer's memories, they follow as bars; then the connected
+ * boards, one at a time, and the reports section opens under them.  The
  * box is an application descriptor: it paints its own surface, asks the
  * host for the PANEL placement role, and refits itself when the face or the
  * boards change.
@@ -42,6 +43,20 @@
 
 /* The release the box shows. */
 #define ABOUT_VERSION TIKU_SHELL_ABOUT_VERSION
+
+/* The boards the devices section keeps; dev[ABOUT_HOST], after them, holds
+ * this computer's own memory maps. */
+#define ABOUT_DEVS  6
+#define ABOUT_HOST  ABOUT_DEVS
+/* The memories an entry maps: SRAM, the NVM and PSRAM, and the areas one
+ * map holds. */
+#define ABOUT_MAPS  3
+#define ABOUT_AREAS 12
+/* The room for a memory's name, bold, left of its bar. */
+#define LABEL_W     70
+/* This computer's memory section: the legend's columns, each this wide. */
+#define HOST_COLS   3
+#define HOST_CELL   215
 
 /*
  * The colour cycle.  Each set of colours is held for HOLD_US, then faded
@@ -101,18 +116,19 @@ typedef struct {
         }             mem[4];
         int           nmem;
         /* Each memory's map as the board reports it: its estates in
-         * order, drawn as one bar with a legend. */
+         * order, drawn as one bar with a legend; lay[0] is the SRAM,
+         * lay[1] the NVM and lay[2] the PSRAM. */
         struct {
-            char          name[16];     /* SRAM, or the NVM's kind */
+            char          name[16];     /* SRAM, PSRAM or the NVM's kind */
             unsigned long total;        /* the bank, or the part */
             struct {
                 char          label[12];
                 unsigned long size, used;   /* in use; stack: headroom */
                 int           live;         /* used is meaningful */
-            }             est[8];
+            }             est[ABOUT_AREAS];
             int           nest;
             unsigned long bank2;        /* a second bank, or 0 */
-        }             lay[2];
+        }             lay[ABOUT_MAPS];
         int           nlay;
         char          has[112];     /* what else is on it          */
         unsigned long part_sram;    /* the SRAM the part is fitted with */
@@ -121,7 +137,7 @@ typedef struct {
         char          up[24];       /* seconds it has been running */
         char          boots[16];
         int           known;        /* the shell has an answer for it */
-    }                          dev[6];
+    }                          dev[ABOUT_DEVS + 1];
     int                        ndev;
     /* The board on show, and where its stepper's arrows were painted,
      * for the hit test. */
@@ -130,8 +146,6 @@ typedef struct {
     /* The button a press is holding: 1 reports, 2 prev, 3 next, 4 open. */
     tiku_press_t               press;
 } about_state_t;
-
-#define ABOUT_DEVS  6
 
 #define REPORT_ROWS    5
 #define ACCOUNT_LINES  7
@@ -178,6 +192,16 @@ static int about_body_w(void)
     int need = 150 + longest + 18;
 
     return (need > ABOUT_W) ? need : ABOUT_W;
+}
+
+/** @brief The box's width: the body's, or wider for this computer's
+ *         memory legend's columns when the platform maps them. */
+static int about_box_w(const about_state_t *st)
+{
+    int host = 18 + HOST_COLS * HOST_CELL + 14;
+
+    return (st->dev[ABOUT_HOST].nlay > 0 && host > about_body_w()) ? host
+                                                                  : about_body_w();
 }
 
 /** @brief What the reports section adds to the box's height when open. */
@@ -314,7 +338,8 @@ about_dev_estate(about_state_t *st, int at, const char *mem, char *rest)
 {
     char *f[4] = { rest, NULL, NULL, NULL };
     unsigned long v[3] = { 0UL, 0UL, 0UL };
-    int nf = 1, i, k, which = (strcmp(mem, "nvm") == 0) ? 1 : 0;
+    int nf = 1, i, k, which = (strcmp(mem, "nvm") == 0) ? 1 :
+                              (strcmp(mem, "psram") == 0) ? 2 : 0;
 
     for (i = 1; i < 4; i++) {
         char *tab = strchr(f[i - 1], '\t');
@@ -341,9 +366,10 @@ about_dev_estate(about_state_t *st, int at, const char *mem, char *rest)
     }
     if (strcmp(f[0], "total") == 0 || strcmp(f[0], "bank") == 0) {
         st->dev[at].lay[which].total = v[0];
-        if (which == 0) {
-            snprintf(st->dev[at].lay[0].name,
-                     sizeof st->dev[at].lay[0].name, "SRAM");
+        if (which != 1) {
+            snprintf(st->dev[at].lay[which].name,
+                     sizeof st->dev[at].lay[which].name, "%s",
+                     which == 2 ? "PSRAM" : "SRAM");
         }
         return;
     }
@@ -352,21 +378,26 @@ about_dev_estate(about_state_t *st, int at, const char *mem, char *rest)
         return;
     }
     k = st->dev[at].lay[which].nest;
-    if (k >= 8) {
+    if (k >= ABOUT_AREAS) {
         return;
     }
     snprintf(st->dev[at].lay[which].est[k].label,
              sizeof st->dev[at].lay[which].est[k].label, "%s", f[0]);
-    /* stack: pool then headroom; tier: size, used, bank; code: window
-     * then in use; store: capacity, then in use when the board says it;
+    /* stack and jobs: pool then headroom; tier: size, used, bank; code:
+     * window then in use; store: capacity, then in use when the board says
+     * it; heap: size, then in use; free: a size none of which is in use;
      * the rest are a size alone. */
     st->dev[at].lay[which].est[k].size = v[0];
-    if (strcmp(f[0], "stack") == 0) {
+    if (strcmp(f[0], "stack") == 0 || strcmp(f[0], "jobs") == 0) {
         /* For the stack, used holds the lowest headroom the board has
          * seen, which the legend prints as headroom; live stays 0. */
         st->dev[at].lay[which].est[k].used = v[1];
         st->dev[at].lay[which].est[k].live = 0;
+    } else if (strcmp(f[0], "free") == 0) {
+        st->dev[at].lay[which].est[k].used = 0;
+        st->dev[at].lay[which].est[k].live = 1;
     } else if (strcmp(f[0], "tier") == 0 || strcmp(f[0], "code") == 0 ||
+               strcmp(f[0], "heap") == 0 ||
                (strcmp(f[0], "store") == 0 && nf >= 3)) {
         st->dev[at].lay[which].est[k].used = v[1];
         st->dev[at].lay[which].est[k].live = 1;
@@ -430,7 +461,8 @@ about_dev_facts(about_state_t *st, int at, const char *text)
                 }
             } else if (strcmp(row, "mem") == 0) {
                 about_dev_mem(st, at, tab);
-            } else if (strcmp(row, "sram") == 0 || strcmp(row, "nvm") == 0) {
+            } else if (strcmp(row, "sram") == 0 || strcmp(row, "nvm") == 0 ||
+                       strcmp(row, "psram") == 0) {
                 about_dev_estate(st, at, row, tab);
             } else if (strcmp(row, "has") == 0) {
                 /* Joined into one comma-separated line. */
@@ -458,7 +490,7 @@ dev_rows(const about_state_t *st, int i)
         int m;
 
         for (m = 0; m < st->dev[i].nlay; m++) {
-            rows += 1 + legend_lines((about_state_t *)st, NULL, 58 + 62, 0,
+            rows += 1 + legend_lines((about_state_t *)st, NULL, 58 + LABEL_W, 0,
                                      i, m)
                     + (st->dev[i].lay[m].bank2 > 0UL ? 1 : 0);
         }
@@ -484,12 +516,19 @@ about_estates[] = {
     { "module",  "Modules", 0x6A4C93u },   /* violet                 */
     { "static",  "Static",  0x3B6EA5u },
     { "stack",   "Stack pool", 0xC0703Cu }, /* amber: the pool it grows in */
+    { "jobs",    "Job stack", 0xD89A5Cu },  /* a lighter amber        */
     { "guard",   "Guard",   0xB03A48u },
     { "unassigned", "Unassigned", 0x7A7A7Au },
     { "tier",    "Tier",    0x2E8B57u },   /* green                  */
     { "tier2",   "Tier",    0x2E8B57u },
     { "store",   "Store",   0x8A8A2Eu },   /* olive                  */
     { "persist", "Persist", 0xB03A48u },   /* carmine                */
+    { "heap",    "Heap",    0x2E8B8Bu },   /* teal                   */
+    { "frames",  "Frames",  0x5A86C0u },   /* light blue             */
+    { "drivers", "Drivers", 0x8C6D46u },   /* brown                  */
+    { "shadow",  "Store shadow", 0x9C8F3Au },
+    { "settings", "Settings", 0xA05C8Cu }, /* plum                   */
+    { "free",    "Free",    0x9A9A9Au },   /* grey, drawn lightened  */
 };
 
 /** @brief How @p key is named and coloured, or a plain grey default. */
@@ -550,8 +589,11 @@ legend_lines(about_state_t *st, tiku_surface_t *s, int x, int y, int i,
         name = estate_look(st->dev[i].lay[m].est[k].label, &hue);
         fmt_bytes(st->dev[i].lay[m].est[k].size, size, sizeof size);
         fmt_bytes(st->dev[i].lay[m].est[k].used, used, sizeof used);
-        if (strcmp(st->dev[i].lay[m].est[k].label, "stack") == 0) {
+        if (strcmp(st->dev[i].lay[m].est[k].label, "stack") == 0 ||
+            strcmp(st->dev[i].lay[m].est[k].label, "jobs") == 0) {
             snprintf(usage, sizeof usage, "%s headroom", used);
+        } else if (strcmp(st->dev[i].lay[m].est[k].label, "free") == 0) {
+            snprintf(usage, sizeof usage, "Free");
         } else if (st->dev[i].lay[m].est[k].live) {
             snprintf(usage, sizeof usage, "%s used", used);
         } else if (strcmp(st->dev[i].lay[m].est[k].label, "store") == 0) {
@@ -603,7 +645,7 @@ static int
 paint_legend(about_state_t *st, int x, int y, int i, int m)
 {
     const tiku_font_t *plain = tiku_font_plain();
-    int lines = legend_lines(st, st->surface, x + 62, y, i, m);
+    int lines = legend_lines(st, st->surface, x + LABEL_W, y, i, m);
 
     if (st->dev[i].lay[m].bank2 > 0UL) {
         unsigned long tsz = 0UL, tused = 0UL;
@@ -625,7 +667,7 @@ paint_legend(about_state_t *st, int x, int y, int i, int m)
         } else {
             snprintf(said, sizeof said, "bank 2 %s", b);
         }
-        tiku_text(st->surface, plain, x + 62,
+        tiku_text(st->surface, plain, x + LABEL_W,
                   y + lines * (plain->height + 2) + plain->ascent, said,
                   TIKU_C_TEXT);
         lines++;
@@ -634,13 +676,12 @@ paint_legend(about_state_t *st, int x, int y, int i, int m)
 }
 
 /**
- * @brief One memory as one bar: its estates side by side in the order
- *        they lie, each as wide as its share, the live ones showing their
- *        use inside, the total at the right and the legend underneath.
- * @return how many lines it took, or 0 when the memory has no total.
+ * @brief One memory's name and its bar: its estates side by side in the
+ *        order they lie, each as wide as its share, the live ones showing
+ *        their use inside, and the total at the right.
  */
-static int
-paint_layout(about_state_t *st, int x, int y, int i, int m)
+static void
+paint_bar(about_state_t *st, int x, int y, int i, int m)
 {
     const tiku_font_t *plain = tiku_font_plain();
     int h = plain->height, k, px;
@@ -648,12 +689,9 @@ paint_layout(about_state_t *st, int x, int y, int i, int m)
     char a[24];
     /* The bar takes the box's width, less room for the total at its
      * right. */
-    tiku_rect_t bar = { x + 62, y + 1, st->surface->w - (x + 62) - 78,
+    tiku_rect_t bar = { x + LABEL_W, y + 1, st->surface->w - (x + LABEL_W) - 78,
                         h - 2 };
 
-    if (total == 0UL) {
-        return 0;
-    }
     tiku_text(st->surface, tiku_font_bold(), x, y + tiku_font_bold()->ascent,
               st->dev[i].lay[m].name, TIKU_C_TEXT);
     tiku_fill(st->surface, bar, tiku_tint(TIKU_C_PANEL, 1.12f));
@@ -702,7 +740,148 @@ paint_layout(about_state_t *st, int x, int y, int i, int m)
     fmt_bytes(total, a, sizeof a);
     tiku_text(st->surface, plain, bar.x + bar.w + 8, y + plain->ascent, a,
               TIKU_C_TEXT);
-    return 1 + paint_legend(st, x, y + h + 2, i, m);
+}
+
+/**
+ * @brief One memory as one bar, with the legend's table underneath.
+ * @return how many lines it took, or 0 when the memory has no total.
+ */
+static int
+paint_layout(about_state_t *st, int x, int y, int i, int m)
+{
+    if (st->dev[i].lay[m].total == 0UL) {
+        return 0;
+    }
+    paint_bar(st, x, y, i, m);
+    return 1 + paint_legend(st, x, y + tiku_font_plain()->height + 2, i, m);
+}
+
+/* The order this computer's memories are drawn in: SRAM, PSRAM, NVM. */
+static const int host_order[ABOUT_MAPS] = { 0, 2, 1 };
+
+/**
+ * @brief Read this computer's memory maps into dev[ABOUT_HOST], none when
+ *        the platform has no maps.
+ */
+static void
+about_host_refresh(about_state_t *st)
+{
+    char text[2048];
+
+    memset(&st->dev[ABOUT_HOST], 0, sizeof st->dev[ABOUT_HOST]);
+    if (tiku_sys_memory_map(text, sizeof text) > 0) {
+        text[sizeof text - 1u] = '\0';
+        about_dev_facts(st, ABOUT_HOST, text);
+    }
+}
+
+/** @brief How many legend rows memory @p m of this computer takes: its
+ *         areas with a size, HOST_COLS to a row. */
+static int
+host_rows(const about_state_t *st, int m)
+{
+    int k, n = 0;
+
+    for (k = 0; k < st->dev[ABOUT_HOST].lay[m].nest; k++) {
+        n += st->dev[ABOUT_HOST].lay[m].est[k].size > 0UL;
+    }
+    return (n + HOST_COLS - 1) / HOST_COLS;
+}
+
+/** @brief The height of this computer's memory section, 0 without maps:
+ *         per memory a bar, its legend rows and a 3-pixel gap. */
+static int
+host_h(const about_state_t *st)
+{
+    int step = tiku_font_plain()->height + 2, h = 0, m;
+
+    for (m = 0; m < ABOUT_MAPS; m++) {
+        if (st->dev[ABOUT_HOST].lay[m].total > 0UL) {
+            h += (1 + host_rows(st, m)) * step + 3;
+        }
+    }
+    return h > 0 ? h + 4 : 0;
+}
+
+/**
+ * @brief An area's figure in the compact legend: what is in use over its
+ *        size when it reports use (a stack's is its size less its
+ *        headroom), the unit written once when both share it, otherwise
+ *        its size.
+ */
+static void
+host_value(const about_state_t *st, int m, int k, char *out, size_t max)
+{
+    unsigned long size = st->dev[ABOUT_HOST].lay[m].est[k].size;
+    unsigned long used = st->dev[ABOUT_HOST].lay[m].est[k].used;
+    const char *label = st->dev[ABOUT_HOST].lay[m].est[k].label;
+    char a[24], b[24];
+
+    fmt_bytes(size, b, sizeof b);
+    if (strcmp(label, "stack") == 0 || strcmp(label, "jobs") == 0) {
+        used = size > used ? size - used : 0UL;
+    } else if (!st->dev[ABOUT_HOST].lay[m].est[k].live ||
+               strcmp(label, "free") == 0) {
+        snprintf(out, max, "%s", b);
+        return;
+    }
+    fmt_bytes(used, a, sizeof a);
+    {
+        const char *ua = strrchr(a, ' '), *ub = strrchr(b, ' ');
+
+        if (used == 0UL) {
+            snprintf(out, max, "0/%s", b);
+        } else if (ua != NULL && ub != NULL && strcmp(ua, ub) == 0) {
+            snprintf(out, max, "%.*s/%s", (int)(ua - a), a, b);
+        } else {
+            snprintf(out, max, "%s/%s", a, b);
+        }
+    }
+}
+
+/**
+ * @brief This computer's memories from @p y down: each as a bar, then its
+ *        areas HOST_COLS to a row, a swatch, the name and the figure.
+ */
+static void
+paint_host(about_state_t *st, int y)
+{
+    const tiku_font_t *plain = tiku_font_plain();
+    int step = plain->height + 2, x = 18, o, k, col;
+
+    for (o = 0; o < ABOUT_MAPS; o++) {
+        int m = host_order[o];
+
+        if (st->dev[ABOUT_HOST].lay[m].total == 0UL) {
+            continue;
+        }
+        paint_bar(st, x, y, ABOUT_HOST, m);
+        y += step;
+        for (k = 0, col = 0; k < st->dev[ABOUT_HOST].lay[m].nest; k++) {
+            int cx = x + col * HOST_CELL;
+            char value[64];
+            tiku_rgb_t hue;
+            const char *name;
+
+            if (st->dev[ABOUT_HOST].lay[m].est[k].size == 0UL) {
+                continue;
+            }
+            name = estate_look(st->dev[ABOUT_HOST].lay[m].est[k].label, &hue);
+            host_value(st, m, k, value, sizeof value);
+            tiku_fill(st->surface, (tiku_rect_t){ cx, y + (plain->height - 6) / 2,
+                                                  6, 6 }, hue);
+            tiku_text(st->surface, plain, cx + 10, y + plain->ascent, name,
+                      TIKU_C_TEXT);
+            tiku_text(st->surface, plain,
+                      cx + HOST_CELL - 12 - tiku_text_width(plain, value),
+                      y + plain->ascent, value, TIKU_C_TEXT);
+            if (++col == HOST_COLS) {
+                col = 0;
+                y += step;
+            }
+        }
+        y += (col > 0 ? step : 0) + 3;
+    }
 }
 
 /** @brief What the devices section takes, 0 when nothing is connected. */
@@ -737,7 +916,7 @@ paint_room(about_state_t *st, int x, int y, const char *label,
 
     tiku_text(st->surface, plain, x, y + plain->ascent, label,
               TIKU_C_TEXT);
-    bar.x = x + 62;
+    bar.x = x + LABEL_W;
     bar.y = y + 2;
     bar.w = 92;
     bar.h = plain->height - 4;
@@ -923,25 +1102,25 @@ static int about_body_h(void)
 }
 
 /**
- * @brief The whole box: the facts, the connected boards, and the reports
- *        when they are open.
+ * @brief The whole box: the facts, this computer's memories, the
+ *        connected boards, and the reports when they are open.
  */
 static int
 about_h(const about_state_t *st)
 {
-    return about_body_h() + devices_h(st) +
+    return about_body_h() + host_h(st) + devices_h(st) +
            (st->reports_open ? reports_h() : 0);
 }
 
 /**
- * @brief The content width: the body less two window borders, so the
- *        window's outer width is about_body_w().
+ * @brief The content width: the box less two window borders, so the
+ *        window's outer width is about_box_w().
  *
  * tests/integration/shell/about.script checks pixels at this geometry.
  */
-static int about_content_w(void)
+static int about_content_w(const about_state_t *st)
 {
-    return about_body_w() - 2 * TIKU_WINDOW_BORDER;
+    return about_box_w(st) - 2 * TIKU_WINDOW_BORDER;
 }
 
 /** @brief How many processors are online, at least 1. */
@@ -1409,11 +1588,14 @@ paint(about_state_t *st)
                            built, TIKU_C_TEXT);
         }
     }
+    if (host_h(st) > 0) {
+        paint_host(st, about_body_h());
+    }
     if (st->ndev > 0) {
-        paint_devices(st, about_body_h());
+        paint_devices(st, about_body_h() + host_h(st));
     }
     if (st->reports_open) {
-        paint_reports(st, about_body_h() + devices_h(st));
+        paint_reports(st, about_body_h() + host_h(st) + devices_h(st));
     }
 }
 
@@ -1449,8 +1631,9 @@ about_start(void **state, const tiku_app_services_t *services)
     st->opened_us = tiku_trk_now();
     st->step = -1;
     st->chosen = -1;
-    w = about_content_w();
-    h = about_body_h() + devices_h(st);
+    about_host_refresh(st);
+    w = about_content_w(st);
+    h = about_body_h() + host_h(st) + devices_h(st);
     st->surface = tiku_surface_new(w, h, TIKU_C_PANEL);
     if (st->surface == NULL) {
         free(st);
@@ -1620,11 +1803,19 @@ about_tick(void *state, int64_t now_us)
     if (st == NULL) {
         return;
     }
+    /* Repainted once a second, so the memory gauge and this computer's
+     * maps follow the machine; the maps are read again then. */
+    sec = now_us / 1000000;
+    if (sec != st->gauge_s) {
+        st->gauge_s = sec;
+        about_host_refresh(st);
+        owe = 1;
+    }
     /* The face and the boards change outside this window, so the size is
      * checked on every tick, after the boards are re-read.  The host keeps
      * the window's corner in place on a resize. */
     about_devices_refresh(st);
-    want_w = about_content_w();
+    want_w = about_content_w(st);
     want_h = about_h(st);
     if (want_w != st->surface->w || want_h != st->surface->h) {
         tiku_surface_t *grown = tiku_surface_new(want_w, want_h,
@@ -1643,13 +1834,6 @@ about_tick(void *state, int64_t now_us)
     step = cycle_step(st, now_us);
     if (step != st->step) {
         st->step = step;
-        owe = 1;
-    }
-    /* Repainted once a second, so the memory gauge follows the
-     * machine. */
-    sec = now_us / 1000000;
-    if (sec != st->gauge_s) {
-        st->gauge_s = sec;
         owe = 1;
     }
     if (owe) {

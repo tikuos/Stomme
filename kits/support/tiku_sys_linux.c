@@ -270,6 +270,14 @@ tiku_sys_memory(long *total_kb, long *avail_kb)
     }
 }
 
+int
+tiku_sys_memory_map(char *out, size_t max)
+{
+    (void)out;
+    (void)max;
+    return 0;                   /* the About box shows the gauge alone */
+}
+
 long
 tiku_sys_uptime(void)
 {

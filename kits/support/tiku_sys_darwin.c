@@ -221,6 +221,14 @@ tiku_sys_processor(char *name, size_t max, unsigned long *hz)
     return 0;
 }
 
+int
+tiku_sys_memory_map(char *out, size_t max)
+{
+    (void)out;
+    (void)max;
+    return 0;                   /* the About box shows the gauge alone */
+}
+
 long
 tiku_sys_uptime(void)
 {
