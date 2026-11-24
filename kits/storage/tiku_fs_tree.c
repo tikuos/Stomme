@@ -71,13 +71,14 @@ fop_copy_tree(tiku_fs_t *fs, const char *src, const char *dstpath, char *err,
     DIR *d;
     struct dirent *e;
     {
-        /* Between two stores the local filesystem calls below do not
-         * apply; fop_copy_across() copies through the backends. */
+        /* Between two stores, or within a device's, whose paths are not
+         * local ones, the local filesystem calls below do not apply;
+         * fop_copy_across() copies through the backends (Stomme#21). */
         char sl[TIKU_PATH_MAX], dl[TIKU_PATH_MAX];
         tiku_backend_t *sb = fop_store_of(fs, src, sl, sizeof sl);
         tiku_backend_t *db = fop_store_of(fs, dstpath, dl, sizeof dl);
 
-        if (sb != NULL && db != NULL && sb != db) {
+        if (sb != NULL && db != NULL && (sb != db || sb->devid[0] != '\0')) {
             return fop_copy_across(fs, sb, sl, db, dl, src, err, errmax);
         }
     }
