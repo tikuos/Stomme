@@ -73,6 +73,20 @@ tiku_image_err_t tiku_image_load(const char *path,
 tiku_image_err_t tiku_image_decode(const void *bytes, size_t len,
                                   tiku_image_t *out);
 
+/**
+ * @brief Decode as tiku_image_decode() does, reduced to the largest size
+ *        within @p max_w by @p max_h with its aspect ratio kept; a smaller
+ *        image keeps its size, and a bound of zero or less is none.
+ * @note A JPEG is reduced as it is decoded; a PNG or BMP is decoded whole.
+ */
+tiku_image_err_t tiku_image_decode_fit(const void *bytes, size_t len,
+                                       int max_w, int max_h,
+                                       tiku_image_t *out);
+
+/** @brief The size tiku_image_decode_fit() gives a @p w by @p h image, into
+ *         @p *fw and @p *fh, each at least 1. */
+void tiku_image_fit_size(int w, int h, int max_w, int max_h, int *fw, int *fh);
+
 /** @brief Encoded data-URI budget, including its MIME prefix and whitespace. */
 #define TIKU_IMAGE_DATA_URI_MAX (1024u * 1024u)
 /** @brief Pixel budget for embedded PNG resources. */

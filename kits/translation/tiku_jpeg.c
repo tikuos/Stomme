@@ -5,9 +5,10 @@
  * Authors: Ambuj Varshney <ambuj@kinstugi-os.org>
  *
  * tiku_jpeg.c - JPEG, sequential and progressive: Huffman, dequantise,
- * IDCT, chroma upsample, YCbCr to RGB.
+ * IDCT, chroma upsample, YCbCr to RGB, at full size or reduced to a bound.
  *
- * A sequential file of one scan is drawn block by block as it is read.
+ * A sequential file of one scan is drawn as it is read: each row of MCUs
+ * becomes the output rows it holds, so its planes keep one row of MCUs.
  * Anything else -- progressive scans that each add a band of
  * frequencies or one bit more (T.81 Annex G), or components sent in
  * scans of their own -- keeps every block's coefficients until the
@@ -41,7 +42,9 @@ typedef struct {
     int            dcpred;
     int            bw, bh;          /* size in blocks, MCU-aligned        */
     int            ow, oh;          /* its own blocks, a lone scan's grid */
-    unsigned char *pix;             /* bw*8 by bh*8 samples               */
+    unsigned char *pix;             /* bw*8 by bh*8 samples, or v*8 rows
+                                     * of them for one row of MCUs, each
+                                     * side shifted right by the shift */
     short         *coef;            /* bw*bh blocks of 64, when kept      */
 } jcomp_t;
 
@@ -66,12 +69,35 @@ typedef struct {
     int                  transform; /* Adobe APP14: 2 YCCK, 0 CMYK        */
     int                  progressive;   /* SOF2                           */
     int short_memory; /**< an image-plane allocation was refused */
+    int                  max_w, max_h;  /* the bound, or 0 for none     */
+    int                  fw, fh;    /* the size decoded to                */
+    int                  shift;     /* planes keep 1/2^shift of each side */
+    int                  sums[8][8];    /* with a shift: cs summed over the
+                                         * 2^shift samples each kept one
+                                         * covers, n = 8 >> shift of them */
+    uint32_t            *out;       /* a one-scan decode's output pixels  */
+    int                  row;       /* its next output row to convert     */
     int                  kept;      /* coefficients kept for a last IDCT  */
     int                  scans;     /* scans read to their end            */
     int                  ss, se, ah, al;    /* the scan's band and bits  */
     int                  eobrun;    /* blocks left whose band is done     */
     jbits_t              bits;
 } jdec_t;
+
+static void band(jdec_t *d, int r);
+
+/** @brief The IDCT's cosines, 1024 times cos((2x+1)u pi/16) and, for u = 0,
+ *         1024; read-only, so decoders on several threads share them. */
+static const int cs[8][8] = {
+        { 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024 },
+        { 1420, 1204,  805,  283, -283, -805,-1204,-1420 },
+        { 1338,  554, -554,-1338,-1338, -554,  554, 1338 },
+        { 1204, -283,-1420, -805,  805, 1420,  283,-1204 },
+        { 1024,-1024,-1024, 1024, 1024,-1024,-1024, 1024 },
+        {  805,-1420,  283, 1204,-1204, -283, 1420, -805 },
+        {  554,-1338, 1338, -554, -554, 1338,-1338,  554 },
+        {  283, -805, 1204,-1420, 1420,-1204,  805, -283 }
+};
 
 /** @brief The zig-zag order coefficients arrive in. */
 static const unsigned char zigzag[64] = {
@@ -178,25 +204,27 @@ huff_decode(jbits_t *b, const jhuff_t *h)
 static void
 idct8(const int *in, unsigned char *out, int stride)
 {
-    int tmp[64], u, x, y;
+    int tmp[64], rows[8], nrows = 0, k, u, x, y;
 
-    /* Read-only: decoders on several threads share it. */
-    static const int cs[8][8] = {
-            { 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024 },
-            { 1420, 1204,  805,  283, -283, -805,-1204,-1420 },
-            { 1338,  554, -554,-1338,-1338, -554,  554, 1338 },
-            { 1204, -283,-1420, -805,  805, 1420,  283,-1204 },
-            { 1024,-1024,-1024, 1024, 1024,-1024,-1024, 1024 },
-            {  805,-1420,  283, 1204,-1204, -283, 1420, -805 },
-            {  554,-1338, 1338, -554, -554, 1338,-1338,  554 },
-            {  283, -805, 1204,-1420, 1420,-1204,  805, -283 }
-    };
-    for (y = 0; y < 8; y++) {       /* rows */
+    /* Rows: a row of zeros transforms to zeros, which add nothing to the
+     * columns, so it is skipped; a row's trailing zeros add nothing to its
+     * sums. */
+    for (y = 0; y < 8; y++) {
+        const int *r = in + y * 8;
+        int last = 7;
+
+        while (last >= 0 && r[last] == 0) {
+            last--;
+        }
+        if (last < 0) {
+            continue;
+        }
+        rows[nrows++] = y;
         for (x = 0; x < 8; x++) {
             long s = 0;
 
-            for (u = 0; u < 8; u++) {
-                s += (long)in[y * 8 + u] * cs[u][x];
+            for (u = 0; u <= last; u++) {
+                s += (long)r[u] * cs[u][x];
             }
             /* Rounded: without the 512, the arithmetic shift
              * of a negative sum biases every block half a
@@ -204,12 +232,26 @@ idct8(const int *in, unsigned char *out, int stride)
             tmp[y * 8 + x] = (int)((s + 512L) >> 10);
         }
     }
-    for (x = 0; x < 8; x++) {       /* columns */
+    if (nrows == 0 || (nrows == 1 && rows[0] == 0)) {
+        /* At most the first row: each column is one value, since that
+         * row's cosines are all 1024. */
+        for (x = 0; x < 8; x++) {
+            int v = (nrows ? (int)(((long)tmp[x] * 1024 + 4096L) >> 13) : 0) + 128;
+            unsigned char c = (unsigned char)((v < 0) ? 0 : ((v > 255) ? 255 : v));
+
+            for (y = 0; y < 8; y++) {
+                out[y * stride + x] = c;
+            }
+        }
+        return;
+    }
+    for (x = 0; x < 8; x++) {       /* columns, over the rows kept */
         for (y = 0; y < 8; y++) {
             long s = 0;
             int v;
 
-            for (u = 0; u < 8; u++) {
+            for (k = 0; k < nrows; k++) {
+                u = rows[k];
                 s += (long)tmp[u * 8 + x] * cs[u][y];
             }
             v = (int)((s + 4096L) >> 13) + 128;
@@ -375,6 +417,22 @@ planes(jdec_t *d)
 {
     int c;
 
+    /* The largest reduction whose planes are still no smaller than the
+     * fit, so each output pixel has a sample of its own. */
+    tiku_image_fit_size(d->w, d->h, d->max_w, d->max_h, &d->fw, &d->fh);
+    while (d->shift < 3 && (d->fw < d->w || d->fh < d->h) &&
+           ((d->w + (2 << d->shift) - 1) >> (d->shift + 1)) >= d->fw &&
+           ((d->h + (2 << d->shift) - 1) >> (d->shift + 1)) >= d->fh) {
+        d->shift++;
+    }
+    for (int u = 0; u < 8; u++) {
+        for (int x = 0; x < 8 >> d->shift; x++) {
+            d->sums[u][x] = 0;
+            for (int i = 0; i < 1 << d->shift; i++) {
+                d->sums[u][x] += cs[u][(x << d->shift) + i];
+            }
+        }
+    }
     d->mcux = (d->w + d->hmax * 8 - 1) / (d->hmax * 8);
     d->mcuy = (d->h + d->vmax * 8 - 1) / (d->vmax * 8);
     for (c = 0; c < d->ncomp; c++) {
@@ -384,7 +442,8 @@ planes(jdec_t *d)
         k->bh = d->mcuy * k->v;
         k->ow = (d->w * k->h + d->hmax * 8 - 1) / (d->hmax * 8);
         k->oh = (d->h * k->v + d->vmax * 8 - 1) / (d->vmax * 8);
-        k->pix = calloc((size_t)k->bw * 8u * (size_t)k->bh * 8u, 1u);
+        k->pix = calloc((size_t)(k->bw * 8 >> d->shift) *
+                        (size_t)((d->kept ? k->bh : k->v) * 8 >> d->shift), 1u);
         if (k->pix == NULL) {
             d->short_memory = 1;
             return -1;
@@ -398,7 +457,70 @@ planes(jdec_t *d)
             }
         }
     }
+    if (!d->kept) {
+        d->out = malloc((size_t)d->fw * (size_t)d->fh * sizeof *d->out);
+        if (d->out == NULL) {
+            d->short_memory = 1;
+            return -1;
+        }
+    }
     return 0;
+}
+
+/**
+ * @brief Write block (@p row, @p col) of component @p c, dequantised in
+ *        @p blk, into its plane: the IDCT's samples, or with a shift each
+ *        plane sample the rounded mean of the samples it covers, before
+ *        they are held to a byte.
+ */
+static void
+put_block(const jdec_t *d, jcomp_t *c, const int *blk, int row, int col)
+{
+    int n = 8 >> d->shift, stride = c->bw * 8 >> d->shift;
+    int tmp[64], rows[8], nrows = 0, k, u, x, y;
+    /* A one-scan decode keeps the current row of MCUs only. */
+    unsigned char *at = c->pix + (long)(d->kept ? row : row % c->v) * n * stride +
+                        (long)col * n;
+
+    if (d->shift == 0) {
+        idct8(blk, at, stride);
+        return;
+    }
+    /* idct8()'s two passes, each output the sum over the samples it
+     * covers, the sums' extra factor of 2^shift shifted out with the
+     * rounding; zero rows are skipped as there. */
+    for (y = 0; y < 8; y++) {
+        const int *r = blk + y * 8;
+        int last = 7;
+
+        while (last >= 0 && r[last] == 0) {
+            last--;
+        }
+        if (last < 0) {
+            continue;
+        }
+        rows[nrows++] = y;
+        for (x = 0; x < n; x++) {
+            long s = 0;
+
+            for (u = 0; u <= last; u++) {
+                s += (long)r[u] * d->sums[u][x];
+            }
+            tmp[y * 8 + x] = (int)((s + (512L << d->shift)) >> (10 + d->shift));
+        }
+    }
+    for (x = 0; x < n; x++) {
+        for (y = 0; y < n; y++) {
+            long s = 0;
+            int v;
+
+            for (k = 0; k < nrows; k++) {
+                s += (long)tmp[rows[k] * 8 + x] * d->sums[rows[k]][y];
+            }
+            v = (int)((s + (4096L << d->shift)) >> (13 + d->shift)) + 128;
+            at[y * stride + x] = (unsigned char)((v < 0) ? 0 : ((v > 255) ? 255 : v));
+        }
+    }
 }
 
 /** @brief A sequential block: the DC difference, then the AC runs, into
@@ -579,8 +701,7 @@ block(jdec_t *d, jcomp_t *c, int row, int col)
         for (k = 0; k < 64; k++) {
             blk[zigzag[k]] *= d->qt[c->tq][k];
         }
-        idct8(blk, c->pix + (long)row * 8 * c->bw * 8 + (long)col * 8,
-              c->bw * 8);
+        put_block(d, c, blk, row, col);
         return 0;
     }
     co = c->coef + ((long)row * c->bw + col) * 64;
@@ -649,6 +770,12 @@ scan(jdec_t *d, int ns, const int *which)
             if (block(d, one, my, mx) != 0) {
                 return -1;
             }
+            /* A lone component's row of MCUs is v rows of its blocks,
+             * the last perhaps fewer. */
+            if (!d->kept && mx == across - 1 &&
+                (my % one->v == one->v - 1 || my == one->oh - 1)) {
+                band(d, my / one->v);
+            }
             continue;
         }
         for (c = 0; c < ns; c++) {
@@ -661,6 +788,9 @@ scan(jdec_t *d, int ns, const int *which)
                     }
                 }
             }
+        }
+        if (!d->kept && mx == across - 1) {
+            band(d, my);
         }
     }
     return 0;
@@ -698,69 +828,97 @@ draw_kept(jdec_t *d)
                 for (k = 0; k < 64; k++) {
                     blk[zigzag[k]] = co[zigzag[k]] * d->qt[m->tq][k];
                 }
-                idct8(blk, m->pix + (long)row * 8 * m->bw * 8 +
-                           (long)col * 8, m->bw * 8);
+                put_block(d, m, blk, row, col);
             }
         }
     }
 }
 
-/** @brief Component @p c's sample under image pixel (@p x, @p y). */
+/** @brief Component @p c's sample under pixel (@p x, @p y) of the image
+ *         shifted as its planes are. */
 static int
 sample(const jdec_t *d, int c, int x, int y)
 {
     const jcomp_t *k = &d->comp[c];
 
-    return k->pix[(long)(y * k->v / d->vmax) * k->bw * 8 +
+    return k->pix[(long)(y * k->v / d->vmax) * (k->bw * 8 >> d->shift) +
                   (x * k->h / d->hmax)];
 }
 
-/** @brief Convert component planes to ARGB using Adobe's declared transform.
+/** @brief Convert output row @p y of @p px from the component planes, whose
+ *         first row is row @p top of the shifted image, using Adobe's
+ *         declared transform: each pixel the sample under it. */
+static void
+convert_row(const jdec_t *d, uint32_t *px, int y, int top)
+{
+    int sw = (d->w + (1 << d->shift) - 1) >> d->shift;
+    int sh = (d->h + (1 << d->shift) - 1) >> d->shift;
+    int sy = (int)((long long)y * sh / d->fh) - top, x;
+
+    for (x = 0; x < d->fw; x++) {
+        int sx = (int)((long long)x * sw / d->fw);
+        int Y = sample(d, 0, sx, sy), cb = 128, cr = 128, r, g, bl;
+
+        if (d->ncomp >= 3) {
+            cb = sample(d, 1, sx, sy);
+            cr = sample(d, 2, sx, sy);
+        }
+        r = Y + ((91881 * (cr - 128)) >> 16);
+        g = Y - ((22554 * (cb - 128) + 46802 * (cr - 128)) >> 16);
+        bl = Y + ((116130 * (cb - 128)) >> 16);
+        if (d->ncomp == 3 && d->transform == 0) {
+            r = Y;
+            g = cb;
+            bl = cr;
+        }
+        if (d->ncomp == 4) {
+            int k = sample(d, 3, sx, sy);
+            int cy = d->transform == 2 ? 255 - clamp8(r) : Y;
+            int ma = d->transform == 2 ? 255 - clamp8(g) : cb;
+            int ye = d->transform == 2 ? 255 - clamp8(bl) : cr;
+
+            if (d->transform == 0 || d->transform == 2) {
+                r = cy * k / 255;
+                g = ma * k / 255;
+                bl = ye * k / 255;
+            } else {
+                r = (255 - cy) * (255 - k) / 255;
+                g = (255 - ma) * (255 - k) / 255;
+                bl = (255 - ye) * (255 - k) / 255;
+            }
+        }
+        px[(long)y * d->fw + x] = 0xff000000u |
+            ((uint32_t)clamp8(r) << 16) | ((uint32_t)clamp8(g) << 8) |
+            (uint32_t)clamp8(bl);
+    }
+}
+
+/** @brief Convert whole component planes to fw by fh ARGB pixels.
  *  @return Allocated pixels, or NULL. */
 static uint32_t *
 to_rgb(const jdec_t *d)
 {
-    uint32_t *px = malloc((size_t)d->w * (size_t)d->h * sizeof *px);
-    int y, x;
+    uint32_t *px = malloc((size_t)d->fw * (size_t)d->fh * sizeof *px);
 
-    for (y = 0; px != NULL && y < d->h; y++) {
-        for (x = 0; x < d->w; x++) {
-            int Y = sample(d, 0, x, y), cb = 128, cr = 128, r, g, bl;
-
-            if (d->ncomp >= 3) {
-                cb = sample(d, 1, x, y);
-                cr = sample(d, 2, x, y);
-            }
-            r = Y + ((91881 * (cr - 128)) >> 16);
-            g = Y - ((22554 * (cb - 128) + 46802 * (cr - 128)) >> 16);
-            bl = Y + ((116130 * (cb - 128)) >> 16);
-            if (d->ncomp == 3 && d->transform == 0) {
-                r = Y;
-                g = cb;
-                bl = cr;
-            }
-            if (d->ncomp == 4) {
-                int k = sample(d, 3, x, y);
-                int cy = d->transform == 2 ? 255 - clamp8(r) : Y;
-                int ma = d->transform == 2 ? 255 - clamp8(g) : cb;
-                int ye = d->transform == 2 ? 255 - clamp8(bl) : cr;
-
-                if (d->transform == 0 || d->transform == 2) {
-                    r = cy * k / 255;
-                    g = ma * k / 255;
-                    bl = ye * k / 255;
-                } else {
-                    r = (255 - cy) * (255 - k) / 255;
-                    g = (255 - ma) * (255 - k) / 255;
-                    bl = (255 - ye) * (255 - k) / 255;
-                }
-            }
-            px[(long)y * d->w + x] = 0xff000000u |
-                ((uint32_t)clamp8(r) << 16) | ((uint32_t)clamp8(g) << 8) |
-                (uint32_t)clamp8(bl);
-        }
+    for (int y = 0; px != NULL && y < d->fh; y++) {
+        convert_row(d, px, y, 0);
     }
     return px;
+}
+
+/** @brief In a one-scan decode, once row @p r of MCUs is in the planes:
+ *         convert the output rows whose samples it holds. */
+static void
+band(jdec_t *d, int r)
+{
+    int mh = (d->vmax * 8) >> d->shift;     /* shifted rows per MCU row */
+    int sh = (d->h + (1 << d->shift) - 1) >> d->shift;
+
+    while (d->row < d->fh &&
+           (long long)d->row * sh / d->fh < (long long)(r + 1) * mh) {
+        convert_row(d, d->out, d->row, r * mh);
+        d->row++;
+    }
 }
 
 /** @brief The scan at marker @p i: planes made at the first, the scan
@@ -811,6 +969,13 @@ int
 tiku_jpeg_decode(const unsigned char *src, long n, int *ow, int *oh,
                      uint32_t **out)
 {
+    return tiku_jpeg_decode_fit(src, n, 0, 0, ow, oh, out);
+}
+
+int
+tiku_jpeg_decode_fit(const unsigned char *src, long n, int max_w, int max_h,
+                     int *ow, int *oh, uint32_t **out)
+{
     jdec_t *d;
     long i = 2;
     int rc = -1, c;
@@ -825,6 +990,8 @@ tiku_jpeg_decode(const unsigned char *src, long n, int *ow, int *oh,
     }
     d->src = src;
     d->n = n;
+    d->max_w = max_w;
+    d->max_h = max_h;
     d->hmax = d->vmax = 1;
     d->transform = -1;
     while (i + 4 <= n && rc < 0) {
@@ -884,9 +1051,10 @@ tiku_jpeg_decode(const unsigned char *src, long n, int *ow, int *oh,
         rc = 0;
     }
     if (rc == 0) {
-        *out = to_rgb(d);
-        *ow = d->w;
-        *oh = d->h;
+        *out = d->kept ? to_rgb(d) : d->out;
+        d->out = NULL;
+        *ow = d->fw;
+        *oh = d->fh;
         rc = *out != NULL ? 0 : -2;
     }
 done:
@@ -896,6 +1064,7 @@ done:
         free(d->comp[c].pix);
         free(d->comp[c].coef);
     }
+    free(d->out);
     free(d);
     return rc;
 }

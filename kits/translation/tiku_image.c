@@ -582,8 +582,65 @@ tiku_image_load(const char *path, tiku_image_t *out)
     return rc;
 }
 
+void
+tiku_image_fit_size(int w, int h, int max_w, int max_h, int *fw, int *fh)
+{
+    *fw = w;
+    *fh = h;
+    if (max_w <= 0 || max_h <= 0 || (w <= max_w && h <= max_h)) {
+        return;
+    }
+    if ((long long)w * max_h >= (long long)h * max_w) {
+        *fw = max_w;
+        *fh = (int)((long long)h * max_w / w);
+    } else {
+        *fh = max_h;
+        *fw = (int)((long long)w * max_h / h);
+    }
+    *fw = *fw < 1 ? 1 : *fw;
+    *fh = *fh < 1 ? 1 : *fh;
+}
+
+/** @brief Reduce @p im to the fit of @p max_w by @p max_h, each pixel one
+ *         source pixel.  @return TIKU_IMG_OK, or TIKU_IMG_NO_MEMORY with
+ *         @p im unchanged. */
+static tiku_image_err_t
+reduce(tiku_image_t *im, int max_w, int max_h)
+{
+    int fw, fh;
+    uint32_t *px;
+
+    tiku_image_fit_size(im->w, im->h, max_w, max_h, &fw, &fh);
+    if (fw == im->w && fh == im->h) {
+        return TIKU_IMG_OK;
+    }
+    px = malloc((size_t)fw * (size_t)fh * sizeof *px);
+    if (px == NULL) {
+        return TIKU_IMG_NO_MEMORY;
+    }
+    for (int y = 0; y < fh; y++) {
+        const uint32_t *row = im->px + (size_t)((long long)y * im->h / fh) * im->w;
+
+        for (int x = 0; x < fw; x++) {
+            px[(size_t)y * fw + x] = row[(long long)x * im->w / fw];
+        }
+    }
+    free(im->px);
+    im->px = px;
+    im->w = fw;
+    im->h = fh;
+    return TIKU_IMG_OK;
+}
+
 tiku_image_err_t
 tiku_image_decode(const void *bytes, size_t len, tiku_image_t *result)
+{
+    return tiku_image_decode_fit(bytes, len, 0, 0, result);
+}
+
+tiku_image_err_t
+tiku_image_decode_fit(const void *bytes, size_t len, int max_w, int max_h,
+                      tiku_image_t *result)
 {
     const unsigned char *b = bytes;
     /* Decoded into a temporary, so a failed decode leaves result as it
@@ -596,13 +653,15 @@ tiku_image_decode(const void *bytes, size_t len, tiku_image_t *result)
     long n = (long)len;
     if (n >= 2 && b[0] == 'B' && b[1] == 'M') {
         rc = load_bmp(b, n, out);
+        rc = rc == TIKU_IMG_OK ? reduce(out, max_w, max_h) : rc;
     } else if (n >= 8 && b[0] == 137 && b[1] == 'P') {
         rc = load_png(b, n, out);
+        rc = rc == TIKU_IMG_OK ? reduce(out, max_w, max_h) : rc;
     } else if (n >= 3 && b[0] == 0xff && b[1] == 0xd8 && b[2] == 0xff) {
         int jw = 0, jh = 0, jrc;
         uint32_t *jpx = NULL;
 
-        jrc = tiku_jpeg_decode(b, n, &jw, &jh, &jpx);
+        jrc = tiku_jpeg_decode_fit(b, n, max_w, max_h, &jw, &jh, &jpx);
         if (jrc == 0) {
             out->w = jw;
             out->h = jh;
