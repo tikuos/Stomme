@@ -465,9 +465,32 @@ launch_process(const tiku_trk_app_t *app, const char *const *paths,
     return TIKU_TRK_LAUNCH_OK;
 }
 
+/* The host of built-in applications, and its context. */
+static tiku_trk_launch_host_fn launch_host;
+static void *launch_host_context;
+
+void
+tiku_trk_launch_set_host(tiku_trk_launch_host_fn fn, void *context)
+{
+    launch_host = fn;
+    launch_host_context = context;
+}
+
+int
+tiku_trk_launch_builtin(const tiku_trk_app_t *app)
+{
+    return app != NULL && strncmp(app->module, TIKU_TRK_LAUNCH_BUILTIN,
+                                  sizeof TIKU_TRK_LAUNCH_BUILTIN - 1u) == 0;
+}
+
 tiku_trk_launch_err_t
 tiku_trk_launch_run(const tiku_trk_app_t *app, const char *const *paths, int n)
 {
+    if (tiku_trk_launch_builtin(app)) {
+        return launch_host != NULL &&
+               launch_host(launch_host_context, app, paths, n)
+                   ? TIKU_TRK_LAUNCH_OK : TIKU_TRK_LAUNCH_FAILED;
+    }
     return launch_process(app, paths, n, -1);
 }
 

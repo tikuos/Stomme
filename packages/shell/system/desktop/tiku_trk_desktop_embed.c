@@ -5,17 +5,30 @@
  *
  * tiku_trk_desktop_embed.c - hosting an application in the desktop's own
  * process: the services it is given (windows, menus, placement, the file
- * panel, the clipboard, boards and help) and the windows held for it.
+ * panel, the clipboard, boards and help) and the windows held for it; and
+ * the product's built-in applications, whose windows are the desktop's.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 #include "tiku_shell_product.h"
 #include "tiku_trail.h"
+#include "tiku_trk_builtin.h"
 #include "tiku_trk_desktop_private.h"
+
+/* The product's built-in applications, when it links any. */
+extern const tiku_trk_builtin_t *tiku_trk_builtins(int *count) __attribute__((weak));
+
+/** @brief The product's built-in applications, @p *count of them. */
+static const tiku_trk_builtin_t *
+builtin_list(int *count)
+{
+    *count = 0;
+    return tiku_trk_builtins != NULL ? tiku_trk_builtins(count) : NULL;
+}
 
 /**
  * @brief The 75 ms periodic task: pump the board run, then tick every
- *        running hosted application.
+ *        running hosted application and every built-in one.
  * @return 0, so the task stays scheduled.
  */
 int
@@ -39,7 +52,85 @@ tick_embeds(void *ctx)
                                             tiku_trk_now());
         }
     }
+    {
+        int count;
+        const tiku_trk_builtin_t *list = builtin_list(&count);
+
+        for (e = 0; list != NULL && e < count; e++) {
+            if (list[e].tick != NULL) {
+                list[e].tick(tiku_trk_now());
+            }
+        }
+    }
     return 0;
+}
+
+/**
+ * @brief The launcher's host for built-in applications: open built-in @p a
+ *        on each of @p paths, or alone when there are none, below the
+ *        global bar.
+ * @return nonzero when a window opened.
+ */
+static int
+builtin_launch(void *context, const tiku_trk_app_t *a, const char *const *paths, int n)
+{
+    desktop_t *app = context;
+    const char *id = a->module + sizeof TIKU_TRK_LAUNCH_BUILTIN - 1u;
+    int count, opened = 0;
+    const tiku_trk_builtin_t *list = builtin_list(&count);
+    tiku_rect_t area = {0, 0, app->surf->w, app->surf->h};
+
+    if (app->gbar_on == 1) {
+        area.y = app->menus.bar.height;
+        area.h -= area.y;
+    }
+    for (int i = 0; list != NULL && i < count; i++) {
+        if (list[i].id == NULL || list[i].open == NULL || strcmp(list[i].id, id) != 0) {
+            continue;
+        }
+        if (n <= 0) {
+            return list[i].open(app->desk, area, &app->dirty, NULL) != NULL;
+        }
+        for (int k = 0; k < n; k++) {
+            opened |= paths[k] != NULL &&
+                      list[i].open(app->desk, area, &app->dirty, paths[k]) != NULL;
+        }
+        return opened;
+    }
+    return 0;
+}
+
+void
+desktop_offer_builtins(desktop_t *app)
+{
+    int count;
+    const tiku_trk_builtin_t *list = builtin_list(&count);
+
+    for (int i = 0; list != NULL && i < count; i++) {
+        tiku_trk_app_t *entry;
+        char module[TIKU_PATH_MAX];
+        int at;
+
+        if (list[i].id == NULL || list[i].name == NULL || list[i].open == NULL ||
+            snprintf(module, sizeof module, "%s%s", TIKU_TRK_LAUNCH_BUILTIN,
+                     list[i].id) >= (int)sizeof module) {
+            continue;
+        }
+        /* No runner: the module names the application, which runs here. */
+        at = tiku_trk_launch_add(&app->apps, list[i].name, "",
+                                 list[i].types != NULL ? list[i].types : "");
+        if (at < 0) {
+            continue;
+        }
+        entry = &app->apps.app[at];
+        snprintf(entry->module, sizeof entry->module, "%s", module);
+        snprintf(entry->id, sizeof entry->id, "%s", list[i].id);
+        snprintf(entry->icon, sizeof entry->icon, "%s",
+                 list[i].icon != NULL ? list[i].icon : "");
+        snprintf(entry->category, sizeof entry->category, "%s",
+                 list[i].category != NULL ? list[i].category : "");
+    }
+    tiku_trk_launch_set_host(builtin_launch, app);
 }
 
 /** @brief Draw a hosted application's window: its latest frame, on the

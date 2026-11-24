@@ -27,6 +27,26 @@ check(int cond, const char *row, const char *what)
     if (!cond) { fails++; }
 }
 
+/** @brief What the built-in host was handed, and what it answers. */
+static struct {
+    int calls, n, answer;
+    const tiku_trk_app_t *app;
+    char path[128];
+    void *context;
+} hosted;
+
+/** @brief A host that records its launch and answers hosted.answer. */
+static int
+host(void *context, const tiku_trk_app_t *app, const char *const *paths, int n)
+{
+    hosted.calls++;
+    hosted.context = context;
+    hosted.app = app;
+    hosted.n = n;
+    snprintf(hosted.path, sizeof hosted.path, "%s", n > 0 ? paths[0] : "");
+    return hosted.answer;
+}
+
 int
 main(void)
 {
@@ -202,6 +222,46 @@ main(void)
               TIKU_TRK_LAUNCH_IS_TRACKER, "AW-035",
               "this Tracker registered with no command is still this "
               "Tracker, not an application that is missing");
+    }
+
+    printf("\nan application kept in the desktop's process\n");
+    {
+        tiku_trk_apps_t own;
+        const char *doc[1] = {"/tmp/trk_launch_photo.jpg"};
+        int at, running = tiku_trk_launch_running();
+
+        tiku_trk_launch_clear(&own);
+        at = tiku_trk_launch_add(&own, "Viewer", "", "image/jpeg");
+        if (at < 0) {
+            check(0, "builtin", "a built-in application registers with no runner");
+        } else {
+            snprintf(own.app[at].module, sizeof own.app[at].module, "%s",
+                     TIKU_TRK_LAUNCH_BUILTIN "image");
+            check(tiku_trk_launch_builtin(&own.app[at]) && !tiku_trk_launch_builtin(NULL),
+                  "builtin", "a module named builtin: is a built-in application");
+            tiku_trk_launch_set_host(NULL, NULL);
+            check(tiku_trk_launch_run(&own.app[at], doc, 1) == TIKU_TRK_LAUNCH_FAILED &&
+                  tiku_trk_launch_running() == running, "builtin",
+                  "with no host it fails, and no process is started for it");
+            hosted.answer = 1;
+            tiku_trk_launch_set_host(host, &own);
+            check(tiku_trk_launch_run(&own.app[at], doc, 1) == TIKU_TRK_LAUNCH_OK &&
+                  hosted.calls == 1 && hosted.app == &own.app[at] && hosted.n == 1 &&
+                  strcmp(hosted.path, doc[0]) == 0 && hosted.context == &own &&
+                  tiku_trk_launch_running() == running, "builtin",
+                  "the host is handed it, its document and its context, in this process");
+            hosted.answer = 0;
+            check(tiku_trk_launch_run(&own.app[at], NULL, 0) == TIKU_TRK_LAUNCH_FAILED &&
+                  hosted.calls == 2 && hosted.n == 0, "builtin",
+                  "a host that opens nothing is a failed launch");
+            snprintf(own.app[at].module, sizeof own.app[at].module, "%s", "/opt/Viewer.so");
+            check(!tiku_trk_launch_builtin(&own.app[at]) &&
+                  tiku_trk_launch_run(&own.app[at], doc, 1) == TIKU_TRK_LAUNCH_NO_APP &&
+                  hosted.calls == 2, "builtin",
+                  "an application with a module file is started as a process, "
+                  "here refused for its missing runner, and the host is not asked");
+            tiku_trk_launch_set_host(NULL, NULL);
+        }
     }
 
     printf("\nthe registry as a file (AW-013)\n");

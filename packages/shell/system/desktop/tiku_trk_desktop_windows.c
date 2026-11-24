@@ -499,6 +499,15 @@ windows_press(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
         *damage = tiku_trk_damage_all();
         return 1;
     }
+    if (folder_of(app, w) == NULL && w->event != NULL) {
+        /* A window with a handler of its own, a built-in application's,
+         * takes its content's presses and its press's moves and release. */
+        tiku_workspace_activate(app->desk, w);
+        if (ev->button == 1) app->prefs_track = w;
+        (void)tiku_window_send(w, ev);
+        *damage = tiku_trk_damage_all();
+        return 1;
+    }
     return 0;                   /* a folder's content, or nobody's */
 }
 

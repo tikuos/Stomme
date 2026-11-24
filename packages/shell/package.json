@@ -45,6 +45,7 @@
     "system/desktop/tiku_desktop_panel_jobs.c",
     "system/desktop/tiku_desktop_print_vfs.c",
     "system/desktop/tiku_desktop_volume_commands.c",
+    "system/desktop/tiku_trk_builtin.h",
     "system/desktop/tiku_trk_desktop.c",
     "system/desktop/tiku_trk_desktop_appgroups.inl",
     "system/desktop/tiku_trk_desktop_apps.c",

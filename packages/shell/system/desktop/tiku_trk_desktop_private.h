@@ -1449,6 +1449,9 @@ int embed_deliver(struct embed_win *ew, const tiku_event_t *ev);
 int embed_open_or_raise(desktop_t *app,
                         const tiku_app_descriptor_t *descriptor);
 int embed_start(desktop_t *app, const tiku_app_descriptor_t *descriptor);
+/** @brief Register the product's built-in applications with the launcher,
+ *         which opens them through the desktop. */
+void desktop_offer_builtins(desktop_t *app);
 int tick_embeds(void *ctx);
 struct embed_win *embed_win_of_window(desktop_t *app, const tiku_window_t *w);
 void embed_drop_window(struct embed_win *ew, int tell);

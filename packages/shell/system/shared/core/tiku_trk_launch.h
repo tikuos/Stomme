@@ -222,10 +222,31 @@ int tiku_trk_launch_self(const tiku_model_t *m, tiku_trk_app_t *out);
  * @return TIKU_TRK_LAUNCH_OK once the child is forked, or why not.  A
  *         command that then fails to run shows when it is reaped.
  * @note An application with a module takes one document per launch; more
- *       than one is refused as TIKU_TRK_LAUNCH_NOTHING.
+ *       than one is refused as TIKU_TRK_LAUNCH_NOTHING.  A built-in
+ *       application is handed to the host tiku_trk_launch_set_host() set.
  */
 tiku_trk_launch_err_t tiku_trk_launch_run(const tiku_trk_app_t *app,
                                           const char *const *paths, int n);
+
+/** @brief The module prefix of an application its host keeps in its own
+ *         process: "builtin:" and the application's id. */
+#define TIKU_TRK_LAUNCH_BUILTIN "builtin:"
+
+/** @brief Start built-in application @p app over @p paths in this process;
+ *         nonzero when it runs. */
+typedef int (*tiku_trk_launch_host_fn)(void *context, const tiku_trk_app_t *app,
+                                       const char *const *paths, int n);
+
+/**
+ * @brief Hand tiku_trk_launch_run() the applications whose module starts with
+ *        TIKU_TRK_LAUNCH_BUILTIN: @p fn starts them, with @p context; NULL
+ *        hands none, and such an application is then refused as
+ *        TIKU_TRK_LAUNCH_FAILED.
+ */
+void tiku_trk_launch_set_host(tiku_trk_launch_host_fn fn, void *context);
+
+/** @brief Whether @p app is a built-in application, kept in this process. */
+int tiku_trk_launch_builtin(const tiku_trk_app_t *app);
 
 /** @brief The sentence a failed launch should say (AW-039). */
 const char *tiku_trk_launch_reason(tiku_trk_launch_err_t err);

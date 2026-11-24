@@ -1357,9 +1357,11 @@ int desktop_document_open(void *ctx, const tiku_trk_app_t *application,
     struct stat sb;
     tiku_backend_t *b = tiku_backend_serving(app->backend, path,
                                             local, sizeof local);
+    /* A built-in application runs here and has no runner or module file. */
+    int builtin = tiku_trk_launch_builtin(application);
     if (!b || !b->ops || strcmp(b->ops->name, "posix") ||
         local[0] != '/' || access(local, R_OK) ||
-        access(application->cmd, X_OK) || access(application->module, R_OK) ||
+        (!builtin && (access(application->cmd, X_OK) || access(application->module, R_OK))) ||
         stat(local, &sb) || !S_ISREG(sb.st_mode))
         return 0;
     const char *paths[] = {local};

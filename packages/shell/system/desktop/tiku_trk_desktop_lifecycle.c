@@ -709,6 +709,7 @@ boot_deskbar(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
     prepare_places(app);
     tiku_trk_launch_clear(&app->apps);
     offer_installed(app, o->argv0);
+    desktop_offer_builtins(app);
     /*
      * The Interface kit carries icon commands in display lists without
      * decoding them; this installs the HVIF player that draws them.
