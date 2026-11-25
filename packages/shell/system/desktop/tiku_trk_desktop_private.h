@@ -499,6 +499,10 @@ typedef struct desktop {
             uint32_t            *frame;     /**< the application's pixels,
                                              *   RGB, fw by fh */
             int                  fw, fh;    /**< the frame's width and height */
+            /** For a window from open_drawn(): what paints its content,
+             *  and the application's argument to it; NULL otherwise. */
+            void (*paint)(void *app, uint32_t id, tiku_surface_t *s);
+            void                *paint_app;
         } win[TIKU_TRK_EMBED_WINDOWS]; /**< the application's windows */
         uint32_t             next_id;   /**< the next window id to hand out */
         int                  running;   /**< the slot holds an application */

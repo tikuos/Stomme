@@ -292,6 +292,22 @@ typedef struct tiku_app_services {
     const struct tiku_msg *startup_message;
     /** @brief Send a structured request to a desktop service. */
     int (*send_message)(void *ctx, const struct tiku_msg *message);
+    /**
+     * @brief Ask for a window the host paints by calling @p draw, with
+     *        @p app, whenever the window's content is drawn: @p s is the
+     *        content, its origin the content's corner and its clip what is
+     *        to be drawn.  The application keeps no pixels for it, and
+     *        frame() and present() do not apply to it.
+     * @return its id, or 0.
+     * @note May be NULL: a host in another process offers it to none, and
+     *       the application then opens a window and sends frames.  @p draw
+     *       runs on the host's thread and must not keep @p s.
+     */
+    uint32_t (*open_drawn)(void *ctx, const char *title, int w, int h,
+                           void (*draw)(void *app, uint32_t id, tiku_surface_t *s),
+                           void *app);
+    /** @brief Have a window from open_drawn() drawn again. */
+    void (*redraw)(void *ctx, uint32_t id);
 } tiku_app_services_t;
 
 /** @brief Which question pick() asks. */

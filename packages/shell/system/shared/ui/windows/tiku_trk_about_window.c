@@ -71,7 +71,12 @@
 
 typedef struct {
     const tiku_app_services_t *services;
+    /* What paint() draws on: the box's own surface when the host takes
+     * frames; the host's view of the window while it draws a window from
+     * open_drawn(), and NULL between. */
     tiku_surface_t            *surface;
+    int                        width, height;  /* the content's size */
+    int                        drawn;          /* the host draws the window */
     uint32_t                        id;
     /* Counted once at start; the memory is read again on every paint. */
     int                        ncpu;
@@ -561,7 +566,7 @@ legend_lines(about_state_t *st, tiku_surface_t *s, int x, int y, int i,
              int m)
 {
     const tiku_font_t *plain = tiku_font_plain();
-    int room = st->surface->w - x - 14, k, lines = 1;
+    int room = st->width - x - 14, k, lines = 1;
     int step = plain->height + 2;
     int size_right = x + room * 48 / 100;
     int usage_right = x + room - 6;
@@ -1599,14 +1604,31 @@ paint(about_state_t *st)
     }
 }
 
-/** @brief Paint and hand the frame over. */
+/** @brief Have the window shown afresh: drawn again by the host, or
+ *         painted and handed over as a frame. */
 static void
 show(about_state_t *st)
 {
+    if (st->drawn) {
+        st->services->redraw(st->services->ctx, st->id);
+        return;
+    }
     paint(st);
     (void)st->services->frame(st->services->ctx, st->id,
                               st->surface->px, st->surface->w,
                               st->surface->h);
+}
+
+/** @brief The host drawing the window: paint on its view @p s. */
+static void
+about_draw(void *app, uint32_t id, tiku_surface_t *s)
+{
+    about_state_t *st = app;
+
+    (void)id;
+    st->surface = s;
+    paint(st);
+    st->surface = NULL;
 }
 
 /**
@@ -1632,14 +1654,20 @@ about_start(void **state, const tiku_app_services_t *services)
     st->step = -1;
     st->chosen = -1;
     about_host_refresh(st);
-    w = about_content_w(st);
-    h = about_body_h() + host_h(st) + devices_h(st);
-    st->surface = tiku_surface_new(w, h, TIKU_C_PANEL);
-    if (st->surface == NULL) {
-        free(st);
-        return -1;
+    w = st->width = about_content_w(st);
+    h = st->height = about_body_h() + host_h(st) + devices_h(st);
+    /* A host that draws the window keeps no pixels for it; otherwise the
+     * box paints its own surface and sends frames. */
+    st->drawn = services->open_drawn != NULL && services->redraw != NULL;
+    if (st->drawn) {
+        st->id = services->open_drawn(services->ctx, "About this system", w, h,
+                                      about_draw, st);
+    } else {
+        st->surface = tiku_surface_new(w, h, TIKU_C_PANEL);
+        st->id = st->surface != NULL
+                     ? services->open(services->ctx, "About this system", w, h)
+                     : 0;
     }
-    st->id = services->open(services->ctx, "About this system", w, h);
     if (st->id == 0) {
         tiku_surface_free(st->surface);
         free(st);
@@ -1817,13 +1845,16 @@ about_tick(void *state, int64_t now_us)
     about_devices_refresh(st);
     want_w = about_content_w(st);
     want_h = about_h(st);
-    if (want_w != st->surface->w || want_h != st->surface->h) {
-        tiku_surface_t *grown = tiku_surface_new(want_w, want_h,
-                                                 TIKU_C_PANEL);
+    if (want_w != st->width || want_h != st->height) {
+        tiku_surface_t *grown = st->drawn ? NULL
+                                          : tiku_surface_new(want_w, want_h,
+                                                             TIKU_C_PANEL);
 
-        if (grown != NULL) {
+        if (st->drawn || grown != NULL) {
             tiku_surface_free(st->surface);
             st->surface = grown;
+            st->width = want_w;
+            st->height = want_h;
             if (st->services->resize != NULL) {
                 (void)st->services->resize(st->services->ctx, st->id,
                                            want_w, want_h);

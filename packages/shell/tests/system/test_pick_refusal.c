@@ -4,12 +4,15 @@
  * Authors: Ambuj Varshney <ambuj@tiku-os.org>
  *
  * test_pick_refusal.c - an application's file request while the file panel
- * asks the desktop's own question.
+ * asks the desktop's own question; a hosted application's window the
+ * desktop draws.
  *
  * The panel asks where Move to puts a folder's selection.  A hosted
  * application's request and a remote application's request are both
  * refused, and the panel keeps the Move to question.  Once the panel has
- * closed, the hosted application's request opens it.
+ * closed, the hosted application's request opens it.  A window from
+ * open_drawn() is painted on a view of the desktop's surface, inside its
+ * content and its clip, with no pixels kept for it.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -34,6 +37,57 @@ check(int ok, const char *what)
 
 /** @brief Main's file is not linked; nothing here has folders to sync. */
 void sync_folder_preferences(desktop_t *app) { (void)app; }
+
+/* What the drawn window's painter was handed, and the services it got. */
+static struct {
+    int                        calls, w, h;
+    long                       stride;
+    const tiku_app_services_t *services;
+    uint32_t                   id;
+} painted;
+
+#define RED   TIKU_RGB(200, 0, 0)
+#define GREEN TIKU_RGB(0, 200, 0)
+#define GROUND TIKU_RGB(1, 2, 3)
+
+/** @brief Paint the window red, its first pixel green, and note the
+ *         surface. */
+static void
+paint_red(void *app, uint32_t id, tiku_surface_t *s)
+{
+    (void)app;
+    (void)id;
+    painted.calls++;
+    painted.w = s->w;
+    painted.h = s->h;
+    painted.stride = tiku_surface_stride(s);
+    tiku_fill(s, (tiku_rect_t){ 0, 0, s->w, s->h }, RED);
+    tiku_pixel(s, 0, 0, GREEN);
+}
+
+/** @brief Open one window the desktop draws. */
+static int
+drawn_start(void **state, const tiku_app_services_t *services)
+{
+    *state = NULL;
+    painted.services = services;
+    painted.id = services->open_drawn(services->ctx, "Drawn", 120, 80,
+                                      paint_red, NULL);
+    return painted.id != 0 ? 0 : -1;
+}
+
+static const tiku_app_descriptor_t drawn_app = {
+    .id = "test.drawn", .name = "Drawn", .start = drawn_start
+};
+
+/** @brief Fill the whole desktop with GROUND, its clip reset. */
+static void
+ground(desktop_t *app)
+{
+    tiku_clip_reset(app->surf);
+    tiku_fill(app->surf, (tiku_rect_t){ 0, 0, app->surf->w, app->surf->h },
+              GROUND);
+}
 
 /** @brief Whether the panel is up asking Move to for @p fl. */
 static int
@@ -93,6 +147,62 @@ main(void)
           app->file_panel.target == &app->pending_pick,
           "with the panel closed, a hosted application's request opens it");
     tiku_trk_panel_window_close(&app->file_panel);
+
+    printf("A window the desktop draws for a hosted application\n");
+    check(embed_start(app, &drawn_app), "the application starts with it");
+    {
+        struct desktop_embed *es = &app->embeds[0];
+        struct embed_win *ew = embed_win_of_id(es, painted.id);
+        tiku_window_t *w = ew != NULL ? ew->window : NULL;
+        tiku_rect_t c;
+
+        check(w != NULL && ew->paint == paint_red, "the window takes its painter");
+        if (w == NULL) {
+            return 1;
+        }
+        c = tiku_window_content(w);
+        ground(app);
+        embed_window_draw(w, app->surf, c, ew);
+        check(painted.calls == 1 && painted.w == c.w && painted.h == c.h &&
+              painted.stride == tiku_surface_stride(app->surf),
+              "the painter gets a view of the content on the desktop's rows");
+        check(ew->frame == NULL, "and the desktop keeps no pixels for it");
+        check(tiku_peek(app->surf, c.x, c.y) == GREEN &&
+              tiku_peek(app->surf, c.x + c.w - 1, c.y + c.h - 1) == RED &&
+              tiku_peek(app->surf, c.x - 1, c.y) == GROUND &&
+              tiku_peek(app->surf, c.x + c.w, c.y) == GROUND &&
+              tiku_peek(app->surf, c.x, c.y + c.h) == GROUND,
+              "its pixels land in the content and nowhere else");
+        ground(app);
+        tiku_clip_set(app->surf, (tiku_rect_t){ c.x + 10, c.y + 10, 20, 20 });
+        embed_window_draw(w, app->surf, c, ew);
+        check(tiku_peek(app->surf, c.x + 15, c.y + 15) == RED &&
+              tiku_peek(app->surf, c.x, c.y) == GROUND &&
+              tiku_peek(app->surf, c.x + 40, c.y + 15) == GROUND,
+              "a clipped draw paints the clip alone");
+        /* After a frame was drawn: nothing to draw, then the window. */
+        app->dirty = 0;
+        app->damage = (tiku_rect_t){ 0, 0, 0, 0 };
+        painted.services->redraw(painted.services->ctx, painted.id);
+        check(app->dirty == 2 && app->damage.x <= w->frame.x &&
+              app->damage.y <= w->frame.y &&
+              app->damage.x + app->damage.w >= w->frame.x + w->frame.w &&
+              app->damage.y + app->damage.h >= w->frame.y + w->frame.h,
+              "a redraw damages the window's frame alone");
+        /* Half off the right edge: painted whole, the visible part shown. */
+        w->frame.x = app->surf->w - w->frame.w / 2;
+        c = tiku_window_content(w);
+        ground(app);
+        embed_window_draw(w, app->surf, c, ew);
+        check(painted.calls == 3 && painted.w == c.w && painted.h == c.h &&
+              tiku_peek(app->surf, c.x, c.y) == GREEN &&
+              tiku_peek(app->surf, app->surf->w - 1, c.y + 5) == RED &&
+              tiku_peek(app->surf, c.x - 1, c.y + 5) == GROUND,
+              "a window partly off the screen is painted whole and shown");
+        embed_drop_window(ew, 0);
+        check(ew->paint == NULL && ew->window == NULL,
+              "a closed window forgets its painter");
+    }
 
     printf("%s\n", fails ? "FAILURES" : "all passed");
     return fails ? 1 : 0;

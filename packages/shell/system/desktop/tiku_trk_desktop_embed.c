@@ -133,8 +133,9 @@ desktop_offer_builtins(desktop_t *app)
     tiku_trk_launch_set_host(builtin_launch, app);
 }
 
-/** @brief Draw a hosted application's window: its latest frame, on the
- *         panel colour. */
+/** @brief Draw a hosted application's window: through its painter, on a
+ *         view of the desktop's surface, or its latest frame on the panel
+ *         colour. */
 static void
 embed_window_draw(tiku_window_t *window, tiku_surface_t *surface,
                   tiku_rect_t content, void *context)
@@ -142,6 +143,29 @@ embed_window_draw(tiku_window_t *window, tiku_surface_t *surface,
     struct embed_win *ew = context;
 
     (void)window;
+    if (ew != NULL && ew->paint != NULL) {
+        tiku_surface_t view, *whole;
+
+        /* The view does not record: a recording desktop's list is not
+         * whole for this window. */
+        tiku_gfx_rec_miss(surface);
+        if (tiku_surface_view(&view, surface, content) == 0) {
+            if (view.clip.w > 0 && view.clip.h > 0) {
+                ew->paint(ew->paint_app, ew->id, &view);
+            }
+            return;
+        }
+        /* Partly off the surface: painted whole for this draw only, and
+         * the part on the surface copied. */
+        whole = tiku_surface_new(content.w, content.h, TIKU_C_PANEL);
+        if (whole != NULL && (surface->scale <= 1 ||
+                              tiku_surface_rescale(whole, surface->scale, TIKU_C_PANEL) == 0)) {
+            ew->paint(ew->paint_app, ew->id, whole);
+            tiku_blit(surface, content.x, content.y, whole);
+        }
+        tiku_surface_free(whole);
+        return;
+    }
     tiku_fill(surface, content, TIKU_C_PANEL);
     if (ew == NULL || ew->frame == NULL) {
         return;
@@ -207,7 +231,9 @@ embed_window_count(const struct desktop_embed *slot)
  *        window or the workspace opens none.
  */
 static uint32_t
-embed_svc_open(void *ctx, const char *title, int w, int h)
+embed_open_window(void *ctx, const char *title, int w, int h,
+                  void (*paint)(void *app, uint32_t id, tiku_surface_t *s),
+                  void *paint_app)
 {
     struct desktop_embed *slot = ctx;
     desktop_t *app = slot->app;
@@ -264,6 +290,8 @@ embed_svc_open(void *ctx, const char *title, int w, int h)
     }
     ew->slot = slot;
     ew->id = slot->next_id++;
+    ew->paint = paint;
+    ew->paint_app = paint_app;
     /* The workspace tag is this window's own entry, so
      * tiku_workspace_find() by tag, as the Deskbar's window rows use it,
      * returns this window and not another of the application's. */
@@ -275,6 +303,35 @@ embed_svc_open(void *ctx, const char *title, int w, int h)
     tiku_window_set_size_controls(ew->window, 0, 0);
     desktop_damage_all(app);
     return ew->id;
+}
+
+static uint32_t
+embed_svc_open(void *ctx, const char *title, int w, int h)
+{
+    return embed_open_window(ctx, title, w, h, NULL, NULL);
+}
+
+/** @brief A window the application paints when the desktop draws it, on
+ *         a view of the desktop's surface; it keeps no pixels. */
+static uint32_t
+embed_svc_open_drawn(void *ctx, const char *title, int w, int h,
+                     void (*draw)(void *app, uint32_t id, tiku_surface_t *s),
+                     void *app)
+{
+    return draw != NULL ? embed_open_window(ctx, title, w, h, draw, app) : 0;
+}
+
+/** @brief Draw window @p id again: its cached content forgotten and its
+ *         frame damaged. */
+static void
+embed_svc_redraw(void *ctx, uint32_t id)
+{
+    struct desktop_embed *slot = ctx;
+    struct embed_win *ew = embed_win_of_id(slot, id);
+
+    if (ew != NULL && ew->window != NULL) {
+        desktop_damage_window(slot->app, ew->window);
+    }
 }
 
 /**
@@ -488,6 +545,8 @@ embed_drop_window(struct embed_win *ew, int tell)
     }
     window = ew->window;
     ew->window = NULL;          /* before the close, so nothing re-enters */
+    ew->paint = NULL;
+    ew->paint_app = NULL;
     free(ew->frame);
     ew->frame = NULL;
     ew->fw = 0;
@@ -871,6 +930,8 @@ embed_start(desktop_t *app, const tiku_app_descriptor_t *descriptor)
      * slot. */
     slot->services.ctx = slot;
     slot->services.open = embed_svc_open;
+    slot->services.open_drawn = embed_svc_open_drawn;
+    slot->services.redraw = embed_svc_redraw;
     slot->services.frame = embed_svc_frame;
     slot->services.menus = embed_svc_menus;
     slot->services.close = embed_svc_close;
