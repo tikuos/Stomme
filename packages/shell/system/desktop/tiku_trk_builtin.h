@@ -40,5 +40,12 @@ typedef struct {
  * The product defines it; a desktop linked without a definition has none.
  */
 const tiku_trk_builtin_t *tiku_trk_builtins(int *count);
+/**
+ * @brief Draw @p rect of built-in window @p window again in the desktop's
+ *        next frame, through the window's draw callback; the rest of the
+ *        screen keeps what it shows.  Nothing outside the window's frame is
+ *        drawn for it.
+ */
+void tiku_trk_builtin_damage(tiku_window_t *window, tiku_rect_t rect);
 
 #endif /* TIKU_TRK_BUILTIN_H_ */

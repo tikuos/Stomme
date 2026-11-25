@@ -1454,8 +1454,9 @@ int embed_open_or_raise(desktop_t *app,
                         const tiku_app_descriptor_t *descriptor);
 int embed_start(desktop_t *app, const tiku_app_descriptor_t *descriptor);
 /** @brief Register the product's built-in applications with the launcher,
- *         which opens them through the desktop, and give each a row in its
- *         category's Deskbar group. */
+ *         which opens them through the desktop, give each a row in its
+ *         category's Deskbar group, and keep @p app for
+ *         tiku_trk_builtin_damage(). */
 void desktop_offer_builtins(desktop_t *app);
 /**
  * @brief Tick each built-in application, once a turn before the frame is

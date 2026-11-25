@@ -102,6 +102,33 @@ builtins(desktop_t *app)
         desktop_turn_end(app, &options, &loop);
         check(builtin_ticks == 1, "a desktop turn ticks each built-in");
     }
+    {
+        tiku_window_t *w = tiku_workspace_open(app->desk, "Built-in",
+            (tiku_rect_t){ 40, 60, 200, 120 }, NULL, NULL, NULL);
+        tiku_rect_t d;
+
+        app->dirty = 0;
+        app->damage = (tiku_rect_t){ 0, 0, 0, 0 };
+        tiku_trk_builtin_damage(w, (tiku_rect_t){ 300, 300, 10, 10 });
+        tiku_trk_builtin_damage(NULL, (tiku_rect_t){ 40, 60, 10, 10 });
+        check(w != NULL && app->dirty == 0,
+              "damage outside a built-in's window, or of none, draws nothing");
+        tiku_trk_builtin_damage(w, (tiku_rect_t){ 0, 0, 100, 100 });
+        d = app->damage;
+        check(app->dirty == 2 && d.x == 40 && d.y == 60 && d.w == 60 && d.h == 40,
+              "a built-in's damage is its part inside the window");
+        tiku_trk_builtin_damage(w, (tiku_rect_t){ 150, 150, 20, 20 });
+        d = app->damage;
+        check(app->dirty == 2 && d.x == 40 && d.y == 60 && d.w == 130 && d.h == 110,
+              "more damage joins it");
+        app->dirty = 1;
+        tiku_trk_builtin_damage(w, (tiku_rect_t){ 40, 60, 10, 10 });
+        check(app->dirty == 1, "and a full frame stays full");
+        app->dirty = 0;
+        if (w != NULL) {
+            tiku_workspace_close(app->desk, w);
+        }
+    }
     check(desktop_launch_builtin_path(app, "builtin:missing") == 0 &&
           desktop_launch_builtin_path(app, "/apps/editor.so") == 0 &&
           desktop_launch_builtin_path(app, NULL) == 0 && builtin_opened == 1,

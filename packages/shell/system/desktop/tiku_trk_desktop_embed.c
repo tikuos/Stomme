@@ -56,6 +56,9 @@ tick_embeds(void *ctx)
     return 0;
 }
 
+/* The desktop whose workspace holds the built-in applications' windows. */
+static desktop_t *builtin_desktop;
+
 void
 desktop_builtins_turn(desktop_t *app)
 {
@@ -70,6 +73,35 @@ desktop_builtins_turn(desktop_t *app)
     }
 }
 
+void
+tiku_trk_builtin_damage(tiku_window_t *window, tiku_rect_t rect)
+{
+    desktop_t *app = builtin_desktop;
+    tiku_rect_t f;
+    int x0, y0, x1, y1;
+
+    if (app == NULL || window == NULL) {
+        return;
+    }
+    f = window->frame;
+    x0 = rect.x > f.x ? rect.x : f.x;
+    y0 = rect.y > f.y ? rect.y : f.y;
+    x1 = rect.x + rect.w < f.x + f.w ? rect.x + rect.w : f.x + f.w;
+    y1 = rect.y + rect.h < f.y + f.h ? rect.y + rect.h : f.y + f.h;
+    if (x1 <= x0 || y1 <= y0) {
+        return;
+    }
+    tiku_workspace_cache_forget(app->desk, window);
+    /* Content alone changed, so the window's shadow needs no repaint: the
+     * rectangle joins the damage as it is, unless a full frame comes. */
+    if (app->dirty == 1) {
+        return;
+    }
+    app->damage = app->dirty == 2
+        ? tiku_rect_union(app->damage, (tiku_rect_t){ x0, y0, x1 - x0, y1 - y0 })
+        : (tiku_rect_t){ x0, y0, x1 - x0, y1 - y0 };
+    app->dirty = 2;
+}
 
 /**
  * @brief The launcher's host for built-in applications: open built-in @p a
@@ -132,6 +164,7 @@ desktop_offer_builtins(desktop_t *app)
     int count;
     const tiku_trk_builtin_t *list = builtin_list(&count);
 
+    builtin_desktop = app;
     for (int i = 0; list != NULL && i < count; i++) {
         tiku_trk_app_t *entry;
         char module[TIKU_PATH_MAX];
