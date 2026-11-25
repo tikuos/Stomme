@@ -233,7 +233,7 @@ color_at(const source_t *src, int x, int y, pcolor_t *c)
 static tiku_rgb_t *
 pixel(tiku_painter_t *p, int x, int y)
 {
-    return p->s->px + (size_t)y * (size_t)(p->s->w * p->scale) + x;
+    return p->s->px + (size_t)y * (size_t)tiku_surface_stride(p->s) + x;
 }
 
 /** @brief Colour @p c laid over @p px by @p cover, 0 to 1. */

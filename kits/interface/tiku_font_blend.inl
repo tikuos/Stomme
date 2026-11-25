@@ -10,7 +10,7 @@ blend(tiku_surface_t *s, int sc, int x, int y, tiku_rgb_t c,
 {
     tiku_rgb_t d;
     unsigned dr, dg, db, sr, sg, sb;
-    long stride = (long)s->w * sc;
+    long stride = tiku_surface_stride(s);
 
     if (a == 0u ||
         x < s->clip.x * sc || y < s->clip.y * sc ||

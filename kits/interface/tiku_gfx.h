@@ -151,6 +151,9 @@ typedef struct {
     int               record_depth;
     tiku_rect_t        damage; /* optional outer repaint clip */
     int                damage_active; /* nonzero while damage is in force */
+    /* Native pixels from one row to the next; 0 reads as w * scale.  A
+     * view's is its parent's (tiku_surface_view()). */
+    int                stride;
 } tiku_surface_t;
 
 /**
@@ -197,6 +200,20 @@ int tiku_surface_resize(tiku_surface_t *s, int w, int h,
 
 /** @brief Free @p s and its pixels; NULL is allowed. */
 void tiku_surface_free(tiku_surface_t *s);
+
+/** @brief Native pixels from one row of @p s to the next. */
+long tiku_surface_stride(const tiku_surface_t *s);
+
+/**
+ * @brief Make @p view the rectangle @p r of @p parent: its pixels are the
+ *        parent's, its origin r's corner, its clip the parent's clip and
+ *        repaint region within @p r.
+ * @return 0, or -1 when @p r is empty or not inside the parent.
+ * @note A view owns no pixels: it is not freed, resized or rescaled, and
+ *       it does not record.
+ */
+int tiku_surface_view(tiku_surface_t *view, const tiku_surface_t *parent,
+                      tiku_rect_t r);
 
 /** @brief Restrict drawing to @p r, cut to the surface and to any repaint
  *         region. */

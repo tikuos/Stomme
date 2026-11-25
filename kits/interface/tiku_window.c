@@ -731,7 +731,7 @@ static void cache_capture(tiku_workspace_t *ws, int slot, tiku_rect_t r,
     }
     for (int y = 0; y < r.h*sc; y++)
         memcpy(p->px+(size_t)y*r.w*sc,
-            s->px+((size_t)r.y*sc+y)*s->w*sc+(size_t)r.x*sc,
+            s->px+((size_t)r.y*sc+y)*(size_t)tiku_surface_stride(s)+(size_t)r.x*sc,
             (size_t)r.w*sc*sizeof *p->px);
     ws->cache[slot].valid = 1; ws->cache[slot].active = active;
 }

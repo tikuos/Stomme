@@ -105,6 +105,53 @@ scale_of(const tiku_surface_t *s)
     return (s != NULL && s->scale > 1) ? s->scale : 1;
 }
 
+long
+tiku_surface_stride(const tiku_surface_t *s)
+{
+    return s->stride > 0 ? (long)s->stride : (long)s->w * scale_of(s);
+}
+
+int
+tiku_surface_view(tiku_surface_t *view, const tiku_surface_t *parent,
+                  tiku_rect_t r)
+{
+    int sc;
+
+    if (view == NULL || parent == NULL || parent->px == NULL ||
+        r.x < 0 || r.y < 0 || r.w <= 0 || r.h <= 0 ||
+        r.x + r.w > parent->w || r.y + r.h > parent->h) {
+        return -1;
+    }
+    sc = scale_of(parent);
+    memset(view, 0, sizeof *view);
+    view->px = parent->px + (long)r.y * sc * tiku_surface_stride(parent) +
+               (long)r.x * sc;
+    view->w = r.w;
+    view->h = r.h;
+    view->scale = parent->scale;
+    view->stride = (int)tiku_surface_stride(parent);
+    /* The parent's clip, as far as it falls in the rectangle. */
+    {
+        int x0 = parent->clip.x > r.x ? parent->clip.x : r.x;
+        int y0 = parent->clip.y > r.y ? parent->clip.y : r.y;
+        int x1 = parent->clip.x + parent->clip.w < r.x + r.w ?
+                 parent->clip.x + parent->clip.w : r.x + r.w;
+        int y1 = parent->clip.y + parent->clip.h < r.y + r.h ?
+                 parent->clip.y + parent->clip.h : r.y + r.h;
+
+        view->clip = (x1 > x0 && y1 > y0)
+            ? (tiku_rect_t){ x0 - r.x, y0 - r.y, x1 - x0, y1 - y0 }
+            : (tiku_rect_t){ 0, 0, 0, 0 };
+    }
+    if (parent->damage_active) {
+        view->damage = parent->damage;
+        view->damage.x -= r.x;
+        view->damage.y -= r.y;
+        view->damage_active = 1;
+    }
+    return 0;
+}
+
 #ifndef TIKU_PORTABLE_UI
 tiku_surface_t *
 tiku_surface_new(int w, int h, tiku_rgb_t bg)
@@ -193,7 +240,7 @@ tiku_peek(const tiku_surface_t *s, int x, int y)
         x >= s->w || y >= s->h) {
         return 0;
     }
-    return s->px[(long)y * sc * ((long)s->w * sc) + (long)x * sc];
+    return s->px[(long)y * sc * tiku_surface_stride(s) + (long)x * sc];
 }
 
 #ifndef TIKU_PORTABLE_UI
@@ -357,7 +404,7 @@ tiku_pixel(tiku_surface_t *s, int x, int y, tiku_rgb_t c)
         return;
     }
     sc = scale_of(s);
-    stride = (long)s->w * sc;
+    stride = tiku_surface_stride(s);
     for (ry = 0; ry < sc; ry++) {
         tiku_rgb_t *row = s->px + ((long)y * sc + ry) * stride +
                                (long)x * sc;
@@ -428,8 +475,8 @@ tiku_blit(tiku_surface_t *dst, int x, int y,
     if (x1 <= x0 || y1 <= y0) return;
     if (scale_of(dst) == scale_of(src)) {
         int sc = scale_of(dst), sub;
-        long dstride = (long)dst->w * sc;
-        long sstride = (long)src->w * sc;
+        long dstride = tiku_surface_stride(dst);
+        long sstride = tiku_surface_stride(src);
 
         for (row = y0; row < y1; row++) {
             for (sub = 0; sub < sc; sub++) {
@@ -444,7 +491,7 @@ tiku_blit(tiku_surface_t *dst, int x, int y,
         /* Unequal scales: carry each source pixel over logically. */
         int col;
         int ss = scale_of(src);
-        long sstride = (long)src->w * ss;
+        long sstride = tiku_surface_stride(src);
 
         for (row = y0; row < y1; row++) {
             for (col = x0; col < x1; col++) {
@@ -490,7 +537,7 @@ tiku_copy_bits(tiku_surface_t *s, tiku_rect_t src, int dx,
     }
     {
         int sc = scale_of(s), sub;
-        long stride = (long)s->w * sc;
+        long stride = tiku_surface_stride(s);
 
         if (dy > 0) {
             /* Downwards: the bottom scanline first, or the copy overwrites
@@ -578,7 +625,7 @@ round_corners(tiku_surface_t *s, tiku_rect_t r, int radius, unsigned corners,
               tiku_rgb_t c, int ring)
 {
     int sc = scale_of(s);
-    long stride = (long)s->w * sc;
+    long stride = tiku_surface_stride(s);
     int rad = radius * sc;
     native_box_t box = native_box(r, sc), clip = native_box(s->clip, sc);
     int k, x, y;
@@ -646,7 +693,7 @@ tiku_grab(const tiku_surface_t *s, tiku_rect_t r)
         tiku_surface_free(out);
         return NULL;
     }
-    sstride = (long)s->w * sc;
+    sstride = tiku_surface_stride(s);
     dstride = (long)r.w * sc;
     for (y = 0; y < r.h * sc; y++) {
         memcpy(out->px + (long)y * dstride,
@@ -685,8 +732,8 @@ tiku_blend(tiku_surface_t *dst, int x, int y, const tiku_surface_t *src,
     if (x1 <= x0 || y1 <= y0) {
         return;
     }
-    dstride = (long)dst->w * sc;
-    sstride = (long)src->w * sc;
+    dstride = tiku_surface_stride(dst);
+    sstride = tiku_surface_stride(src);
     for (row = y0 * sc; row < y1 * sc; row++) {
         tiku_rgb_t *out = dst->px + (long)row * dstride;
         const tiku_rgb_t *in = src->px + (long)(row - y * sc) * sstride
@@ -733,8 +780,8 @@ tiku_blend_scaled(tiku_surface_t *dst, tiku_rect_t at,
     if (box.x1 <= box.x0 || box.y1 <= box.y0) {
         return;
     }
-    dstride = (long)dst->w * sc;
-    sstride = sw;
+    dstride = tiku_surface_stride(dst);
+    sstride = tiku_surface_stride(src);
     /* Nearest source pixel for each native destination pixel, with no
      * filtering. */
     for (row = box.y0 * sc; row < box.y1 * sc; row++) {
@@ -902,7 +949,7 @@ tiku_shadow(tiku_surface_t *s, tiku_rect_t r, int radius, int corner,
     }
     if (strength > 1.0f) { strength = 1.0f; }
     sc = scale_of(s);
-    stride = (long)s->w * sc;
+    stride = tiku_surface_stride(s);
     rad = radius * sc;
     if (rad > 32) { rad = 32; }
     cr = (corner > 0) ? corner * sc : 0;
@@ -1032,7 +1079,7 @@ tiku_veil(tiku_surface_t *s, tiku_rect_t r, tiku_rgb_t c, float amount)
     if (x1 > s->clip.x + s->clip.w) { x1 = s->clip.x + s->clip.w; }
     if (y1 > s->clip.y + s->clip.h) { y1 = s->clip.y + s->clip.h; }
     sc = scale_of(s);
-    stride = (long)s->w * sc;
+    stride = tiku_surface_stride(s);
     for (y = y0; y < y1; y++) {
         int ry;
 
@@ -1072,7 +1119,7 @@ tiku_fill(tiku_surface_t *s, tiku_rect_t r, tiku_rgb_t c)
     if (y1 > s->clip.y + s->clip.h) { y1 = s->clip.y + s->clip.h; }
     {
         int sc = scale_of(s);
-        long stride = (long)s->w * sc;
+        long stride = tiku_surface_stride(s);
 
         for (y = (long)y0 * sc; y < (long)y1 * sc; y++) {
             tiku_rgb_t *row = s->px + (long)y * stride;
@@ -1240,7 +1287,7 @@ png_rows(const tiku_surface_t *s, unsigned char *raw, int nw, int nh)
         int x;
         raw[off++] = 0;                       /* filter: none */
         for (x = 0; x < nw; x++) {
-            tiku_rgb_t c = s->px[(long)y * nw + x];
+            tiku_rgb_t c = s->px[(long)y * tiku_surface_stride(s) + x];
             raw[off++] = (unsigned char)((c >> 16) & 0xFFu);
             raw[off++] = (unsigned char)((c >> 8) & 0xFFu);
             raw[off++] = (unsigned char)(c & 0xFFu);
@@ -1349,7 +1396,7 @@ invert_pixel(tiku_surface_t *s, int x, int y)
         return;
     }
     sc = scale_of(s);
-    stride = (long)s->w * sc;
+    stride = tiku_surface_stride(s);
     for (ry = 0; ry < sc; ry++) {
         tiku_rgb_t *row = s->px + ((long)y * sc + ry) * stride +
                                (long)x * sc;
