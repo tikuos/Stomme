@@ -42,17 +42,55 @@ void db_draw_frame(tiku_trk_deskbar_t *db, tiku_surface_t *s, int *rows);
 
 
 
+/* The leaf menu's and a submenu's least widths, and the most any is
+ * widened to fit its labels; a longer label is clipped to its row. */
+#define LEAF_MENU_W 176
+#define SUB_MENU_W  210
+#define MENU_MOST_W 400
+
+static int item_expands(int kind);
+
+/**
+ * @brief The width @p n rows of @p rows need in a menu whose rows are
+ *        @p rowh high, at least @p least: tiku_ui_menu_icons() sets a
+ *        label 10 pixels into the menu, 20 more when the bar paints icons,
+ *        and an expanding row keeps tiku_ui_submenu_arrow()'s arrow and a
+ *        gap clear after its label.
+ */
+static int
+menu_width(const tiku_trk_deskbar_t *db, const tiku_trk_db_item_t *rows,
+           int n, int rowh, int least)
+{
+    const tiku_font_t *f = tiku_font_plain();
+    int th = rowh / 2, w = least;
+
+    if ((th & 1) == 0) th--;
+    if (th < 5) th = 5;
+    for (int i = 0; i < n; i++) {
+        int need;
+
+        if (rows[i].kind == TIKU_TRK_DB_ITEM_SEP) continue;
+        need = 10 + (db->menu_icon != NULL ? 20 : 0) +
+               tiku_text_width(f, rows[i].label) +
+               (item_expands(rows[i].kind) ? 8 + 8 + th / 2 + 1 : 10);
+        if (need > w) w = need;
+    }
+    return w < MENU_MOST_W ? w : MENU_MOST_W;
+}
+
 /**
  * @brief Where the leaf menu goes: right of the bar when it is docked
  *        left, otherwise left of it, clamped at x 0 (DB-010).  It opens
- *        below the leaf button, or above it on a bottom dock.
+ *        below the leaf button, or above it on a bottom dock, as wide as
+ *        its labels need.
  */
 tiku_rect_t
 db_leaf_menu_rect(const tiku_trk_deskbar_t *db, int rowh, int rows)
 {
     tiku_rect_t m;
 
-    m.w = 176;
+    m.w = menu_width(db, db->leaf, rows < db->leaf_count ? rows : db->leaf_count,
+                     rowh, LEAF_MENU_W);
     m.h = rows * rowh + 4;
     m.y = (db->dock == TIKU_TRK_DB_BOTTOM)
               ? db->frame.y + 2 - m.h
@@ -718,13 +756,13 @@ tiku_trk_deskbar_quit_policy(int prefs_open, int shortcut_quit)
 
 /** @brief Where the submenu goes: level with its leaf row, right of the
  *         leaf menu with a left dock and left of it otherwise, clamped at
- *         x 0. */
+ *         x 0, as wide as its labels need. */
 tiku_rect_t
 db_sub_menu_rect(const tiku_trk_deskbar_t *db, tiku_rect_t m, int rowh)
 {
     tiku_rect_t r;
 
-    r.w = 210;
+    r.w = menu_width(db, db->sub, db->sub_count, rowh, SUB_MENU_W);
     r.h = db->sub_count * rowh + 4;
     r.y = m.y + 2 + db->sub_of * rowh;
     r.x = (db->dock == TIKU_TRK_DB_LEFT_EXPANDED ||

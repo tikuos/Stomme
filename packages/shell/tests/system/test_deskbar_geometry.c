@@ -4,7 +4,8 @@
  * Authors: Ambuj Varshney <ambuj@tiku-os.org>
  *
  * test_deskbar_geometry.c - where the Deskbar's list, tray, popups and
- * hidden sliver go on each dock, and what a click or a drop there finds.
+ * hidden sliver go on each dock, how wide its menus are, and what a click
+ * or a drop there finds.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -190,6 +191,58 @@ bottom_dock_menu(void)
     tiku_surface_free(s);
 }
 
+/** @brief A menu row's icon: nothing drawn, but the menu lays out an icon
+ *  column for it. */
+static int
+no_icon(void *context, tiku_surface_t *s, const tiku_trk_db_item_t *item,
+        int x, int y, int size)
+{
+    (void)context; (void)s; (void)item; (void)x; (void)y; (void)size;
+    return 0;
+}
+
+/** @brief The leaf menu and a submenu widen to their labels: an expanding
+ *  row's label ends clear of the submenu arrow, and a long application
+ *  name fits its submenu row (Stomme#23). */
+static void
+menus_fit_labels(void)
+{
+    tiku_surface_t *s = tiku_surface_new(1000, 680, TIKU_C_BACKDROP);
+    tiku_trk_deskbar_t *db = fixture(s, TIKU_TRK_DB_TOP, 2);
+    const tiku_font_t *f = tiku_font_plain();
+    int rowh = f->height + 6, th = rowh / 2, arrow;
+    tiku_rect_t m, sm;
+    static const char group[] = "Graphics & Design and Tools";
+    static const char name[] = "An Application With A Long Name Indeed";
+
+    printf("\nmenus as wide as their labels (Stomme#23)\n");
+    if ((th & 1) == 0) th--;
+    if (th < 5) th = 5;
+    arrow = 8 + th / 2 + 1;
+    tiku_trk_deskbar_set_menu_icon_painter(db, no_icon, NULL);
+    db->leaf_count = 2;
+    db->leaf[0].kind = TIKU_TRK_DB_ITEM_ROW;
+    strcpy(db->leaf[0].label, "Find");
+    db->leaf[1].kind = TIKU_TRK_DB_ITEM_EXPAND;
+    strcpy(db->leaf[1].label, group);
+    m = db_leaf_menu_rect(db, rowh, db->leaf_count);
+    check(m.x + 2 + 8 + 20 + tiku_text_width(f, group) + 6 <= m.x + m.w - arrow,
+          "#23", "an expanding row's label ends clear of its arrow");
+    check(m.x >= 0 && m.x + m.w <= 1000, "#23", "and the menu stays on screen");
+    db->leaf[1].kind = TIKU_TRK_DB_ITEM_ROW;
+    strcpy(db->leaf[1].label, "Shut down...");
+    check(db_leaf_menu_rect(db, rowh, db->leaf_count).w == 176, "#23",
+          "short labels keep the menu at its least width");
+    db->sub_count = 1;
+    db->sub_of = 0;
+    strcpy(db->sub[0].label, name);
+    sm = db_sub_menu_rect(db, m, rowh);
+    check(sm.x + 2 + 8 + 20 + tiku_text_width(f, name) + 4 <= sm.x + sm.w - 2,
+          "#23", "a long name fits its submenu row");
+    tiku_trk_deskbar_free(db);
+    tiku_surface_free(s);
+}
+
 /** @brief D-066: a hidden top dock keeps its sliver below the global bar. */
 static void
 hidden_top_dock(void)
@@ -315,6 +368,7 @@ main(void)
     window_row_drop();
     left_dock_popups();
     bottom_dock_menu();
+    menus_fit_labels();
     hidden_top_dock();
     tray_rows();
     down_arrow();
