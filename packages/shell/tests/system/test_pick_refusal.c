@@ -4,7 +4,7 @@
  * Authors: Ambuj Varshney <ambuj@tiku-os.org>
  *
  * test_pick_refusal.c - file requests while the file panel asks its own
- * question; drawn windows; built-in applications in the Deskbar.
+ * question; drawn windows; built-in applications; opaque windows.
  *
  * The panel asks where Move to puts a folder's selection.  A hosted
  * application's request and a remote application's request are both
@@ -151,6 +151,25 @@ static const tiku_app_descriptor_t drawn_app = {
     .id = "test.drawn", .name = "Drawn", .start = drawn_start
 };
 
+/* Content draws counted per window, for what an opaque window hides. */
+static int lower_draws, upper_draws;
+
+static void
+draw_lower(tiku_window_t *w, tiku_surface_t *s, tiku_rect_t r, void *c)
+{
+    (void)w; (void)c;
+    lower_draws++;
+    tiku_fill(s, r, GREEN);
+}
+
+static void
+draw_upper(tiku_window_t *w, tiku_surface_t *s, tiku_rect_t r, void *c)
+{
+    (void)w; (void)c;
+    upper_draws++;
+    tiku_fill(s, r, RED);
+}
+
 /** @brief Fill the whole desktop with GROUND, its clip reset. */
 static void
 ground(desktop_t *app)
@@ -275,6 +294,48 @@ main(void)
               "a closed window forgets its painter");
     }
     builtins(app);
+
+    printf("A window that paints all of its content\n");
+    {
+        tiku_window_t *lower = tiku_workspace_open(app->desk, "Lower",
+            (tiku_rect_t){ 20, 40, 300, 200 }, draw_lower, NULL, NULL);
+        tiku_window_t *upper = tiku_workspace_open(app->desk, "Upper",
+            (tiku_rect_t){ 40, 60, 200, 150 }, draw_upper, NULL, NULL);
+        tiku_rect_t c = upper != NULL ? tiku_window_content(upper)
+                                      : (tiku_rect_t){ 0, 0, 0, 0 };
+        tiku_rect_t inside = { c.x + 10, c.y + 10, 50, 40 };
+
+        tiku_workspace_cache_mode(app->desk, TIKU_CACHE_OFF);
+        ground(app);
+        tiku_clip_set(app->surf, inside);
+        lower_draws = upper_draws = 0;
+        tiku_workspace_draw(app->desk);
+        check(lower != NULL && upper != NULL && lower_draws == 1 && upper_draws == 1,
+              "a clip inside a window draws what lies under it");
+        tiku_window_set_opaque(upper, 1);
+        ground(app);
+        tiku_clip_set(app->surf, inside);
+        lower_draws = upper_draws = 0;
+        tiku_workspace_draw(app->desk);
+        check(lower_draws == 0 && upper_draws == 1 &&
+              tiku_peek(app->surf, inside.x, inside.y) == RED,
+              "unless the window is opaque: then it alone draws");
+        tiku_clip_set(app->surf, (tiku_rect_t){ c.x - 5, c.y + 10, 50, 40 });
+        lower_draws = upper_draws = 0;
+        tiku_workspace_draw(app->desk);
+        check(lower_draws == 1 && upper_draws == 1,
+              "a clip reaching past its content draws what lies under it");
+        tiku_workspace_set_now(app->desk, 1000);
+        upper->opened_at = 1000;
+        tiku_clip_set(app->surf, inside);
+        lower_draws = upper_draws = 0;
+        tiku_workspace_draw(app->desk);
+        check(lower_draws == 1, "as does a window still rising into place");
+        tiku_workspace_set_now(app->desk, 0);
+        tiku_clip_reset(app->surf);
+        tiku_workspace_close(app->desk, upper);
+        tiku_workspace_close(app->desk, lower);
+    }
 
     printf("%s\n", fails ? "FAILURES" : "all passed");
     return fails ? 1 : 0;

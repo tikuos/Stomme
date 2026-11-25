@@ -449,6 +449,14 @@ tiku_window_set_plain(tiku_window_t *window, int plain)
 }
 
 void
+tiku_window_set_opaque(tiku_window_t *window, int opaque)
+{
+    if (window != NULL) {
+        window->opaque = opaque != 0;
+    }
+}
+
+void
 tiku_window_set_handlers(tiku_window_t *window,
                               tiku_window_event_fn event,
                               tiku_window_close_fn close_requested,
@@ -926,22 +934,50 @@ tiku_workspace_set_backdrop(tiku_workspace_t *workspace,
     }
 }
 
+/**
+ * @brief The order index of the highest shown window that is opaque, stands
+ *        still and holds all of @p clip in its content; -1 when there is
+ *        none.  Nothing under it shows through the clip.
+ */
+static int
+covering(const tiku_workspace_t *workspace, tiku_rect_t clip)
+{
+    for (int i = workspace->count - 1; i >= 0; i--) {
+        const tiku_window_t *w = &workspace->windows[workspace->order[i]];
+        int64_t age = workspace->now - w->opened_at;
+        tiku_rect_t c;
+
+        if (!w->open || w->minimized || w->hidden || !w->opaque) continue;
+        if (workspace->now != 0 && w->opened_at != 0 && age >= 0 && age < RISE_US) continue;
+        c = tiku_window_content(w);
+        if (clip.x >= c.x && clip.y >= c.y && clip.x + clip.w <= c.x + c.w &&
+            clip.y + clip.h <= c.y + c.h) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 void
 tiku_workspace_draw(tiku_workspace_t *workspace)
 {
     tiku_rect_t all;
-    int i;
+    int i, first;
 
     if (workspace == NULL || workspace->surface == NULL) { return; }
     all = (tiku_rect_t){ 0, 0, workspace->surface->w,
                               workspace->surface->h };
-    tiku_fill(workspace->surface, all, TIKU_C_BACKDROP);
-    if (workspace->backdrop != NULL) {
-        workspace->backdrop(workspace->surface,
-                            workspace->backdrop_context);
+    first = covering(workspace, workspace->surface->clip);
+    if (first < 0) {
+        tiku_fill(workspace->surface, all, TIKU_C_BACKDROP);
+        if (workspace->backdrop != NULL) {
+            workspace->backdrop(workspace->surface,
+                                workspace->backdrop_context);
+        }
+        first = 0;
     }
     workspace->animating = 0;
-    for (i = 0; i < workspace->count; i++) {
+    for (i = first; i < workspace->count; i++) {
         tiku_window_t *window =
             &workspace->windows[workspace->order[i]];
 

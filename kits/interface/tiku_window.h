@@ -152,6 +152,9 @@ struct tiku_window {
      * its content, as a splash screen or an About panel has.  It cannot
      * be dragged or closed by hand; whoever opened it closes it. */
     int                          plain;
+    /* Its draw callback paints every pixel of its content, so a frame
+     * whose clip lies inside that content draws nothing under it. */
+    int                          opaque;
     /* Left out of the workspace's drawing while set: a screenshot of the
      * desk without the window that asked for it.  Nothing else about the
      * window changes; whoever sets it clears it before the next frame. */
@@ -258,6 +261,9 @@ tiku_window_t *tiku_workspace_at(
 
 /** @brief Dress @p window plain: no tab, only the hairline. */
 void tiku_window_set_plain(tiku_window_t *window, int plain);
+/** @brief Say whether @p window's draw callback paints every pixel of its
+ *  content; tiku_workspace_draw() then skips what lies under it. */
+void tiku_window_set_opaque(tiku_window_t *window, int opaque);
 
 /**
  * @brief Set @p window's event, close-request and destroy handlers; each
