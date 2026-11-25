@@ -29,7 +29,7 @@ builtin_list(int *count)
 
 /**
  * @brief The 75 ms periodic task: pump the board run, then tick every
- *        running hosted application and every built-in one.
+ *        running hosted application.
  * @return 0, so the task stays scheduled.
  */
 int
@@ -53,18 +53,23 @@ tick_embeds(void *ctx)
                                             tiku_trk_now());
         }
     }
-    {
-        int count;
-        const tiku_trk_builtin_t *list = builtin_list(&count);
-
-        for (e = 0; list != NULL && e < count; e++) {
-            if (list[e].tick != NULL) {
-                list[e].tick(tiku_trk_now());
-            }
-        }
-    }
     return 0;
 }
+
+void
+desktop_builtins_turn(desktop_t *app)
+{
+    int count;
+    const tiku_trk_builtin_t *list = builtin_list(&count);
+
+    (void)app;
+    for (int i = 0; list != NULL && i < count; i++) {
+        if (list[i].tick != NULL) {
+            list[i].tick(tiku_trk_now());
+        }
+    }
+}
+
 
 /**
  * @brief The launcher's host for built-in applications: open built-in @p a

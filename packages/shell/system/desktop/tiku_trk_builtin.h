@@ -28,8 +28,9 @@ typedef struct {
      */
     tiku_window_t *(*open)(tiku_workspace_t *workspace, tiku_rect_t area,
                            int *dirty, const char *path);
-    /** Each desktop turn, with the monotonic time in microseconds; may be
-     *  NULL. */
+    /** Each desktop turn, before its frame is drawn, with the monotonic
+     *  time in microseconds; may be NULL.  A turn comes at least every
+     *  10 ms. */
     void (*tick)(int64_t now);
 } tiku_trk_builtin_t;
 

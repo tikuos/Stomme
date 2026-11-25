@@ -39,8 +39,10 @@ check(int ok, const char *what)
 
 /** @brief Main's file is not linked; nothing here has folders to sync. */
 void sync_folder_preferences(desktop_t *app) { (void)app; }
-static int builtin_opened;
+static int builtin_opened, builtin_ticks;
 static const char *builtin_path = "unset";
+/** @brief A built-in's tick: counted. */
+static void tick_builtin(int64_t now) { (void)now; builtin_ticks++; }
 static tiku_window_t builtin_window;
 /** @brief A built-in's open: counted, with the path it was handed. */
 static tiku_window_t *
@@ -56,7 +58,7 @@ const tiku_trk_builtin_t *
 tiku_trk_builtins(int *count)
 {
     static const tiku_trk_builtin_t list[] = {
-        {"camera", "Camera", "image/jpeg", "image_viewer", "graphics", open_builtin, NULL},
+        {"camera", "Camera", "image/jpeg", "image_viewer", "graphics", open_builtin, tick_builtin},
         {"notes", "Notes", NULL, NULL, NULL, open_builtin, NULL},
     };
     *count = (int)(sizeof list / sizeof list[0]);
@@ -90,6 +92,16 @@ builtins(desktop_t *app)
           "one without a category or icon goes to Applications with none");
     check(desktop_launch_builtin_path(app, "builtin:camera") == 1 && builtin_opened == 1 &&
           builtin_path == NULL, "its row's path opens it alone");
+    {
+        desktop_options_t options;
+        desktop_loop_t loop;
+
+        memset(&options, 0, sizeof options);
+        memset(&loop, 0, sizeof loop);
+        builtin_ticks = 0;
+        desktop_turn_end(app, &options, &loop);
+        check(builtin_ticks == 1, "a desktop turn ticks each built-in");
+    }
     check(desktop_launch_builtin_path(app, "builtin:missing") == 0 &&
           desktop_launch_builtin_path(app, "/apps/editor.so") == 0 &&
           desktop_launch_builtin_path(app, NULL) == 0 && builtin_opened == 1,

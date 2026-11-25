@@ -829,6 +829,7 @@ desktop_turn_end(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
     desktop_device_pump(app);
     desktop_sweep(app, lp);
     desktop_notice_pump(app, lp);
+    desktop_builtins_turn(app);
     if (o->shot != NULL && lp->shot_at > 0 && tiku_trk_now() >= lp->shot_at) {
         desktop_damage_all(app);
     }

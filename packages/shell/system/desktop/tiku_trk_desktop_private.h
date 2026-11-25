@@ -1457,6 +1457,11 @@ int embed_start(desktop_t *app, const tiku_app_descriptor_t *descriptor);
  *         which opens them through the desktop, and give each a row in its
  *         category's Deskbar group. */
 void desktop_offer_builtins(desktop_t *app);
+/**
+ * @brief Tick each built-in application, once a turn before the frame is
+ *        drawn.
+ */
+void desktop_builtins_turn(desktop_t *app);
 /** @brief Start the built-in application whose launch module is @p path,
  *         "builtin:" and its id, alone; a failure goes to the status line.
  *  @return 1 when @p path names one, 0 otherwise. */
