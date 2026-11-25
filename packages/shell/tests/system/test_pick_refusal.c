@@ -3,20 +3,22 @@
  *
  * Authors: Ambuj Varshney <ambuj@tiku-os.org>
  *
- * test_pick_refusal.c - an application's file request while the file panel
- * asks the desktop's own question; a hosted application's window the
- * desktop draws.
+ * test_pick_refusal.c - file requests while the file panel asks its own
+ * question; drawn windows; built-in applications in the Deskbar.
  *
  * The panel asks where Move to puts a folder's selection.  A hosted
  * application's request and a remote application's request are both
  * refused, and the panel keeps the Move to question.  Once the panel has
  * closed, the hosted application's request opens it.  A window from
  * open_drawn() is painted on a view of the desktop's surface, inside its
- * content and its clip, with no pixels kept for it.
+ * content and its clip, with no pixels kept for it.  Each built-in is
+ * offered under "builtin:" and its id with a row in its category's Deskbar
+ * group, and that row's path opens it alone.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 #include "../../system/desktop/tiku_trk_desktop_embed.c"
+#include "../../system/deskbar/bar/tiku_trk_deskbar_private.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,6 +39,63 @@ check(int ok, const char *what)
 
 /** @brief Main's file is not linked; nothing here has folders to sync. */
 void sync_folder_preferences(desktop_t *app) { (void)app; }
+static int builtin_opened;
+static const char *builtin_path = "unset";
+static tiku_window_t builtin_window;
+/** @brief A built-in's open: counted, with the path it was handed. */
+static tiku_window_t *
+open_builtin(tiku_workspace_t *workspace, tiku_rect_t area, int *dirty,
+             const char *path)
+{
+    (void)workspace; (void)area; (void)dirty;
+    builtin_opened++;
+    builtin_path = path;
+    return &builtin_window;
+}
+const tiku_trk_builtin_t *
+tiku_trk_builtins(int *count)
+{
+    static const tiku_trk_builtin_t list[] = {
+        {"camera", "Camera", "image/jpeg", "image_viewer", "graphics", open_builtin, NULL},
+        {"notes", "Notes", NULL, NULL, NULL, open_builtin, NULL},
+    };
+    *count = (int)(sizeof list / sizeof list[0]);
+    return list;
+}
+/** @brief The built-ins offered to @p app's launcher and Deskbar, and a
+ *         Deskbar row's path starting one. */
+static void
+builtins(desktop_t *app)
+{
+    tiku_trk_deskbar_t *db = tiku_trk_deskbar_new(NULL);
+    tiku_trk_deskbar_t *saved = app->deskbar;
+    int before = app->apps.count;
+
+    if (db == NULL) {
+        check(0, "a Deskbar for the built-ins");
+        return;
+    }
+    app->deskbar = db;
+    desktop_offer_builtins(app);
+    tiku_trk_app_t *camera = &app->apps.app[before], *notes = &app->apps.app[before + 1];
+    check(app->apps.count == before + 2 && !strcmp(camera->module, "builtin:camera") &&
+          !strcmp(notes->module, "builtin:notes"),
+          "each built-in is in the launcher under builtin: and its id");
+    check(db->app_count == 2 && !strcmp(db->app[0].label, "Camera") &&
+          !strcmp(db->app[0].command, "builtin:camera") &&
+          !strcmp(db->app[0].icon, "image_viewer") &&
+          db->app[0].group == TIKU_TRK_DB_GROUP_GRAPHICS,
+          "a built-in's Deskbar row: its name, module and icon, in its category's group");
+    check(db->app[1].group == TIKU_TRK_DB_GROUP_APPS && db->app[1].icon[0] == '\0',
+          "one without a category or icon goes to Applications with none");
+    check(desktop_launch_builtin_path(app, "builtin:camera") == 1 && builtin_opened == 1 &&
+          builtin_path == NULL, "its row's path opens it alone");
+    check(desktop_launch_builtin_path(app, "builtin:missing") == 0 &&
+          desktop_launch_builtin_path(app, "/apps/editor.so") == 0 &&
+          desktop_launch_builtin_path(app, NULL) == 0 && builtin_opened == 1,
+          "a path that names no built-in is left to the caller");
+    app->deskbar = saved;
+}
 
 /* What the drawn window's painter was handed, and the services it got. */
 static struct {
@@ -203,6 +262,7 @@ main(void)
         check(ew->paint == NULL && ew->window == NULL,
               "a closed window forgets its painter");
     }
+    builtins(app);
 
     printf("%s\n", fails ? "FAILURES" : "all passed");
     return fails ? 1 : 0;

@@ -4,8 +4,9 @@
  * Authors: Ambuj Varshney <ambuj@tiku-os.org>
  *
  * tiku_trk_desktop_appgroups.inl - the Deskbar group an installed
- * application's manifest category puts it in.  Included by
- * tiku_trk_desktop_apps.c and by tests/system/test_app_groups.c.
+ * application's manifest category, or a built-in application's category,
+ * puts it in.  Included by tiku_trk_desktop_apps.c,
+ * tiku_trk_desktop_embed.c and tests/system/test_app_groups.c.
  *
  * SPDX-License-Identifier: Apache-2.0
  */

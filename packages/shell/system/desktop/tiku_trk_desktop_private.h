@@ -1454,8 +1454,13 @@ int embed_open_or_raise(desktop_t *app,
                         const tiku_app_descriptor_t *descriptor);
 int embed_start(desktop_t *app, const tiku_app_descriptor_t *descriptor);
 /** @brief Register the product's built-in applications with the launcher,
- *         which opens them through the desktop. */
+ *         which opens them through the desktop, and give each a row in its
+ *         category's Deskbar group. */
 void desktop_offer_builtins(desktop_t *app);
+/** @brief Start the built-in application whose launch module is @p path,
+ *         "builtin:" and its id, alone; a failure goes to the status line.
+ *  @return 1 when @p path names one, 0 otherwise. */
+int desktop_launch_builtin_path(desktop_t *app, const char *path);
 int tick_embeds(void *ctx);
 struct embed_win *embed_win_of_window(desktop_t *app, const tiku_window_t *w);
 void embed_drop_window(struct embed_win *ew, int tell);

@@ -372,6 +372,10 @@ deskbar_pick_system(desktop_t *app, tiku_trk_db_pick_t *pick)
 
             break;
         }
+        /* A built-in application's row opens it in the desktop. */
+        if (desktop_launch_builtin_path(app, pick->path)) {
+            break;
+        }
         /* A program row starts the program, which opens its own
          * windows through its session. */
         tiku_trk_app_t program;

@@ -14,6 +14,7 @@
 #include "tiku_trail.h"
 #include "tiku_trk_builtin.h"
 #include "tiku_trk_desktop_private.h"
+#include "tiku_trk_desktop_appgroups.inl"
 
 /* The product's built-in applications, when it links any. */
 extern const tiku_trk_builtin_t *tiku_trk_builtins(int *count) __attribute__((weak));
@@ -100,6 +101,26 @@ builtin_launch(void *context, const tiku_trk_app_t *a, const char *const *paths,
     return 0;
 }
 
+int
+desktop_launch_builtin_path(desktop_t *app, const char *path)
+{
+    if (path == NULL || strncmp(path, TIKU_TRK_LAUNCH_BUILTIN,
+                                sizeof TIKU_TRK_LAUNCH_BUILTIN - 1u) != 0) {
+        return 0;
+    }
+    for (int i = 0; i < app->apps.count; i++) {
+        if (strcmp(app->apps.app[i].module, path) == 0) {
+            if (tiku_trk_launch_run(&app->apps.app[i], NULL, 0) != TIKU_TRK_LAUNCH_OK) {
+                snprintf(app->status, sizeof app->status, "could not start %s",
+                         app->apps.app[i].name);
+                desktop_damage_all(app);
+            }
+            return 1;
+        }
+    }
+    return 0;
+}
+
 void
 desktop_offer_builtins(desktop_t *app)
 {
@@ -129,6 +150,8 @@ desktop_offer_builtins(desktop_t *app)
                  list[i].icon != NULL ? list[i].icon : "");
         snprintf(entry->category, sizeof entry->category, "%s",
                  list[i].category != NULL ? list[i].category : "");
+        (void)tiku_trk_deskbar_add_app_in(app->deskbar,
+            installed_group(entry->category), list[i].name, module, entry->icon);
     }
     tiku_trk_launch_set_host(builtin_launch, app);
 }
