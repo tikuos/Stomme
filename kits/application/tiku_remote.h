@@ -193,7 +193,12 @@ typedef struct tiku_remote_window {
 
 /** @brief One connected application: its windows, what it said, and its
  *         partly read and unsent bytes. */
+typedef int (*tiku_remote_send_fn)(void *ctx, uint32_t type, const void *data,
+                                   uint32_t length);
+
 typedef struct tiku_remote_session {
+    tiku_remote_send_fn send_packet;
+    void *packet_ctx;
     int                  fd;
     uint64_t             generation; /* never reused for another connection */
     uint64_t next_window_generation; /**< monotonic OPEN incarnation source */
@@ -237,6 +242,20 @@ typedef struct tiku_remote_listener {
     char                       path[108];
     tiku_remote_session_t session[TIKU_REMOTE_SESSIONS];
 } tiku_remote_listener_t;
+
+/** @brief Attach a whole-message peer. Its sender returns one on acceptance. */
+tiku_remote_session_t *tiku_remote_attach(tiku_remote_listener_t *listener,
+                                           tiku_remote_send_fn send, void *ctx);
+/** @brief Decode one complete packet. Return -1 for a protocol error,
+ * zero for no desktop change, or one for a change. */
+int tiku_remote_receive(tiku_remote_session_t *session, unsigned char *packet,
+                        size_t length);
+/** @brief Copy a local surface of w by h packed pixels into its open session window.
+ *         Return one on publication, zero on invalid dimensions or refusal. */
+int tiku_remote_frame_copy(tiku_remote_session_t *session, uint32_t id, int w,
+                           int h, const void *pixels);
+/** @brief Release the session's decoded state and queued messages. */
+void tiku_remote_detach(tiku_remote_session_t *session);
 
 /** @brief Listen on the desk socket.  @return 0, or -1. */
 int tiku_remote_listen(tiku_remote_listener_t *listener);
