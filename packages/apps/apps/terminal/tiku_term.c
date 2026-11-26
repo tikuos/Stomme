@@ -8,14 +8,18 @@
 
 #include "tiku_app_product.h"
 #include <errno.h>
-#include <fcntl.h>
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef TIKU_TERM_EXTERNAL_STREAM
+#include "tiku_term_stream.h"
+#else
+#include <fcntl.h>
+#include <signal.h>
 #include <sys/ioctl.h>
 #include <sys/wait.h>
 #include <termios.h>
+#endif
 #include <unistd.h>
 
 #include "tiku_app.h"
@@ -25,7 +29,10 @@
 #include "tiku_gfx.h"
 
 #define COLS      80
-#define ROWS      24
+#ifndef TIKU_TERM_ROWS
+#define TIKU_TERM_ROWS 24
+#endif
+#define ROWS      TIKU_TERM_ROWS
 #define SCROLLBACK 500
 #define STRIP_H   20
 #define MARGIN    4
@@ -735,6 +742,14 @@ publish(term_state_t *st)
     (void)st->services->menus(st->services->ctx, st->id, &menus);
 }
 
+#ifdef TIKU_TERM_EXTERNAL_STREAM
+static int start_shell(term_state_t *st)
+{
+    st->master = tiku_term_stream_open();
+    st->alive = st->master >= 0;
+    return st->alive ? 0 : -1;
+}
+#else
 /**
  * @brief Start $SHELL (else /bin/sh) as an interactive shell on a pty of
  *        its own, in a new session with the pty as its controlling
@@ -797,12 +812,18 @@ start_shell(term_state_t *st)
     return 0;
 }
 
+#endif
+
 /** @brief Write @p n bytes to the shell while it is alive. */
 static void
 send_bytes(term_state_t *st, const char *bytes, size_t n)
 {
     if (st->alive) {
+#ifdef TIKU_TERM_EXTERNAL_STREAM
+        tiku_term_stream_write(st->master, bytes, n);
+#else
         (void)write(st->master, bytes, n);
+#endif
         /* Typing returns the view to the live screen, where what is
          * typed shows. */
         if (st->view != 0) {
@@ -868,6 +889,9 @@ term_stop(void *state)
     if (st == NULL) {
         return;
     }
+#ifdef TIKU_TERM_EXTERNAL_STREAM
+    if (st->master >= 0) tiku_term_stream_close(st->master);
+#else
     if (st->child > 0) {
         (void)kill(st->child, SIGHUP);
         (void)waitpid(st->child, NULL, WNOHANG);
@@ -875,6 +899,7 @@ term_stop(void *state)
     if (st->master >= 0) {
         (void)close(st->master);
     }
+#endif
     tiku_surface_free(st->surface);
     free(st);
 }
@@ -885,14 +910,22 @@ static void
 term_tick(void *state, int64_t now_us)
 {
     term_state_t *st = state;
+#ifdef TIKU_TERM_EXTERNAL_STREAM
+    char buf[256];
+#else
     char buf[8192];
+#endif
     ssize_t n;
 
     (void)now_us;
     if (st->master < 0) {
         return;
     }
+#ifdef TIKU_TERM_EXTERNAL_STREAM
+    if ((n = tiku_term_stream_read(st->master, buf, sizeof buf)) > 0) {
+#else
     while ((n = read(st->master, buf, sizeof buf)) > 0) {
+#endif
         ssize_t i;
 
         for (i = 0; i < n; i++) {
@@ -907,11 +940,13 @@ term_tick(void *state, int64_t now_us)
             st->dirty = 1;
         }
     }
+#ifndef TIKU_TERM_EXTERNAL_STREAM
     if (st->child > 0 && waitpid(st->child, NULL, WNOHANG) == st->child) {
         st->child = -1;
         st->alive = 0;
         st->dirty = 1;
     }
+#endif
     if (st->dirty) {
         paint(st);
     }

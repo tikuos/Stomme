@@ -32,6 +32,9 @@ typedef struct {
      *  time in microseconds; may be NULL.  A turn comes at least every
      *  10 ms. */
     void (*tick)(int64_t now);
+    /** Start a registered program which publishes its own window, returning
+     * nonzero on admission. Used when open is NULL. */
+    int (*start)(void);
 } tiku_trk_builtin_t;
 
 /**

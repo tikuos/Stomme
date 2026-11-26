@@ -363,9 +363,6 @@ panel_slot(desktop_t *app)
     }
     return &app->panels[0];
 }
-#if TIKU_SHELL_BOARD_SERVICES
-
-
 /**
  * @brief The prefix a board's binds are relative to: for
  *        .../gui/<form>/panel the part before /gui/, else "" (a .panel
@@ -382,8 +379,6 @@ root_of(const char *path, char *root, size_t max)
         snprintf(root, max, "%.*s", (int)(gui - path), path);
     }
 }
-#endif
-
 
 int
 open_panel_path(desktop_t *app, const char *path)
@@ -423,10 +418,7 @@ open_panel_path(desktop_t *app, const char *path)
     p->unknown = unknown;
     p->pending = -1;
     snprintf(p->path, sizeof p->path, "%s", path);
-#if TIKU_SHELL_BOARD_SERVICES
-
     root_of(path, p->root, sizeof p->root);
-#endif
 
     panel_refresh(p);
     name = strrchr(path, '/');

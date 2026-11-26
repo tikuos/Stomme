@@ -123,9 +123,10 @@ builtin_launch(void *context, const tiku_trk_app_t *a, const char *const *paths,
         area.h -= area.y;
     }
     for (int i = 0; list != NULL && i < count; i++) {
-        if (list[i].id == NULL || list[i].open == NULL || strcmp(list[i].id, id) != 0) {
+        if (list[i].id == NULL || strcmp(list[i].id, id) != 0) {
             continue;
         }
+        if (list[i].open == NULL) return n == 0 && list[i].start && list[i].start();
         if (n <= 0) {
             return list[i].open(app->desk, area, &app->dirty, NULL) != NULL;
         }
@@ -170,7 +171,7 @@ desktop_offer_builtins(desktop_t *app)
         char module[TIKU_PATH_MAX];
         int at;
 
-        if (list[i].id == NULL || list[i].name == NULL || list[i].open == NULL ||
+        if (list[i].id == NULL || list[i].name == NULL || (!list[i].open && !list[i].start) ||
             snprintf(module, sizeof module, "%s%s", TIKU_TRK_LAUNCH_BUILTIN,
                      list[i].id) >= (int)sizeof module) {
             continue;
