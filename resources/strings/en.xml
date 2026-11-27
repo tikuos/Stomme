@@ -63,6 +63,7 @@
   <string name="menu.programming">Programming</string>
   <string name="menu.documents">Documents</string>
   <string name="menu.graphics">Graphics &amp; Design</string>
+  <string name="menu.audio">Audio</string>
   <string name="menu.utilities">Utilities</string>
   <string name="menu.development">Development</string>
   <string name="menu.device_tools">Device Tools</string>

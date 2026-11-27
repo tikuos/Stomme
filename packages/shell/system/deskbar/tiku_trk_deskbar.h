@@ -876,8 +876,8 @@ int tiku_trk_deskbar_add_app(tiku_trk_deskbar_t *db, const char *label,
  * @brief Which group of the leaf menu an installed program's row lives in.
  *
  * The leaf menu shows each group that has programs, in the order
- * Documents, Graphics & Design, Utilities, Development, Device Tools and
- * Demos; the values here do not follow that order.
+ * Documents, Graphics & Design, Audio, Utilities, Development, Device Tools
+ * and Demos; the values here do not follow that order.
  */
 enum {
     TIKU_TRK_DB_GROUP_APPS = 0,
@@ -886,6 +886,7 @@ enum {
     TIKU_TRK_DB_GROUP_DEMOS,
     TIKU_TRK_DB_GROUP_DOCUMENTS,
     TIKU_TRK_DB_GROUP_GRAPHICS,
+    TIKU_TRK_DB_GROUP_AUDIO,
     TIKU_TRK_DB_GROUP_COUNT,
     /* APPS and PROGRAMMING, by the names the leaf menu shows them under. */
     TIKU_TRK_DB_GROUP_UTILITIES = TIKU_TRK_DB_GROUP_APPS,

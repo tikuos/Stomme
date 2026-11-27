@@ -222,6 +222,7 @@ db_build_leaf(tiku_trk_deskbar_t *db)
         const struct { int group; const char *key; } groups[] = {
             {TIKU_TRK_DB_GROUP_DOCUMENTS, "menu.documents"},
             {TIKU_TRK_DB_GROUP_GRAPHICS, "menu.graphics"},
+            {TIKU_TRK_DB_GROUP_AUDIO, "menu.audio"},
             {TIKU_TRK_DB_GROUP_UTILITIES, "menu.utilities"},
             {TIKU_TRK_DB_GROUP_DEVELOPMENT, "menu.development"},
             {TIKU_TRK_DB_GROUP_DEVICE_TOOLS, "menu.device_tools"},

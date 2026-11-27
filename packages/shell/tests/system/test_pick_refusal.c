@@ -60,6 +60,7 @@ tiku_trk_builtins(int *count)
     static const tiku_trk_builtin_t list[] = {
         {"camera", "Camera", "image/jpeg", "image_viewer", "graphics", open_builtin, tick_builtin},
         {"notes", "Notes", NULL, NULL, NULL, open_builtin, NULL},
+        {"recorder", "Sound Recorder", "audio/wav", "sound_recorder", "audio", open_builtin, NULL},
     };
     *count = (int)(sizeof list / sizeof list[0]);
     return list;
@@ -80,16 +81,18 @@ builtins(desktop_t *app)
     app->deskbar = db;
     desktop_offer_builtins(app);
     tiku_trk_app_t *camera = &app->apps.app[before], *notes = &app->apps.app[before + 1];
-    check(app->apps.count == before + 2 && !strcmp(camera->module, "builtin:camera") &&
+    check(app->apps.count == before + 3 && !strcmp(camera->module, "builtin:camera") &&
           !strcmp(notes->module, "builtin:notes"),
           "each built-in is in the launcher under builtin: and its id");
-    check(db->app_count == 2 && !strcmp(db->app[0].label, "Camera") &&
+    check(db->app_count == 3 && !strcmp(db->app[0].label, "Camera") &&
           !strcmp(db->app[0].command, "builtin:camera") &&
           !strcmp(db->app[0].icon, "image_viewer") &&
           db->app[0].group == TIKU_TRK_DB_GROUP_GRAPHICS,
           "a built-in's Deskbar row: its name, module and icon, in its category's group");
     check(db->app[1].group == TIKU_TRK_DB_GROUP_APPS && db->app[1].icon[0] == '\0',
           "one without a category or icon goes to Applications with none");
+    check(db->app[2].group == TIKU_TRK_DB_GROUP_AUDIO && !strcmp(db->app[2].icon, "sound_recorder"),
+          "the audio category is the Audio group");
     check(desktop_launch_builtin_path(app, "builtin:camera") == 1 && builtin_opened == 1 &&
           builtin_path == NULL, "its row's path opens it alone");
     {

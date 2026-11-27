@@ -47,6 +47,7 @@
   <string name="menu.programming">Programmation</string>
   <string name="menu.documents">Documents</string>
   <string name="menu.graphics">Graphisme et conception</string>
+  <string name="menu.audio">Audio</string>
   <string name="menu.utilities">Utilitaires</string>
   <string name="menu.development">Développement</string>
   <string name="menu.device_tools">Outils pour appareils</string>

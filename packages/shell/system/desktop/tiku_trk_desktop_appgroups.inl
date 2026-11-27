@@ -13,8 +13,8 @@
 
 /**
  * @brief The Deskbar group for manifest category @p category: device tools,
- *        programming (or development), documents, graphics, demos, else
- *        applications.  The category places the row only; it does not
+ *        programming (or development), documents, graphics, audio, demos,
+ *        else applications.  The category places the row only; it does not
  *        change how the application runs.
  */
 static int installed_group(const char *category)
@@ -25,6 +25,7 @@ static int installed_group(const char *category)
         return TIKU_TRK_DB_GROUP_PROGRAMMING;
     if (!strcmp(category, "documents")) return TIKU_TRK_DB_GROUP_DOCUMENTS;
     if (!strcmp(category, "graphics")) return TIKU_TRK_DB_GROUP_GRAPHICS;
+    if (!strcmp(category, "audio")) return TIKU_TRK_DB_GROUP_AUDIO;
     if (!strcmp(category, "demos")) return TIKU_TRK_DB_GROUP_DEMOS;
     return TIKU_TRK_DB_GROUP_APPS;
 }

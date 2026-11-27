@@ -81,6 +81,20 @@ int main(void)
     assert(path[0] == '/');
     char tiny[2]; assert(!canonical_directory(root, tiny, sizeof tiny));
 
+    /* audio is a category; a name outside the list is refused. */
+    {
+        tiku_manifest_t m;
+        char error[96];
+        snprintf(path, sizeof path, "%s/audio.manifest", root);
+        file(root, "audio.manifest", "version=1\nid=recorder\nname=Recorder\n"
+             "module=recorder.so\ncategory=audio\n");
+        assert(tiku_manifest_read(path, &m, error, sizeof error) == 0 && !strcmp(m.category, "audio"));
+        file(root, "audio.manifest", "version=1\nid=recorder\nname=Recorder\n"
+             "module=recorder.so\ncategory=sound\n");
+        assert(tiku_manifest_read(path, &m, error, sizeof error) == -1);
+        remove_file(root, "audio.manifest");
+    }
+
     remove_file(bundle, "app.manifest"); remove_file(bundle, "unrelated.so");
     remove_file(duplicate, "app.manifest"); remove_file(duplicate, "unrelated.so");
     assert(!rmdir(bundle) && !rmdir(duplicate) && !rmdir(root));

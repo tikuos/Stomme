@@ -209,6 +209,22 @@ static void categories(tiku_surface_t *s)
         now += 2*delay; tested++;
     }
     assert(tested == TIKU_TRK_DB_GROUP_COUNT + 2); /* Settings and recents. */
+    /* The groups in the menu's order, Audio after Graphics & Design. */
+    static const int order[] = {
+        TIKU_TRK_DB_GROUP_DOCUMENTS, TIKU_TRK_DB_GROUP_GRAPHICS, TIKU_TRK_DB_GROUP_AUDIO,
+        TIKU_TRK_DB_GROUP_UTILITIES, TIKU_TRK_DB_GROUP_DEVELOPMENT,
+        TIKU_TRK_DB_GROUP_DEVICE_TOOLS, TIKU_TRK_DB_GROUP_DEMOS
+    };
+    int seen = 0;
+    for (int i = 0; i < db->leaf_count; i++) {
+        if (db->leaf[i].kind != TIKU_TRK_DB_ITEM_EXPAND ||
+            (int)db->leaf[i].expand != TIKU_TRK_DB_EXPAND_APPS) continue;
+        assert(seen < (int)(sizeof order / sizeof order[0]) && db->leaf[i].which == order[seen]);
+        if (db->leaf[i].which == TIKU_TRK_DB_GROUP_AUDIO)
+            assert(!strcmp(db->leaf[i].label, "Audio"));
+        seen++;
+    }
+    assert(seen == (int)(sizeof order / sizeof order[0]));
     tiku_trk_deskbar_free(db);
 }
 
