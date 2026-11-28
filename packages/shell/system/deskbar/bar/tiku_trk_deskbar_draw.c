@@ -989,6 +989,22 @@ tiku_trk_deskbar_draw(tiku_trk_deskbar_t *db, tiku_surface_t *s)
     rows = tiku_trk_deskbar_mini(db->dock) ? 0 : db_list_rows(db);
     db_draw_frame(db, s, &rows);
 
+    /* A bounded frame whose damage misses the bar and its shadow paints
+     * none of it; a menu, tip or calendar of the bar reaches past both. */
+    if (s->damage_active && !s->record && !db->menu_open &&
+        !db->calendar_open && !db->clock_menu_open && !db->apps_menu_open &&
+        !(db->win_menu_team >= 0 && db->win_menu_team < db->team_count) &&
+        !(db->tip_y >= 0 && db->tip[0] != '\0')) {
+        tiku_rect_t reach = tiku_inset(db->frame, -(12 + 2));
+
+        if (reach.x >= s->damage.x + s->damage.w ||
+            reach.y >= s->damage.y + s->damage.h ||
+            reach.x + reach.w <= s->damage.x ||
+            reach.y + reach.h <= s->damage.y) {
+            return;
+        }
+    }
+
     /* A shadow beneath, a hairline frame, square corners. */
     tiku_shadow(s, db->frame, 12, 0, 0.35f);
     tiku_fill(s, db->frame, TIKU_C_PANEL);

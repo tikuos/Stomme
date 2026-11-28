@@ -39,6 +39,7 @@ struct tiku_trk_catalog_settings {
     size_t count;
     void (*changed)(void *);
     void *context;
+    uint64_t published;         /* inputs() of the last complete publish, or 0 */
 };
 
 int tiku_trk_catalog_settings_path(const char *collection,const char *mime,
@@ -260,13 +261,51 @@ static void refresh(tiku_trk_catalog_settings_t *owner)
     if(changed && owner->changed)owner->changed(owner->context);
 }
 
+/** @brief Add the bytes of @p text and its terminator to FNV-1a hash @p h. */
+static uint64_t mix(uint64_t h, const char *text)
+{
+    do { h = (h ^ (unsigned char)*text) * 1099511628211ull; } while (*text++);
+    return h;
+}
+
+/** @brief Hash what the rows' snapshots derive from: each row's type, label,
+ * saved and persisted handler and its launch candidates.
+ * @return The hash, never 0; 0 when a persisted handler cannot be read. */
+static uint64_t inputs(tiku_trk_catalog_settings_t *owner)
+{
+    uint64_t h = 14695981039346656037ull;
+    int row, k;
+    for (row = 0; row < owner->accepted.count; row++) {
+        tiku_trk_cand_t candidates[TIKU_TRK_APP_MAX];
+        tiku_trk_association_t *a = &owner->accepted.row[row];
+        const char *type = a->type;
+        char text[TIKU_TRK_APP_NAME_MAX];
+        int count;
+        if (tiku_trk_launch_preferred_persisted(owner->store, type, text,
+                                                sizeof text))
+            return 0;
+        h = mix(mix(mix(mix(h, type), a->label), a->saved), text);
+        h = mix(h, effective(owner, row, text));
+        count = tiku_trk_launch_candidates(owner->apps, &type, 1, NULL,
+                                           candidates, TIKU_TRK_APP_MAX);
+        for (k = 0; k < count; k++) h = mix(h, candidates[k].app->name);
+        h = mix(h, "");
+    }
+    return h ? h : 1;
+}
+
 /** @brief Publish changed snapshots with the combined provider's current
  * revision.
+ * @note With no job in flight, a pass whose inputs() equal those of the last
+ * pass that read, compared and published every row is skipped.
  */
 static void publish(tiku_trk_catalog_settings_t *owner)
 {
     tiku_resource_caller_t caller={.authenticated=1,.scopes=63};size_t i;
+    uint64_t seen;int whole=1;
     if(!owner->registry)return;
+    seen=inputs(owner);
+    if(!owner->job && seen && seen==owner->published)return;
     strcpy(caller.principal,"00000000000000000000000000000001");
     for(i=2;i<2+(size_t)owner->accepted.count*2;i++){
         tiku_resource_snapshot_t old={0},next={0};
@@ -275,16 +314,19 @@ static void publish(tiku_trk_catalog_settings_t *owner)
             snapshot(owner, i, &next)) {
             tiku_resource_snapshot_clear(&old);
             tiku_resource_snapshot_clear(&next);
+            whole=0;
             continue;
         }
-        if (!tiku_resource_value_equal(old.desired, next.desired) ||
-            !tiku_resource_value_equal(old.persisted, next.persisted) ||
-            !tiku_resource_value_equal(old.applied, next.applied) ||
-            strcmp(old.apply_state, next.apply_state))
+        if ((!tiku_resource_value_equal(old.desired, next.desired) ||
+             !tiku_resource_value_equal(old.persisted, next.persisted) ||
+             !tiku_resource_value_equal(old.applied, next.applied) ||
+             strcmp(old.apply_state, next.apply_state)) &&
             tiku_resource_publish(owner->registry, &old.stamp, owner->paths[i],
-                                  &next, &next.stamp);
+                                  &next, &next.stamp))
+            whole=0;
         tiku_resource_snapshot_clear(&old);tiku_resource_snapshot_clear(&next);
     }
+    owner->published = whole && !owner->job ? seen : 0;
 }
 
 /** @brief Release a worker after collection or a proposal before dispatch. */
