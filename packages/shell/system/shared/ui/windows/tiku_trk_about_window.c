@@ -80,6 +80,7 @@ typedef struct {
     uint32_t                        id;
     /* Counted once at start; the memory is read again on every paint. */
     int                        ncpu;
+    char                       system_release[64];
     int64_t                    opened_us;      /* when the cycle started */
     /*
      * The colour-cycle step last painted and the second the gauge was
@@ -1089,7 +1090,7 @@ static int processor_row_h(void)
     return text > CHIP ? text : CHIP;
 }
 
-static int about_body_h(void)
+static int about_body_h(const about_state_t *st)
 {
     /* The facts column: 171 px at a 15 px line, growing by three line
      * heights with the face, with the processor row in place of one. */
@@ -1099,6 +1100,8 @@ static int about_body_h(void)
      * rule, and the line under the rule. */
     int identity = 16 + 80 + 14 + tiku_font_at(28)->height + 6 + 3 + 14 +
                    tiku_font_plain()->height + 20;
+
+    if (st->system_release[0]) facts += tiku_font_plain()->height + 4;
 
     /* The two-line footer runs under both columns: its first line sits in
      * the taller column's bottom margin, and the second is added here. */
@@ -1113,7 +1116,7 @@ static int about_body_h(void)
 static int
 about_h(const about_state_t *st)
 {
-    return about_body_h() + host_h(st) + devices_h(st) +
+    return about_body_h(st) + host_h(st) + devices_h(st) +
            (st->reports_open ? reports_h() : 0);
 }
 
@@ -1494,6 +1497,12 @@ paint(about_state_t *st)
     y = 22;
     tiku_text(surface, bold, facts_x, y + plain->ascent,
                    TIKU_SHELL_DESKTOP_NAME_SPACE ABOUT_VERSION, TIKU_C_TEXT);
+    if (st->system_release[0]) {
+        y += plain->height + 4;
+        snprintf(line, sizeof line, "%s", st->system_release);
+        fit_text(plain, line, surface->w - facts_x - 14);
+        tiku_text(surface, plain, facts_x, y + plain->ascent, line, TIKU_C_TEXT);
+    }
     y += plain->height + 10;
     {   /* The processor: its chip, then its name over its clock, read on
          * every paint so a rate changed while the box is open shows. */
@@ -1574,7 +1583,7 @@ paint(about_state_t *st)
     {   /* The footer: the copyright and the project page, then the
          * licence on a second line, since the three do not fit on one
          * line between the margins. */
-        int foot = about_body_h() - 14;
+        int foot = about_body_h(st) - 14;
 
         tiku_text(surface, plain, left, foot - plain->height - 4,
                        TIKU_SHELL_ABOUT_COPYRIGHT,
@@ -1594,13 +1603,13 @@ paint(about_state_t *st)
         }
     }
     if (host_h(st) > 0) {
-        paint_host(st, about_body_h());
+        paint_host(st, about_body_h(st));
     }
     if (st->ndev > 0) {
-        paint_devices(st, about_body_h() + host_h(st));
+        paint_devices(st, about_body_h(st) + host_h(st));
     }
     if (st->reports_open) {
-        paint_reports(st, about_body_h() + host_h(st) + devices_h(st));
+        paint_reports(st, about_body_h(st) + host_h(st) + devices_h(st));
     }
 }
 
@@ -1650,12 +1659,15 @@ about_start(void **state, const tiku_app_services_t *services)
     }
     st->services = services;
     st->ncpu = count_cpus();
+#ifdef TIKU_SHELL_ABOUT_SYSTEM_RELEASE
+    TIKU_SHELL_ABOUT_SYSTEM_RELEASE(st->system_release, sizeof st->system_release);
+#endif
     st->opened_us = tiku_trk_now();
     st->step = -1;
     st->chosen = -1;
     about_host_refresh(st);
     w = st->width = about_content_w(st);
-    h = st->height = about_body_h() + host_h(st) + devices_h(st);
+    h = st->height = about_body_h(st) + host_h(st) + devices_h(st);
     /* A host that draws the window keeps no pixels for it; otherwise the
      * box paints its own surface and sends frames. */
     st->drawn = services->open_drawn != NULL && services->redraw != NULL;

@@ -121,6 +121,8 @@ bar_press(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
         bar->click_x = ev->x;
         bar->click_y = ev->y;
     }
+    tiku_rect_t previous = tiku_trk_deskbar_leaf_bounds(app->deskbar);
+    int tip_visible = tiku_trk_deskbar_tip(app->deskbar)[0] != '\0';
     memset(&pick, 0, sizeof pick);
     if (tiku_trk_deskbar_click(app->deskbar, ev->x, ev->y, ev->modifiers,
                                (int)ev->button, dclicks, &pick)) {
@@ -138,7 +140,13 @@ bar_press(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
         } else {
             deskbar_pick_dispatch(app, &pick, ev->x, ev->y);
         }
-        *damage = tiku_trk_damage_all();
+        tiku_rect_t current = tiku_trk_deskbar_leaf_bounds(app->deskbar);
+        if (pick.what == TIKU_TRK_DB_NONE && !tip_visible && (previous.w || current.w)) {
+            *damage = tiku_trk_damage_union(bar_frame(app), previous);
+            *damage = tiku_trk_damage_union(*damage, current);
+        } else {
+            *damage = tiku_trk_damage_all();
+        }
         return 1;
     }
     if ((ev->button == 4u || ev->button == 5u) &&

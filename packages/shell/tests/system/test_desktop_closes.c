@@ -37,6 +37,59 @@ check(int ok, const char *what)
 /** @brief Main's file is not linked; nothing here has folders to sync. */
 void sync_folder_preferences(desktop_t *app) { (void)app; }
 
+/** @brief The menu and window closes in this fixture leave the theme alone. */
+void desktop_save_theme(desktop_t *app) { (void)app; check(0, "unexpected theme change"); }
+
+/** @brief A last-folder close exposes its frame and keeps pending full damage. */
+static void last_folder_close(desktop_t *app, const char *path, int pending)
+{
+    folder_t *folder = open_folder(app, path);
+    if (!folder) { check(0, "last folder opens"); return; }
+    tiku_rect_t frame = folder->win->frame, damage;
+    tiku_event_t event = { .type = TIKU_EVENT_POINTER_DOWN, .button = 1,
+                           .x = frame.x + 10, .y = frame.y + tiku_window_tab_h() / 2 };
+
+    desktop_windows_attach(app);
+    app->dirty = 0;
+    app->windows_responder.press(app, &event, &damage);
+    app->dirty = pending;
+    event.type = TIKU_EVENT_POINTER_UP;
+    app->windows_responder.release(app, &event, &damage);
+    check(tiku_workspace_count(app->desk) == 0, "the last folder closes");
+    if (pending) {
+        check(tiku_trk_damage_is_all(damage) && app->dirty == 1,
+              "closing preserves a pending full repaint");
+    } else {
+        check(damage.x == frame.x && damage.y == frame.y &&
+              damage.w == frame.w && damage.h == frame.h && app->dirty != 1,
+              "closing repaints the exposed frame");
+        check(app->damage_next.w > 0, "closing schedules the bars");
+    }
+}
+
+/** @brief Opening and dismissing the leaf menu damage the same bounded area. */
+static void leaf_dismissal(desktop_t *app)
+{
+    tiku_trk_deskbar_set_dock(app->deskbar, TIKU_TRK_DB_RIGHT_EXPANDED);
+    tiku_trk_deskbar_draw(app->deskbar, app->surf);
+    desktop_bar_attach(app);
+    tiku_rect_t bar = tiku_trk_deskbar_frame(app->deskbar), opened, closed;
+    tiku_event_t tap = {.type = TIKU_EVENT_POINTER_DOWN, .button = 1,
+                        .x = bar.x + bar.w / 2, .y = bar.y + 8};
+    app->bar_responder.press(app, &tap, &opened);
+    tiku_rect_t popup = tiku_trk_deskbar_leaf_bounds(app->deskbar);
+    check(popup.w > 0 && opened.w > 0 && opened.w < app->surf->w &&
+          opened.x <= popup.x && opened.y <= popup.y &&
+          opened.x + opened.w >= popup.x + popup.w &&
+          opened.y + opened.h >= popup.y + popup.h, "opening repaints the leaf popup");
+    tap.x = 0;
+    tap.y = app->surf->h - 1;
+    app->bar_responder.press(app, &tap, &closed);
+    check(!tiku_trk_deskbar_menu_open(app->deskbar) && closed.x == opened.x &&
+          closed.y == opened.y && closed.w == opened.w && closed.h == opened.h,
+          "dismissal restores the previous popup bounds");
+}
+
 /** @brief Whether every folder slot is empty. */
 static int
 slots_empty(desktop_t *app)
@@ -155,6 +208,9 @@ main(void)
     }
 
     printf("Cmd-click on a close box closes every folder window (D-054)\n");
+    leaf_dismissal(app);
+    last_folder_close(app, a, 0);
+    last_folder_close(app, a, 1);
     fa = open_folder(app, a);
     fb = open_folder(app, b);
     check(fa != NULL && fb != NULL, "two folder windows open");

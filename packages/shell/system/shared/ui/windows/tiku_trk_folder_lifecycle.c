@@ -137,6 +137,7 @@ tiku_trk_folder_lifecycle_close(tiku_trk_folder_lifecycle_t *controller,
     /* The kept pixels belong to the window that was showing, so a slot
      * reused for another folder starts from a blank frame. */
     tiku_trk_folder_window_forget(folder);
+    tiku_trk_folder_window_free_background(folder);
     /* The window pointer is cleared too: the workspace recycles window
      * objects, so a closed slot still holding one would claim a reopened
      * window that lands at the same address. */

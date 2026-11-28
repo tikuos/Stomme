@@ -33,11 +33,16 @@ static int follow(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
 
 /* The presses and releases that reach the surfaces, for the lens test. */
 static int lens_downs, lens_ups, lens_x, lens_y;
-/** @brief The Deskbar is not linked: it has no frame here. */
+/** @brief A raised Deskbar with a leaf above its team rows. */
+static const tiku_rect_t leaf_button = { 670, 24, 126, 36 };
+tiku_rect_t tiku_trk_deskbar_leaf_button_rect(const tiku_trk_deskbar_t *db)
+{ (void)db; return leaf_button; }
+tiku_rect_t tiku_trk_deskbar_switch_rect(const tiku_trk_deskbar_t *db)
+{ (void)db; return (tiku_rect_t){ 735, 140, 48, 16 }; }
 tiku_rect_t tiku_trk_deskbar_frame(const tiku_trk_deskbar_t *db)
-{ (void)db; return (tiku_rect_t){ 0, 0, 0, 0 }; }
+{ (void)db; return (tiku_rect_t){ 668, 22, 130, 140 }; }
 int tiku_trk_deskbar_raised(const tiku_trk_deskbar_t *db)
-{ (void)db; return 0; }
+{ (void)db; return 1; }
 int tiku_trk_deskbar_menu_open(const tiku_trk_deskbar_t *db)
 { (void)db; return 0; }
 int tiku_trk_deskbar_popup_at(const tiku_trk_deskbar_t *db, int x, int y,
@@ -482,6 +487,11 @@ int main(void)
     tap.type = TIKU_EVENT_POINTER_UP;
     desktop_pointer_up(app, &tap, NULL);
     before = lens_downs;
+    tiku_rect_t menu;
+    app->deskbar = (tiku_trk_deskbar_t *)(void *)&folder;
+    assert(!lens_wanted(app, 732, 42, &menu));
+    assert(lens_wanted(app, 732, 78, &menu));
+    app->deskbar = NULL;
     desktop_calibrate_attach(app);
     desktop_calibrate_begin(app);
     assert(app->calibrate.phase == DESKTOP_CALIBRATE_OFF);

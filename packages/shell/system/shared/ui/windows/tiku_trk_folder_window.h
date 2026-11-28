@@ -169,7 +169,8 @@ struct tiku_trk_folder_window {
     char                       qscope[64];
     /* The picture behind it, decoded once and kept with the window, so a
      * frame does not decode the file again. */
-    tiku_image_t           bg_image;       /* the decoded picture */
+    tiku_image_t           bg_image;       /* size and optional ARGB pixels */
+    tiku_rgb_t            *bg_rgb;         /* owns the opaque picture's pixels */
     char                       bg_shown[TIKU_PATH_MAX]; /* its file */
     tiku_trk_bg_t bg_applied; /**< background used by the last image draw */
     int                        bg_drawn;   /* labels need a halo over it */
@@ -213,6 +214,9 @@ void tiku_trk_folder_window_draw(tiku_window_t *window,
 /** @brief Draw the visible placed poses, each at its own place. */
 void tiku_trk_folder_window_draw_icons(tiku_trk_folder_window_t *folder,
     tiku_surface_t *surface, tiku_rect_t content);
+
+/** @brief Release the decoded wallpaper when a folder closes or changes pictures. */
+void tiku_trk_folder_window_free_background(tiku_trk_folder_window_t *folder);
 
 /**
  * @brief Draw the picture behind @p folder, its own or the template

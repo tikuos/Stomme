@@ -135,7 +135,9 @@ int main(void)
     write_file(path, "DarkMode 0\nFutureFlag preserved\n");
     tiku_trk_prefs_init(&prefs); CHECK(!tiku_trk_prefs_load(&prefs, path));
     owner = tiku_trk_settings_open(&prefs, path, registry, changed, &calls); CHECK(owner);
+    CHECK(tiku_trk_settings_save_busy(owner));
     drain(); CHECK(calls == 1 && !tiku_trk_settings_error(owner));
+    CHECK(!tiku_trk_settings_save_busy(owner));
     {
         const char *device_path = "/settings/tracker/currentdevice";
         tiku_resource_snapshot_t observed = {0};
@@ -215,7 +217,9 @@ int main(void)
     CHECK(!tiku_trk_prefs_get(&prefs, "ShowDisksIcon"));
     value = read_value(registry, "/settings/tracker/showdisksicon"); CHECK(tiku_msg_find_bool(value.desired, "value", 0, &boolean) && !boolean); tiku_resource_snapshot_clear(&value);
     tiku_trk_prefs_set(&prefs, "DarkMode", 2); CHECK(!tiku_trk_prefs_submit(&prefs, path));
-    CHECK(tiku_trk_prefs_get(&prefs, "DarkMode") == 1); drain(); CHECK(tiku_trk_prefs_get(&prefs, "DarkMode") == 2);
+    CHECK(tiku_trk_settings_save_busy(owner) && tiku_trk_prefs_get(&prefs, "DarkMode") == 1);
+    drain();
+    CHECK(!tiku_trk_settings_save_busy(owner) && tiku_trk_prefs_get(&prefs, "DarkMode") == 2);
     value = read_value(registry, "/settings/ui/theme"); CHECK(!strcmp(tiku_msg_find_string(value.desired, "value", 0), "monochrome")); tiku_resource_snapshot_clear(&value);
     CHECK(!rename(path, original) && !mkdir(path, 0700));
     tiku_trk_prefs_set(&prefs, "DarkMode", 0); CHECK(!tiku_trk_prefs_submit(&prefs, path)); drain();

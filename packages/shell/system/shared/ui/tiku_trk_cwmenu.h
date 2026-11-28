@@ -37,6 +37,7 @@
 #define TIKU_TRK_CMD_READER_OPEN     1705
 /* The image viewer's file picker. */
 #define TIKU_TRK_CMD_IMAGE_OPEN      1706
+#define TIKU_TRK_CMD_CHOOSE_PICTURE  1708
 /* The Move to / Copy to / Create link pickers: 16 destinations each
  * (CW-035).  (command - BASE) / 16 says which picker, % 16 which entry. */
 #define TIKU_TRK_CMD_DEST_BASE       1720

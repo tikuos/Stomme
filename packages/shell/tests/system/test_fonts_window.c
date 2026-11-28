@@ -2,10 +2,6 @@
 #include <assert.h>
 #include "../../system/shared/ui/windows/tiku_trk_fonts_window.c"
 
-void tiku_trk_deskbar_apply_settings(tiku_trk_deskbar_t *bar,
-    const tiku_trk_deskbar_settings_t *settings)
-{ (void)bar; (void)settings; }
-
 static void click(tiku_trk_fonts_window_t *p, tiku_rect_t r, int complete)
 {
     tiku_event_t ev = {.type = TIKU_EVENT_POINTER_DOWN, .button = 1,

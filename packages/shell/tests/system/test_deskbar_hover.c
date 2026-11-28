@@ -71,6 +71,10 @@ static void tracking(tiku_surface_t *s, int dock)
     assert(!tiku_trk_deskbar_menu_tick(db, now+delay-1) && db->sub_of == -1);
     assert(tiku_trk_deskbar_menu_tick(db, now+delay));
     assert(db->sub_of == settings && db->sub_count >= 6);
+    assert(db->sub[0].command == TIKU_TRK_DB_PREFERENCES &&
+           strcmp(db->sub[0].label, "Deskbar") == 0);
+    assert(db->sub[1].command == TIKU_TRK_DB_TRACKER_PREFERENCES &&
+           !strstr(db->sub[1].label, "preferences"));
     assert(!tiku_trk_deskbar_menu_tick(db, now+5*delay));
     tiku_rect_t main = row_rect(db, 0);
     main = db_leaf_menu_rect(db, main.h, db->leaf_count);
@@ -206,9 +210,19 @@ static void categories(tiku_surface_t *s)
         hover(db,i,now);
         assert(tiku_trk_deskbar_menu_tick(db,now+delay));
         assert(db->sub_of == i && db->sub_count > 0 && db->menu_open);
+        if (db->leaf[i].expand == TIKU_TRK_DB_EXPAND_SETTINGS) {
+            int rows = 0;
+            for (int k = 0; k < db->sub_count; k++) {
+                if (db->sub[k].command != TIKU_TRK_DB_LAUNCH_APP) continue;
+                assert(!strcmp(db->sub[k].label, "Example"));
+                assert(!strcmp(db->sub[k].path, "/test/example.so"));
+                rows++;
+            }
+            assert(rows == 1);
+        }
         now += 2*delay; tested++;
     }
-    assert(tested == TIKU_TRK_DB_GROUP_COUNT + 2); /* Settings and recents. */
+    assert(tested == TIKU_TRK_DB_GROUP_COUNT + 1); /* The groups, including Settings, and recents. */
     /* The groups in the menu's order, Audio after Graphics & Design. */
     static const int order[] = {
         TIKU_TRK_DB_GROUP_DOCUMENTS, TIKU_TRK_DB_GROUP_GRAPHICS, TIKU_TRK_DB_GROUP_AUDIO,
@@ -349,7 +363,7 @@ static void button_hover(tiku_surface_t *s, int dock)
     tiku_trk_deskbar_t *db = tiku_trk_deskbar_new(NULL); assert(db);
     tiku_trk_deskbar_set_dock(db, dock);
     tiku_trk_deskbar_draw(db, s);
-    tiku_rect_t r = db_leaf_button_rect(db);
+    tiku_rect_t r = tiku_trk_deskbar_leaf_button_rect(db);
     int x = r.x + r.w - 5, y = r.y + 4;
     tiku_rgb_t normal = tiku_peek(s, x, y);
     assert(normal == TIKU_C_TAB && !db->leaf_hover);

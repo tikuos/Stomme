@@ -43,7 +43,7 @@ static font_layout_t layout(tiku_rect_t c)
     font_layout_t l;
     int fh = tiku_font_plain()->height, bh = tiku_ui_button_h();
     int top = c.y + fh + 34, left = 216;
-    int bottom = c.y + body_height() - bh - 18;
+    int bottom = c.y + c.h - bh - (18 - TIKU_WINDOW_BORDER);
     l.family = (tiku_rect_t){c.x + 18, top, left, bottom - top - 72};
     l.list = tiku_preferences_group_body(l.family);
     l.size = (tiku_rect_t){c.x + left + 34, top, c.w - left - 52, bh + fh + 42};
@@ -77,9 +77,13 @@ static int window_height(void)
  */
 static void refit(tiku_trk_fonts_window_t *p)
 {
-    if (p->window && p->window->open &&
-        p->window->frame.h != window_height()) {
-        p->window->frame.h = window_height();
+    if (!p->window || !p->window->open) return;
+    tiku_rect_t old = p->window->frame, frame = old;
+    frame.h = window_height();
+    frame.w = TIKU_TRK_FONTS_W;
+    frame = tiku_trk_deskbar_fit_panel(p->deskbar, p->screen_w, p->screen_h, frame);
+    if (memcmp(&frame, &old, sizeof frame) != 0) {
+        p->window->frame = frame;
         if (p->dirty) *p->dirty = 1;
     }
 }
@@ -340,6 +344,8 @@ tiku_trk_fonts_window_open(tiku_trk_fonts_window_t *controller)
     frame.h = window_height();
     frame.x = (controller->screen_w - frame.w) / 2;
     frame.y = (controller->screen_h - frame.h) / 3;
+    frame = tiku_trk_deskbar_fit_panel(controller->deskbar,
+        controller->screen_w, controller->screen_h, frame);
     controller->window = tiku_workspace_open(controller->workspace,
         tiku_str("title.fonts"), frame, draw, controller, NULL);
     if (controller->window != NULL) {

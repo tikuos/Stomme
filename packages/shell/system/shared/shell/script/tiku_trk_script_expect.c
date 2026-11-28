@@ -885,6 +885,8 @@ sc_parse_window(sc_step_t *st, char **w, int n)
         st->op = OP_EXPECT_BARAT;
         st->x = atoi(w[1]);
         st->y = atoi(w[2]);
+    } else if (strcmp(w[0], "expect-window-fits") == 0 && n == 1) {
+        st->op = OP_EXPECT_WINDOW_FITS;
     } else if (strcmp(w[0], "expect-window-at") == 0 && n >= 3) {
         st->op = OP_EXPECT_WINAT;
         st->x = atoi(w[1]);
@@ -949,6 +951,14 @@ sc_pump_pixels(tiku_trk_script_t *s, const tiku_trk_script_state_t *st,
                  (st != NULL) ? st->bar_y : -1);
         sc_verdict(s, st != NULL && st->bar_x == cur->x && st->bar_y == cur->y,
                 "deskbar at:", at);
+        return 1;
+    }
+    case OP_EXPECT_WINDOW_FITS: {
+        char detail[256] = "no window geometry";
+        int fits = st && st->window_fits &&
+            st->window_fits(st->pose_ctx, detail, sizeof detail);
+
+        sc_verdict(s, fits, "window fits:", detail);
         return 1;
     }
     case OP_EXPECT_WINAT: {

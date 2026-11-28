@@ -67,7 +67,8 @@ static void exercise(tiku_store_t *store, const char *node, const char *path, in
     CHECK(model.value.icon_size==48);
     CHECK(tiku_state_read(store,node,TIKU_ATTR_DESK_VIEW_STATE,bytes,sizeof bytes-1)>0);
     CHECK(!memcmp(bytes,"icon 48 12 10 20 30 40 2 3 1 0",strlen(view)));
-    input=tiku_resource_value_integer(TIKU_RESOURCE_INTEGER,33); CHECK(change(registry,"/settings/desktop/icon_size",input,2)==TIKU_RESOURCE_VALUE); tiku_msg_free(input);
+    input=tiku_resource_value_integer(TIKU_RESOURCE_INTEGER,15); CHECK(change(registry,"/settings/desktop/icon_size",input,2)==TIKU_RESOURCE_VALUE); tiku_msg_free(input);
+    input=tiku_resource_value_integer(TIKU_RESOURCE_INTEGER,129); CHECK(change(registry,"/settings/desktop/icon_size",input,3)==TIKU_RESOURCE_VALUE); tiku_msg_free(input);
     input=tiku_resource_value_integer(TIKU_RESOURCE_INTEGER,INT64_MAX); CHECK(change(registry,"/settings/desktop/icon_size",input,3)==TIKU_RESOURCE_VALUE); tiku_msg_free(input);
     input=trk_value_container("object");
     CHECK(!trk_value_member(input,"path",tiku_resource_value_string(TIKU_RESOURCE_TEXT,"/tmp/picture with spaces.png")) &&
@@ -80,7 +81,7 @@ static void exercise(tiku_store_t *store, const char *node, const char *path, in
     input=tiku_resource_value_integer(TIKU_RESOURCE_BOOLEAN,1); CHECK(!change(registry,"/settings/desktop/reduce_motion",input,5)); tiku_msg_free(input);
     CHECK(tiku_trk_prefs_get(&table,"ReduceMotion"));
     snapshot=read_value(registry,"/settings/ui/reduce-motion"); CHECK(tiku_msg_find_bool(snapshot.persisted,"value",0,&(int){0})); tiku_resource_snapshot_clear(&snapshot);
-    model.value.icon_size=64; CHECK(!tiku_trk_desktop_settings_submit(desktop)); CHECK(model.value.icon_size==48); drain(); CHECK(model.value.icon_size==64);
+    model.value.icon_size=57; CHECK(!tiku_trk_desktop_settings_submit(desktop)); CHECK(model.value.icon_size==48); drain(); CHECK(model.value.icon_size==57);
     CHECK(!strcmp(tiku_trk_desktop_settings_status(desktop),""));
     CHECK(!tiku_state_write(store,node,TIKU_ATTR_DESK_VIEW_STATE,"mini 96 9 8 7 6 5 4 3 0 1",25) && !tiku_store_flush(store));
     tiku_trk_desktop_settings_poll(desktop, 1001);

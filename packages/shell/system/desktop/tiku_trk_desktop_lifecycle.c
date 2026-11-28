@@ -27,8 +27,6 @@
 static void settings_changed(void *context)
 {
     desktop_t *app = context;
-    app->desktop_prefs_window.model.value.reduce_motion =
-        tiku_trk_prefs_get(prefs_model(app), "ReduceMotion") != 0;
     tiku_trk_soundprefs_apply(prefs_model(app));
     sync_folder_preferences(app);
     desktop_damage_all(app);
@@ -822,6 +820,9 @@ boot_settings(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
     app->fonts_window.submit_save = record_font_submit;
     app->fonts_window.save_status = record_save_status;
     {
+        (void)find_wallpaper_dir(o->argv0,
+            app->desktop_prefs_window.pictures_dir,
+            sizeof app->desktop_prefs_window.pictures_dir);
         if (!find_help_dir(o->argv0, app->help_root, sizeof app->help_root))
             app->help_root[0] = 0;
     }
@@ -979,8 +980,8 @@ boot_icons(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
                 return 1;
             }
         }
-        tiku_trk_desktop_prefs_window_bind_settings(&app->desktop_prefs_window,
-                                                    prefs_model(app), path);
+        app->desktop_prefs_window.pick_file = desktop_choose_picture;
+        app->desktop_prefs_window.pick_context = app;
         tiku_trk_sounds_window_init(&app->sounds_window, app->desk,
             prefs_model(app), path, DESK_W, DESK_H, &app->dirty,
             sound_choose, app);
@@ -1584,6 +1585,7 @@ desktop_teardown(desktop_t *app, desktop_loop_t *lp)
     tiku_trk_session_controller_save(&app->session);
     splash_stage(app, "the desktop");
     for (i = 0; i < app->folder_count; i++) {
+        tiku_trk_folder_window_free_background(&app->folders[i]);
         tiku_trk_poseview_free(app->folders[i].view);
     }
     tiku_trk_desktop_view_destroy(&app->desktop_view);

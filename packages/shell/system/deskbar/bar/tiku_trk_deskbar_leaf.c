@@ -232,13 +232,13 @@ db_build_leaf(tiku_trk_deskbar_t *db)
          * label key; the assertion fails when this table and the enum
          * differ in length. */
         _Static_assert(sizeof groups / sizeof groups[0] ==
-                       TIKU_TRK_DB_GROUP_COUNT, "a group has no name");
+                       TIKU_TRK_DB_GROUP_COUNT - 1, "a group outside Settings has no name");
         int counts[TIKU_TRK_DB_GROUP_COUNT] = {0};
         for (i = 0; i < db->app_count; i++) {
             int group = db->app[i].group;
             if (group >= 0 && group < TIKU_TRK_DB_GROUP_COUNT) counts[group]++;
         }
-        for (i = 0; i < TIKU_TRK_DB_GROUP_COUNT; i++) {
+        for (i = 0; i < (int)(sizeof groups / sizeof groups[0]); i++) {
             int group = groups[i].group;
             if (counts[group]) add_expand(db, TIKU_TRK_DB_EXPAND_APPS, group,
                 tiku_str(groups[i].key), NULL,

@@ -721,6 +721,8 @@ typedef struct desktop {
                                          *   a destination for */
     int                  theme_mode;    /**< the theme in use; -1 until
                                          *   first applied */
+    int                  theme_target;    /**< Deskbar selection pending presentation, or -1 */
+    int                  theme_submitted; /**< the settings owner accepted the save */
     /** The global menu bar: 1 on, 0 off, -1 until the first sync. It is one
      * strip at the top of the screen: the system menu at its left and the
      * menus the focused window published, rebuilt on every draw. */
@@ -1239,6 +1241,8 @@ int desktop_help_html(desktop_t *app, const char *title, const char *html);
 int desktop_help_open(desktop_t *app, const char *page);
 int desktop_help_ready(desktop_t *app);
 int desktop_launch_app(desktop_t *app, const char *id, const char *document);
+void desktop_choose_picture(void *context);
+int find_wallpaper_dir(const char *argv0, char *out, size_t max);
 int find_help_dir(const char *argv0, char *out, size_t max);
 void build_pickers(desktop_t *app, folder_t *fl);
 void offer_installed(desktop_t *app, const char *argv0);
@@ -1396,6 +1400,8 @@ void desktop_damage_check_idle(desktop_t *app);
 int tick_clock(void *ctx);
 void blit(desktop_t *app);
 void desktop_damage(desktop_t *app, tiku_rect_t rect);
+/** @brief Invalidate the given pixels, including disjoint pending updates. */
+void desktop_damage_rect(desktop_t *app, tiku_rect_t rect);
 /**
  * @brief The box desktop_draw_drag() covers with the pointer at (@p x,
  *        @p y): up to four 32-pixel icons, each 6 pixels down and right of
@@ -1439,6 +1445,10 @@ void desktop_focus_paint(desktop_t *app);
 void desktop_idle_work(desktop_t *app);
 void desktop_screenshot_tick(desktop_t *app);
 void draw_all(desktop_t *app);
+/** @brief Present the Deskbar switch and the destination theme before applying it. */
+void desktop_preview_theme(desktop_t *app, int mode);
+/** @brief Submit the selection when the settings owner is ready and handle a failed save. */
+void desktop_save_theme(desktop_t *app);
 void set_backdrop_color(void *context, const tiku_trk_color_t *color);
 
 /* tiku_trk_desktop_drivers.c */
@@ -1677,6 +1687,7 @@ void desktop_vfs_request(desktop_t *app, int session,
 
 /* tiku_trk_desktop_windows.c */
 void desktop_windows_attach(desktop_t *app);
+void desktop_keep_window_tabs_visible(desktop_t *app);
 
 /** @brief Capture the inherited supervisor channel before application
  * launches.

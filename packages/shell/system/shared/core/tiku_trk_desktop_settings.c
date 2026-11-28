@@ -130,10 +130,7 @@ static int desktop_replace(tiku_trk_deskprefs_values_t *out, int index,
         if (strcmp(type, "integer") ||
             !tiku_msg_find_int64(input, "value", 0, &number))
             return -1;
-        for (i = 0; i < TIKU_TRK_DESK_ICON_STEPS; i++)
-            if (number == tiku_trk_deskprefs_icon_step(i))
-                break;
-        if (i == TIKU_TRK_DESK_ICON_STEPS) return -1;
+        if (number < 16 || number > 128) return -1;
         out->icon_size = (int)number; return 0;
     }
     if (index != BACKGROUND || strcmp(type, "object") ||

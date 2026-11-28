@@ -132,6 +132,38 @@ stepper_rect(tiku_rect_t content, int y)
     return r;
 }
 
+typedef struct {
+    int pitch;
+    int compact;
+    tiku_rect_t monitor, status, action[3];
+} deskbar_prefs_layout_t;
+
+/** @brief Place the dock beside the rows on a short display. */
+static deskbar_prefs_layout_t
+panel_layout(tiku_rect_t content)
+{
+    int compact = content.h < TIKU_TRK_DB_PREFS_H - tiku_window_tab_h() -
+                              TIKU_WINDOW_BORDER * 2;
+    int actions = compact ? 365 : 488;
+    return (deskbar_prefs_layout_t){
+        .pitch = compact ? 27 : 29,
+        .compact = compact,
+        .monitor = {compact ? content.w - 137 : 292, compact ? 47 : 392, 116, 82},
+        .status = {18, actions + 30, content.w - 36, compact ? 19 : 30},
+        .action = {{18, actions, 112, 26}, {140, actions, 100, 26},
+                   {278, actions, 142, 26}}
+    };
+}
+
+/** @brief Translate a control from content coordinates to the screen. */
+static tiku_rect_t
+at_content(tiku_rect_t content, tiku_rect_t control)
+{
+    control.x += content.x;
+    control.y += content.y;
+    return control;
+}
+
 /** @brief Draw the rows, the dock monitor, and the three buttons. */
 static void
 draw(tiku_window_t *window, tiku_surface_t *surface,
@@ -141,11 +173,12 @@ draw(tiku_window_t *window, tiku_surface_t *surface,
     tiku_trk_deskbar_settings_t *s = &controller->model.value;
     const tiku_font_t *font = tiku_font_plain();
     int row;
+    deskbar_prefs_layout_t layout = panel_layout(content);
 
     (void)window;
     tiku_fill(surface, content, TIKU_C_PANEL);
     for (row = 0; row < ROW_COUNT; row++) {
-        int y = content.y + 12 + row * 29;
+        int y = content.y + 12 + row * layout.pitch;
         int enabled = row_enabled(controller, row);
         int *value = row_value(s, row);
         char number[24];
@@ -204,8 +237,7 @@ draw(tiku_window_t *window, tiku_surface_t *surface,
         }
     }
     {
-        tiku_rect_t monitor = { content.x + 292, content.y + 392,
-                                     116, 82 };
+        tiku_rect_t monitor = at_content(content, layout.monitor);
         tiku_trk_db_dock_t dock = tiku_trk_deskbar_dock(controller->deskbar);
         char current[32];
 
@@ -215,26 +247,25 @@ draw(tiku_window_t *window, tiku_surface_t *surface,
                  (int)dock);
         tiku_text(surface, font, monitor.x + 29, monitor.y + 45,
                        current, TIKU_C_TEXT);
-        tiku_text(surface, font, content.x + 18, content.y + 432,
-                       tiku_str("prefs.deskbar.dock_location"),
-                       TIKU_C_TEXT);
+        tiku_rect_t label = !layout.compact
+            ? (tiku_rect_t){content.x + 18, content.y + 412, 255, 24}
+            : (tiku_rect_t){monitor.x, monitor.y - 27, monitor.w, 24};
+        tiku_text_line_draw(surface, label, TIKU_MEASURE_PLAIN,
+            tiku_str("prefs.deskbar.dock_location"), TIKU_C_TEXT);
     }
     if (controller->save_status) {
         const char *status = controller->save_status(controller->save_context);
         if (status && *status) tiku_text_line_draw(surface,
-            (tiku_rect_t){content.x + 18, content.y + 518, content.w - 36, 30},
+            at_content(content, layout.status),
             TIKU_MEASURE_PLAIN, status, TIKU_C_TEXT);
     }
-    button(surface, (tiku_rect_t){ content.x + 18, content.y + 488,
-           112, 26 }, tiku_str("button.defaults"),
+    button(surface, at_content(content, layout.action[0]), tiku_str("button.defaults"),
            tiku_trk_deskbar_prefs_defaultable(&controller->model),
            tiku_press_held(&controller->press, 1));
-    button(surface, (tiku_rect_t){ content.x + 140, content.y + 488,
-           100, 26 }, tiku_str("button.revert"),
+    button(surface, at_content(content, layout.action[1]), tiku_str("button.revert"),
            tiku_trk_deskbar_prefs_revertable(&controller->model),
            tiku_press_held(&controller->press, 2));
-    button(surface, (tiku_rect_t){ content.x + 278, content.y + 488,
-           142, 26 }, tiku_str("prefs.deskbar.edit_in_tracker"), 1,
+    button(surface, at_content(content, layout.action[2]), tiku_str("prefs.deskbar.edit_in_tracker"), 1,
            tiku_press_held(&controller->press, 3));
 }
 
@@ -250,16 +281,17 @@ event(tiku_window_t *window, const tiku_event_t *event,
     tiku_trk_deskbar_prefs_window_t *controller = context;
     tiku_rect_t content = tiku_window_content(window);
     int x = event->x - content.x, y = event->y - content.y;
-    int row = (y - 12) / 29;
+    deskbar_prefs_layout_t layout = panel_layout(content);
+    int row = (y - 12) / layout.pitch;
 
     {
         /* The three buttons along the bottom show pressed while held and
          * act on a release over them; the rows act on the press. */
-        int under = (inside((tiku_rect_t){ 18, 488, 112, 26 }, x, y) &&
+        int under = (inside(layout.action[0], x, y) &&
                      tiku_trk_deskbar_prefs_defaultable(&controller->model)) ? 1
-                  : (inside((tiku_rect_t){ 140, 488, 100, 26 }, x, y) &&
+                  : (inside(layout.action[1], x, y) &&
                      tiku_trk_deskbar_prefs_revertable(&controller->model)) ? 2
-                  : inside((tiku_rect_t){ 278, 488, 142, 26 }, x, y) ? 3
+                  : inside(layout.action[2], x, y) ? 3
                   : 0;
 
         if (event->type == TIKU_EVENT_POINTER_MOVE) {
@@ -295,7 +327,7 @@ event(tiku_window_t *window, const tiku_event_t *event,
         !inside(content, event->x, event->y)) {
         return 0;
     }
-    if (row >= 0 && row < ROW_COUNT && y >= 12 && y < 389) {
+    if (row >= 0 && row < ROW_COUNT && y >= 12 && (!layout.compact || x < layout.monitor.x - 12)) {
         tiku_trk_deskbar_settings_t *s = &controller->model.value;
         int *value = row_value(s, row);
 
@@ -309,7 +341,7 @@ event(tiku_window_t *window, const tiku_event_t *event,
              */
             tiku_layout_t step;
             tiku_rect_t run = stepper_rect((tiku_rect_t){ 0, 0, 0, 0 },
-                                           12 + row * 29);
+                                           12 + row * layout.pitch);
             int part;
 
             stepper_row(&step);
@@ -337,9 +369,10 @@ event(tiku_window_t *window, const tiku_event_t *event,
         apply(controller);
         return 1;
     }
-    if (inside((tiku_rect_t){ 292, 392, 116, 82 }, x, y)) {
+    if (inside(layout.monitor, x, y)) {
         tiku_trk_db_dock_t dock = tiku_trk_deskbar_prefs_dock_at(
-            x - 292, y - 392, 116, 82,
+            x - layout.monitor.x, y - layout.monitor.y,
+            layout.monitor.w, layout.monitor.h,
             tiku_trk_deskbar_dock(controller->deskbar));
 
         tiku_trk_deskbar_set_dock(controller->deskbar, dock);
@@ -359,10 +392,15 @@ saved_frame(tiku_trk_deskbar_prefs_window_t *controller)
     found = tiku_state_read(controller->store, TIKU_KEY_SESSION,
             TIKU_ATTR_DESKBAR_PREFS_FRAME, position, sizeof position) ==
             (int)sizeof position;
-    return tiku_trk_deskbar_prefs_frame(found,
+    tiku_rect_t area = tiku_trk_deskbar_work_area(controller->deskbar,
+        controller->screen_w, controller->screen_h);
+    int compact = area.h > 0 && area.h < TIKU_TRK_DB_PREFS_H;
+    tiku_rect_t frame = tiku_trk_deskbar_prefs_frame(found,
         found ? position[0] : 0, found ? position[1] : 0,
         controller->screen_w, controller->screen_h,
-        TIKU_TRK_DB_PREFS_W, TIKU_TRK_DB_PREFS_H);
+        compact ? 630 : TIKU_TRK_DB_PREFS_W, TIKU_TRK_DB_PREFS_H);
+    return tiku_trk_deskbar_fit_panel(controller->deskbar,
+        controller->screen_w, controller->screen_h, frame);
 }
 
 void

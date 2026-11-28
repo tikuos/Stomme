@@ -746,7 +746,23 @@ desktop_notice_pump(desktop_t *app, desktop_loop_t *lp)
             if (fl->win == NULL || !fl->win->open) {
                 continue;
             }
-            changed += tiku_trk_poseview_pump(fl->view, 5);
+            /* Move the displayed rows with the tab. Sample their live values
+             * on the next pump after release. Membership notices still reach
+             * the moving folder. */
+            if (fl->win != tiku_workspace_moving(app->desk) &&
+                tiku_trk_poseview_pump(fl->view, 5) > 0) {
+                /* A live value can reorder the list when it is a sort key.
+                 * Repaint the occupied rows and refresh the window cache. */
+                tiku_rect_t area = tiku_trk_folder_window_content(fl);
+                if (tiku_trk_poseview_mode(fl->view) == TIKU_TRK_MODE_LIST) {
+                    int rows = tiku_trk_poseview_count(fl->view) - tiku_trk_poseview_scroll(fl->view);
+                    int height = tiku_trk_poseview_row_height(fl->view);
+                    if (rows >= 0 && height > 0 && rows < area.h / height)
+                        area.h = rows * height + 4;
+                }
+                tiku_workspace_cache_forget(app->desk, fl->win);
+                desktop_damage(app, area);
+            }
             /* Membership changes go through the notice handler, which
              * keeps the selection, the scroll position and the
              * arrangement. */

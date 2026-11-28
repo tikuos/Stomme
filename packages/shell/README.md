@@ -43,6 +43,11 @@ dashes for the time and no date; resumed, the time with a question mark.
 Both are drawn in the dimmed ink of a disabled menu item, and the clock's
 tip names the state.
 
+A product defines `TIKU_SHELL_ABOUT_SYSTEM_RELEASE` to show the host system
+release below its desktop version in About. The function takes a character
+buffer and its size at window open and writes a NUL-terminated line. An empty
+line leaves the row out.
+
 A product that runs on a board defines `TIKU_SHELL_LOCAL_BOARD` as a
 function `tiku_backend_t *f(char *name, size_t max)`: at start the desktop
 mounts the backend it returns at `/devices/<name>`, as a device found on a
@@ -87,3 +92,21 @@ the application test view, and their ownership is recorded in
 `application-sources.json`. Product `mk/system.mk` selects link lists and output
 names. Production binaries link the script-refusal stub; development shells
 link the test interpreter.
+
+## Window layout
+
+Use the work area returned by `tiku_trk_deskbar_work_area()` for dialog and
+panel layout. This area excludes the global menu bar and the docked Deskbar.
+For a title tab, the desktop keeps the close control inside that area after
+opening, restoring or moving a window.
+
+Lay out dialogs from the available content width and height and the active
+font. Keep essential actions and save feedback in view. Wrap or reflow wide
+groups and use a scrolling list or pagination for content that grows. Share
+control rectangles between drawing, pointer input and keyboard focus.
+`tiku_trk_deskbar_fit_panel()` bounds an adaptive panel to the work area.
+
+A desktop script can use `expect-window-fits` to check the focused frame and
+its close-box hit target. Run the layout check at 800 by 480 with the 16 px
+font and global menu bar, and exercise both the controls and closing. Check
+desktop-sized layouts when changing shared windows.

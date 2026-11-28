@@ -18,6 +18,33 @@
 #include "tiku_watch.h"
 #include "tiku_trk_session_controller.h"
 
+void
+desktop_save_theme(desktop_t *app)
+{
+    if (app->theme_target < 0 || tiku_trk_settings_save_busy(app->settings))
+        return;
+
+    tiku_trk_prefs_t *prefs = prefs_model(app);
+    int accepted = tiku_trk_prefs_get(prefs, "DarkMode");
+    if (!app->theme_submitted) {
+        tiku_trk_prefs_set(prefs, "DarkMode", app->theme_target);
+        if (tiku_trk_prefs_submit(prefs, app->prefs_window.path) == 0) {
+            app->theme_submitted = 1;
+            desktop_damage_all(app);
+            return;
+        }
+        tiku_trk_prefs_set(prefs, "DarkMode", accepted);
+    } else if (accepted == app->theme_target) {
+        return;
+    }
+
+    app->theme_target = -1;
+    tiku_trk_deskbar_set_theme(app->deskbar, accepted);
+    tiku_alert_open(alert_model(app), TIKU_ALERT_STOP, TIKU_TRK_ALERT_TAG_NONE,
+                    "Could not save the desktop appearance. The previous mode is still in use.", "OK");
+    desktop_damage_all(app);
+}
+
 /**
  * @brief Apply the settings to the running desktop: thumbnails, the global
  *        menu bar, the theme, the file panel's top, the Disks window, the
@@ -66,8 +93,9 @@ sync_folder_preferences(desktop_t *app)
         if (mode < 0 || mode > 2) {
             mode = 0;               /* out of range: the default theme */
         }
-        /* The Deskbar's switch shows the setting, whatever changed it. */
-        tiku_trk_deskbar_set_theme(app->deskbar, mode);
+        /* Keep the selected position visible while the settings owner saves it. */
+        tiku_trk_deskbar_set_theme(app->deskbar,
+            app->theme_target >= 0 ? app->theme_target : mode);
         if (mode != app->theme_mode) {
             tiku_trk_folder_window_t *desk =
                 tiku_trk_desktop_view_folder(&app->desktop_view);
@@ -180,6 +208,7 @@ tracker_run(int argc, char **argv)
     memset(&lp, 0, sizeof lp);
     lp.started_at = tiku_trk_now();
     memset(&app, 0, sizeof app);
+    app.theme_target = -1;
     app.theme_mode = -1;      /* unapplied: the first sync decides */
     app.gbar_on = -1;
     app.gbar_open = -1;

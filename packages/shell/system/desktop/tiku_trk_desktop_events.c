@@ -332,7 +332,8 @@ lens_clamp(int v, int lo, int hi)
  *       or near a window's close or zoom box (under it, or at one of the
  *       points up to DESKTOP_LENS_NEAR pixels across and down from it, in
  *       steps of half that), on the menu bar along the top of the screen,
- *       on the Deskbar where no window covers it, or, in the folder window
+ *       on the visible Deskbar outside its leaf button and theme switch,
+ *       or, in the folder window
  *       under the press, on its own menu bar or an end of its scroll bar.
  */
 static int
@@ -355,6 +356,12 @@ lens_wanted(desktop_t *app, int x, int y, tiku_rect_t *menu)
         return tiku_trk_deskbar_popup_at(app->deskbar, x, y, menu);
     }
     under = tiku_workspace_hit(app->desk, x, y, &w);
+    if (app->deskbar != NULL &&
+        lens_in(tiku_trk_deskbar_frame(app->deskbar), x, y) &&
+        (under == TIKU_HIT_NONE || tiku_trk_deskbar_raised(app->deskbar))) {
+        return !lens_in(tiku_trk_deskbar_leaf_button_rect(app->deskbar), x, y) &&
+               !lens_in(tiku_inset(tiku_trk_deskbar_switch_rect(app->deskbar), -2), x, y);
+    }
     for (dy = -DESKTOP_LENS_NEAR; dy <= DESKTOP_LENS_NEAR;
          dy += DESKTOP_LENS_NEAR / 2) {
         for (dx = -DESKTOP_LENS_NEAR; dx <= DESKTOP_LENS_NEAR;
@@ -369,11 +376,6 @@ lens_wanted(desktop_t *app, int x, int y, tiku_rect_t *menu)
         }
     }
     if (lens_in(global_bar_rect(app), x, y)) {
-        return 1;
-    }
-    if (app->deskbar != NULL &&
-        lens_in(tiku_trk_deskbar_frame(app->deskbar), x, y) &&
-        (under == TIKU_HIT_NONE || tiku_trk_deskbar_raised(app->deskbar))) {
         return 1;
     }
     if (under == TIKU_HIT_CONTENT && w != NULL) {
@@ -466,7 +468,7 @@ lens_open(desktop_t *app, const tiku_event_t *ev)
     tiku_rect_t menu;
     int i, j, aw, ah;
 
-    if (!l->used || l->passing || s == NULL ||
+    if (!l->used || l->passing || s == NULL || alert_model(app)->open ||
         app->calibrate.phase != DESKTOP_CALIBRATE_OFF) {
         return 0;
     }
@@ -705,6 +707,7 @@ void desktop_turn_begin(desktop_t *app, const desktop_options_t *o,
     /* Finished worker jobs are collected before the events are read, so
      * this turn's events are handled with their results applied. */
     (void)tiku_work_collect();
+    desktop_save_theme(app);
     tiku_trk_catalog_settings_poll(app->catalog_settings);
     {
         struct timespec now;
@@ -829,7 +832,10 @@ desktop_turn_end(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
     desktop_device_pump(app);
     desktop_sweep(app, lp);
     desktop_notice_pump(app, lp);
+    int dirty_before_tick = app->dirty;
     desktop_builtins_turn(app);
+    int builtin_frame = !dirty_before_tick && app->dirty;
+    desktop_keep_window_tabs_visible(app);
     if (o->shot != NULL && lp->shot_at > 0 && tiku_trk_now() >= lp->shot_at) {
         desktop_damage_all(app);
     }
@@ -905,11 +911,13 @@ desktop_turn_end(desktop_t *app, const desktop_options_t *o, desktop_loop_t *lp)
         }
         if (lp->sc) usleep((useconds_t)nap);
         else {
-            if (app->dirty) {
+            /* A built-in's next animation tick runs on the next turn.
+             * Count the time spent presenting its frame toward that deadline. */
+            if (builtin_frame || app->dirty) {
                 int64_t frame_due = app->last_present+16667-tiku_trk_now();
                 if (frame_due < nap) nap = frame_due;
             }
-            if (app->cq_head == app->cq_tail)
+            if (nap > 0 && app->cq_head == app->cq_tail)
                 tiku_host_wait(app->host, nap);
         }
     }

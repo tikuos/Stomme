@@ -535,6 +535,7 @@ tiku_trk_desktop_view_destroy(tiku_trk_desktop_view_t *controller)
         return;
     }
     (void)tiku_trk_poseview_save_state(controller->folder.view);
+    tiku_trk_folder_window_free_background(&controller->folder);
     tiku_trk_poseview_free(controller->folder.view);
     controller->folder.view = NULL;
 }

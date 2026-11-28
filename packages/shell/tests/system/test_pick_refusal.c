@@ -39,6 +39,7 @@ check(int ok, const char *what)
 
 /** @brief Main's file is not linked; nothing here has folders to sync. */
 void sync_folder_preferences(desktop_t *app) { (void)app; }
+void desktop_save_theme(desktop_t *app) { (void)app; check(0, "unexpected theme change"); }
 static int builtin_opened, builtin_ticks;
 static const char *builtin_path = "unset";
 /** @brief A built-in's tick: counted. */
@@ -120,10 +121,16 @@ builtins(desktop_t *app)
         d = app->damage;
         check(app->dirty == 2 && d.x == 40 && d.y == 60 && d.w == 60 && d.h == 40,
               "a built-in's damage is its part inside the window");
+        tiku_trk_builtin_damage(w, (tiku_rect_t){ 95, 90, 15, 15 });
+        d = app->damage;
+        check(d.x == 40 && d.y == 60 && d.w == 70 && d.h == 45,
+              "nearby content updates share a rectangle");
         tiku_trk_builtin_damage(w, (tiku_rect_t){ 150, 150, 20, 20 });
         d = app->damage;
-        check(app->dirty == 2 && d.x == 40 && d.y == 60 && d.w == 130 && d.h == 110,
-              "more damage joins it");
+        check(app->dirty == 2 && d.x == 40 && d.y == 60 && d.w == 70 && d.h == 45 &&
+              app->damage_next.x == 150 && app->damage_next.y == 150 &&
+              app->damage_next.w == 20 && app->damage_next.h == 20,
+              "distant content damage keeps its own rectangle for the next frame");
         app->dirty = 1;
         tiku_trk_builtin_damage(w, (tiku_rect_t){ 40, 60, 10, 10 });
         check(app->dirty == 1, "and a full frame stays full");

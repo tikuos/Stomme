@@ -197,6 +197,45 @@ tiku_trk_deskbar_frame(const tiku_trk_deskbar_t *db)
 }
 
 tiku_rect_t
+tiku_trk_deskbar_work_area(const tiku_trk_deskbar_t *db, int width, int height)
+{
+    int top = db ? db->top_inset : 0;
+    tiku_rect_t area = {0, top, width, height - top};
+    if (!db || db->frame.w <= 0 || db->frame.h <= 0) {
+        return area;
+    }
+    if (tiku_trk_deskbar_vertical(db->dock)) {
+        area.w -= db->frame.w;
+        if (db->dock == TIKU_TRK_DB_LEFT_EXPANDED ||
+            db->dock == TIKU_TRK_DB_LEFT_MINI) {
+            area.x = db->frame.w;
+        }
+    } else {
+        area.h -= db->frame.h;
+        if (db->dock == TIKU_TRK_DB_TOP) {
+            area.y += db->frame.h;
+        }
+    }
+    return area;
+}
+
+tiku_rect_t
+tiku_trk_deskbar_fit_panel(const tiku_trk_deskbar_t *db, int width, int height,
+                           tiku_rect_t panel)
+{
+    tiku_rect_t area = tiku_trk_deskbar_work_area(db, width, height);
+    if (area.w <= 0 || area.h <= 0) return panel;
+
+    if (panel.w > area.w) panel.w = area.w;
+    if (panel.h > area.h) panel.h = area.h;
+    if (panel.x > area.x + area.w - panel.w) panel.x = area.x + area.w - panel.w;
+    if (panel.y > area.y + area.h - panel.h) panel.y = area.y + area.h - panel.h;
+    if (panel.x < area.x) panel.x = area.x;
+    if (panel.y < area.y) panel.y = area.y;
+    return panel;
+}
+
+tiku_rect_t
 tiku_trk_deskbar_switch_rect(const tiku_trk_deskbar_t *db)
 {
     tiku_rect_t r = { 0, 0, SWITCH_W, SWITCH_H };

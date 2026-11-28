@@ -189,12 +189,6 @@ struct menu_icon_relay {
     const tiku_trk_db_item_t *items;    /**< the menu's rows, by index     */
 };
 
-/**
- * @brief The TikuOS button's rectangle: where it is painted, where the
- *        pointer hovers it, and what a change of hover repaints.
- */
-tiku_rect_t db_leaf_button_rect(const tiku_trk_deskbar_t *db);
-
 /* Shared across the family: defined in one file, used in another. */
 
 /* tiku_trk_deskbar.c */

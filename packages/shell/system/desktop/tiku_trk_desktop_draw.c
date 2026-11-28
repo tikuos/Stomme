@@ -72,11 +72,22 @@ tick_clock(void *ctx)
 void
 blit(desktop_t *app)
 {
-    if (app->host == NULL) {
+    if (app->host && tiku_host_present_in(app->host, app->surf,
+            app->frame_partial ? &app->frame_damage : NULL) < 0) {
+        desktop_damage_all(app);
         return;
     }
-    (void)tiku_host_present_in(app->host, app->surf,
-                               app->frame_partial ? &app->frame_damage : NULL);
+    if (app->theme_target >= 0 && app->theme_submitted && !app->frame_partial &&
+        app->theme_mode == app->theme_target &&
+        !tiku_trk_settings_save_busy(app->settings)) {
+        app->theme_target = -1;
+        tiku_alert_t *alert = alert_model(app);
+        if (alert->open && alert->tag == TIKU_TRK_ALERT_TAG_THEME_SWITCH) {
+            tiku_rect_t dialog = tiku_trk_status_overlay_alert_frame(&app->status_overlay);
+            tiku_alert_reset(alert);
+            desktop_damage(app, dialog);
+        }
+    }
 }
 
 /**
@@ -186,7 +197,7 @@ shadow_reach(tiku_rect_t rect)
  * A rectangle whose union with the damage already asked for would cover
  * more than twice their two areas is drawn in the frame after instead.
  */
-void desktop_damage(desktop_t *app, tiku_rect_t rect)
+void desktop_damage_rect(desktop_t *app, tiku_rect_t rect)
 {
     tiku_rect_t joined;
 
@@ -194,9 +205,6 @@ void desktop_damage(desktop_t *app, tiku_rect_t rect)
     /* dirty == 1 asks for a full frame; bounded damage never turns it
      * into a partial one. */
     if (app->dirty && app->dirty != 2) return;
-    /* A window's shadow reaches past its frame: what a move of it
-     * dirties is that much more on every side. */
-    rect = shadow_reach(rect);
     if (!app->dirty) {
         app->damage = rect;
         app->dirty = 2;
@@ -209,6 +217,12 @@ void desktop_damage(desktop_t *app, tiku_rect_t rect)
         return;
     }
     app->damage = joined;
+}
+
+/** @brief Include the shadow when invalidating a frame or control. */
+void desktop_damage(desktop_t *app, tiku_rect_t rect)
+{
+    if (rect.w > 0 && rect.h > 0) desktop_damage_rect(app, shadow_reach(rect));
 }
 
 void
@@ -433,6 +447,27 @@ draw_frame(desktop_t *app, const tiku_rect_t *damage, int64_t started)
     desktop_draw_splash(app);
     desktop_forcequit_overlay(app);
     tiku_clip_damage(app->surf, NULL);
+}
+
+void
+desktop_preview_theme(desktop_t *app, int mode)
+{
+    static const char *const messages[] = {
+        "Switching desktop mode. Applying the light theme…",
+        "Switching desktop mode. Applying the dark theme…",
+        "Switching desktop mode. Applying the monochrome theme…"
+    };
+    tiku_rect_t track = tiku_trk_deskbar_switch_rect(app->deskbar);
+
+    app->theme_target = mode;
+    app->theme_submitted = 0;
+    tiku_trk_deskbar_set_theme(app->deskbar, mode);
+    tiku_alert_open(alert_model(app), TIKU_ALERT_INFO, TIKU_TRK_ALERT_TAG_THEME_SWITCH,
+                    messages[mode], NULL);
+    tiku_rect_t dialog = tiku_trk_status_overlay_alert_frame(&app->status_overlay);
+    tiku_rect_t damage = tiku_rect_union(tiku_inset(track, -2), dialog);
+    draw_frame(app, &damage, tiku_trk_now());
+    blit(app);
 }
 
 #if TIKU_SHELL_DAMAGE_CHECK

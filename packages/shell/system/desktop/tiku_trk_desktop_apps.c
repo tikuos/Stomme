@@ -369,43 +369,15 @@ desktop_help_page_of(desktop_t *app, tiku_window_t *window)
     return NULL;
 }
 
-/**
- * @brief Find the help folder, a folder holding an index.html: TIKU_HELP
- *        when set, else climbing from this binary as find_companion() does.
- * @return nonzero when @p out names it.
- */
-int
-find_help_dir(const char *argv0, char *out, size_t max)
+/** @brief Locate a product resource directory containing the named file. */
+static int
+find_assets(const char *argv0, const char *const *where, size_t count,
+            const char *entry, char *out, size_t max)
 {
-    static const char *const where[] = {
-#if TIKU_SHELL_BOARD_SERVICES
-
-        "%s/assets/help", "%s/help", "%s/TikuTracker/help",
-        TIKU_SHELL_INSTALLED_HELP_PATH
-    }
-#else
-
-        "%s/assets/help", "%s/help",
-        TIKU_SHELL_INSTALLED_HELP_PATH
-    }
-#endif
-;
     char dir[TIKU_PATH_MAX];
     char *slash;
     int up;
 
-    if (getenv("TIKU_HELP") != NULL) {
-        char page[TIKU_PATH_MAX];
-
-        if (!canonical_directory(getenv("TIKU_HELP"), out, max)) return 0;
-        /* TIKU_HELP too must hold an index.html. */
-        if (snprintf(page, sizeof page, "%s/index.html", out) <
-            (int)sizeof page && access(page, R_OK) == 0) {
-            return 1;
-        }
-        out[0] = '\0';
-        return 0;
-    }
     snprintf(dir, sizeof dir, "%s", (argv0 != NULL) ? argv0 : "");
     slash = strrchr(dir, '/');
     if (slash != NULL) {
@@ -427,7 +399,7 @@ find_help_dir(const char *argv0, char *out, size_t max)
             }
             snprintf(step + used, sizeof step - used, "/..");
         }
-        for (i = 0; i < sizeof where / sizeof where[0]; i++) {
+        for (i = 0; i < count; i++) {
             char found[TIKU_PATH_MAX];
             char page[TIKU_PATH_MAX];
 
@@ -435,7 +407,7 @@ find_help_dir(const char *argv0, char *out, size_t max)
                 (int)sizeof found) {
                 continue;
             }
-            if (snprintf(page, sizeof page, "%s/index.html", found) >=
+            if (snprintf(page, sizeof page, "%s/%s", found, entry) >=
                 (int)sizeof page) {
                 continue;
             }
@@ -446,6 +418,57 @@ find_help_dir(const char *argv0, char *out, size_t max)
     }
     out[0] = '\0';
     return 0;
+}
+
+/** @brief Locate the installed stock wallpaper directory. */
+int
+find_wallpaper_dir(const char *argv0, char *out, size_t max)
+{
+    static const char *const where[] = {
+        "%s/assets/system/wallpapers", "%s/share/tiku/system/wallpapers",
+        "%s/system/wallpapers"
+    };
+    if (access("/system/wallpapers", R_OK) == 0)
+        return canonical_directory("/system/wallpapers", out, max);
+    return find_assets(argv0, where, sizeof where / sizeof where[0],
+                       ".", out, max);
+}
+
+/**
+ * @brief Find the help folder, a folder holding an index.html: TIKU_HELP
+ *        when set, else climbing from this binary as find_companion() does.
+ * @return nonzero when @p out names it.
+ */
+int
+find_help_dir(const char *argv0, char *out, size_t max)
+{
+    static const char *const where[] = {
+#if TIKU_SHELL_BOARD_SERVICES
+
+        "%s/assets/help", "%s/help", "%s/TikuTracker/help",
+        TIKU_SHELL_INSTALLED_HELP_PATH
+    }
+#else
+
+        "%s/assets/help", "%s/help",
+        TIKU_SHELL_INSTALLED_HELP_PATH
+    }
+#endif
+;
+    if (getenv("TIKU_HELP") != NULL) {
+        char page[TIKU_PATH_MAX];
+
+        if (!canonical_directory(getenv("TIKU_HELP"), out, max)) return 0;
+        /* TIKU_HELP too must hold an index.html. */
+        if (snprintf(page, sizeof page, "%s/index.html", out) <
+            (int)sizeof page && access(page, R_OK) == 0) {
+            return 1;
+        }
+        out[0] = '\0';
+        return 0;
+    }
+    return find_assets(argv0, where, sizeof where / sizeof where[0],
+                       "index.html", out, max);
 }
 
 /* The leaf menu's table holds at least as many programs as the launch

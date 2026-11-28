@@ -46,6 +46,8 @@ void tiku_trk_settings_poll(tiku_trk_settings_t *, uint64_t monotonic_ms);
 /** @brief Detach worker completions and unregister before the model is freed.
  */
 void tiku_trk_settings_close(tiku_trk_settings_t *);
+/** @brief Whether a GUI save must wait for the initial read or a current writer. */
+int tiku_trk_settings_save_busy(const tiku_trk_settings_t *);
 /** @brief Last completed persistence/reload error, or OK. */
 tiku_resource_error_t tiku_trk_settings_error(const tiku_trk_settings_t *);
 /** @brief Number of scalar and profile entries managed by the controller. */

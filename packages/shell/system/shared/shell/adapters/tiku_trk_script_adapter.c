@@ -421,6 +421,32 @@ adapter_narrate(void *ctx, char *out, size_t max)
         tiku_workspace_focused(adapter->workspace), out, max);
 }
 
+/** @brief Check the active window against the displayed bars and workspace hit test. */
+static int
+window_fits(void *context, char *out, size_t max)
+{
+    tiku_trk_script_adapter_t *a = context;
+    tiku_window_t *w = tiku_workspace_focused(a->workspace), *hit = NULL;
+    if (!w || !w->open || w->minimized || w->plain || !a->surface) {
+        snprintf(out, max, "no visible decorated window");
+        return 0;
+    }
+
+    tiku_rect_t area = tiku_trk_deskbar_work_area(a->deskbar,
+                                               a->surface->w, a->surface->h);
+    tiku_rect_t f = w->frame;
+    int inside = f.w > 0 && f.h > 0 && f.x >= area.x && f.y >= area.y &&
+        (int64_t)f.x + f.w <= area.x + area.w &&
+        (int64_t)f.y + f.h <= area.y + area.h;
+    int close = inside && tiku_workspace_hit(a->workspace,
+        f.x + 4 + tiku_window_tab_button() / 2, f.y + tiku_window_tab_h() / 2,
+        &hit) == TIKU_HIT_CLOSE && hit == w;
+    snprintf(out, max, "%s frame (%d,%d %dx%d), work area (%d,%d %dx%d), %s",
+        w->title, f.x, f.y, f.w, f.h, area.x, area.y, area.w, area.h,
+        !inside ? "outside work area" : close ? "close box reachable" : "close box missed");
+    return close;
+}
+
 /**
  * @brief Everything a script may ask about, read from the shell now:
  *        the status, title, windows, menus, selection, scroll and rows,
@@ -500,6 +526,7 @@ fill_state(tiku_trk_script_adapter_t *adapter,
     state->cell_point = tiku_trk_script_adapter_cell_point;
     state->rows_drawn = tiku_trk_script_adapter_rows_drawn;
     state->tab_point = tiku_trk_script_adapter_tab_point;
+    state->window_fits = window_fits;
     state->narrate = adapter_narrate;
     state->pixel_at = tiku_trk_script_adapter_pixel_at;
     state->redraw_diff = adapter->redraw_diff;

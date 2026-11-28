@@ -1203,6 +1203,11 @@ fpanel_commit(void *context, void *target, int command,
         deliver_pick(app, destination);
         return;
     }
+    if (command == TIKU_TRK_CMD_CHOOSE_PICTURE) {
+        tiku_trk_desktop_prefs_window_chosen(&app->desktop_prefs_window,
+                                             destination);
+        return;
+    }
     if (command == TIKU_TRK_CMD_CHOOSE_SOUND && destination != NULL) {
         tiku_trk_sounds_window_chosen(&app->sounds_window, app->sound_pick,
                                       destination);
@@ -1304,6 +1309,17 @@ find_select_folder(void *context)
 
     tiku_trk_panel_window_open(&app->file_panel, app,
                                TIKU_TRK_CMD_ADD_SCOPE, "/");
+}
+
+/** @brief Browse for the Desktop's custom wallpaper. */
+void
+desktop_choose_picture(void *context)
+{
+    desktop_t *app = context;
+    const char *home = getenv("HOME");
+    tiku_trk_panel_window_open_file(&app->file_panel,
+        &app->desktop_prefs_window, TIKU_TRK_CMD_CHOOSE_PICTURE,
+        home && *home ? home : "/", NULL);
 }
 
 /** @brief The Sounds window's "…": any file at all for @p event. */

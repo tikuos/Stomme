@@ -29,6 +29,7 @@
 #define TIKU_TRK_ALERT_TAG_OPEN_ANYWAY 6
 #define TIKU_TRK_ALERT_TAG_SHUTDOWN 7
 #define TIKU_TRK_ALERT_TAG_SAVE_REPLACE 8   /* a save would overwrite */
+#define TIKU_TRK_ALERT_TAG_THEME_SWITCH 10
 #define TIKU_TRK_ALERT_TAG_EMPTY_TRASH 9    /* asks before emptying   */
 
 /**

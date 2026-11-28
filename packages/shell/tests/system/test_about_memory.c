@@ -3,6 +3,27 @@
  * its chip. */
 #include <assert.h>
 #include <time.h>
+#include <stdio.h>
+#include "tiku_shell_product.h"
+#undef TIKU_SHELL_ABOUT_SYSTEM_RELEASE
+/* The hosted and standalone paints read the same host facts. */
+static int test_processor(char *out, size_t size, unsigned long *hz)
+{
+    snprintf(out, size, "Test CPU");
+    *hz = 320000000;
+    return 0;
+}
+static void test_memory(long *total, long *available)
+{
+    *total = 16384;
+    *available = 8192;
+}
+#define tiku_sys_processor test_processor
+#define tiku_sys_memory test_memory
+
+static const char *release_text = "ExampleOS 2.7";
+static void test_release(char *out, size_t size) { snprintf(out, size, "%s", release_text); }
+#define TIKU_SHELL_ABOUT_SYSTEM_RELEASE test_release
 #include "../../system/shared/ui/windows/tiku_trk_about_window.c"
 
 /* The desktop's clock, for a build that links no task source; where
@@ -220,6 +241,8 @@ int main(void)
         services.redraw = fake_redraw;
         assert(tiku_trk_about_app.start(&state, &services) == 0);
         box = state;
+        assert(!strcmp(box->system_release, "ExampleOS 2.7"));
+        int with_release = about_body_h(box);
         assert(host.drawn_opened == 1 && host.opened == 0 && host.frames == 0);
         assert(box->surface == NULL && host.redraws == 1 && host.app == box);
         assert(host.w == box->width && host.h == box->height);
@@ -249,8 +272,10 @@ int main(void)
         memset(&host, 0, sizeof host);
         services.open_drawn = NULL;
         services.redraw = NULL;
+        release_text = "";
         assert(tiku_trk_about_app.start(&state, &services) == 0);
         box = state;
+        assert(!box->system_release[0] && about_body_h(box) < with_release);
         assert(host.opened == 1 && host.frames == 1 && box->surface != NULL &&
                box->surface->w == box->width && box->surface->h == box->height);
         tiku_trk_about_app.stop(state);

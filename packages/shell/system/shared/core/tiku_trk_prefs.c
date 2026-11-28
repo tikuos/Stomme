@@ -16,6 +16,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef TIKU_SHELL_REDUCE_MOTION_DEFAULT
+#define TIKU_SHELL_REDUCE_MOTION_DEFAULT 0
+#endif
+
 /* Short names for the setting types, for the table below. */
 #define B TIKU_TRK_PREF_BOOL
 #define I TIKU_TRK_PREF_INT
@@ -98,7 +102,8 @@ static const tiku_trk_pref_t table[] = {
 ,
     /* When off, icons, menus and windows animate as they open.  Its tick
      * box is in the TikuDesktop preferences window, not on a page here. */
-    { "ReduceMotion",            B, TIKU_TRK_PAGE_NONE,    0, 0, 0, "" }
+    { "ReduceMotion",            B, TIKU_TRK_PAGE_NONE,
+      TIKU_SHELL_REDUCE_MOTION_DEFAULT, 0, 0, "" }
 };
 
 #define NPREF ((int)(sizeof table / sizeof table[0]))

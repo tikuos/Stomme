@@ -5,11 +5,6 @@
  *
  * tiku_trk_desktop_prefs_window.c - the Desktop preferences window.
  *
- * The picture behind the Desktop, how it is laid, the icon size and Reduce
- * motion.  The pictures offered are the images in the Desktop folder and
- * in the wallpapers folder beside it, so a picture is added by dropping
- * its file into either.
- *
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -23,158 +18,129 @@
 #include <stdio.h>
 #include <string.h>
 
-#define PAD       16
-#define LIST_ROWS  6
+#include "tiku_iconpaint.h"
+#include "tiku_trk_task.h"
+#include <stdlib.h>
 
-/*
- * Where the controls sit, in content coordinates, computed from the face
- * on every call; the drawing and the click both use them.
- */
-static int row_h(void)   { return tiku_ui_row_h(); }   /* 22 at 12 px */
-static int list_y(void)  { return tiku_font_bold()->height + 27; }
-static int mode_y(void)  { return list_y() + LIST_ROWS * row_h() +
-                                  row_h() + 12; }
-static int icon_y(void)  { return mode_y() + 4 * row_h() + row_h() + 4; }
-static int motion_y(void){ return icon_y() + tiku_ui_button_h() + 12; }
-/** @brief Return the vertical position of the preferences action buttons. */
-static int button_y(void)
+#define PAD 12
+#define GAP 6
+#define STOCK_MAX 4
+#define THUMB_W 96
+#define THUMB_H 56
+enum {
+    NONE_TILE = 1,
+    STOCK_TILE,
+    CUSTOM_TILE = STOCK_TILE + STOCK_MAX,
+    MODE_TILE,
+    SIZE_TILE = MODE_TILE + 4,
+    DEFAULTS = SIZE_TILE + 4,
+    REVERT,
+    DIGIT,
+    ERASE = DIGIT + 10,
+    ACCEPT,
+    CANCEL
+};
+
+static const int sizes[] = {32, 48, 64};
+
+typedef struct {
+    tiku_rect_t pictures, modes, sizes, status, defaults, revert;
+} desk_layout_t;
+
+/** @brief Lay out the gallery, placement and size rows above the action
+ * buttons. */
+static desk_layout_t
+layout(tiku_rect_t content)
 {
-    return motion_y() + row_h() + 18 + 2 * tiku_font_plain()->height;
-}
-
-/** @brief The Reduce motion tick box's row, in @p content's space. */
-static tiku_rect_t
-motion_rect(tiku_rect_t content)
-{
-    tiku_rect_t r;
-
-    r.x = content.x + PAD;
-    r.y = content.y + motion_y();
-    r.w = content.w - 2 * PAD;
-    r.h = row_h();
+    desk_layout_t r;
+    int text = tiku_font_bold()->height, h = tiku_ui_button_h();
+    int x = content.x + PAD, width = content.w - 2 * PAD;
+    int y = content.y + PAD + text + 4;
+    r.pictures = (tiku_rect_t){x, y, width, 56};
+    y += r.pictures.h + PAD + text + 4;
+    r.modes = (tiku_rect_t){x, y, width, 42};
+    y += r.modes.h + PAD + text + 4;
+    r.sizes = (tiku_rect_t){x, y, width, 46};
+    r.status = (tiku_rect_t){x, y + r.sizes.h + 4, width,
+                             tiku_font_plain()->height * 2 + 2};
+    y = r.status.y + r.status.h + 4;
+    r.defaults = (tiku_rect_t){
+        x, y, tiku_ui_button_w(tiku_str("button.defaults"), 95), h};
+    r.revert =
+        (tiku_rect_t){x + r.defaults.w + GAP, y,
+                      tiku_ui_button_w(tiku_str("button.revert"), 90), h};
     return r;
 }
 
-/** @brief The side of the tick box beside a laying mode. */
-static int box_side(void)
+/** @brief Divide a row into equal hit targets separated by gutters. */
+static tiku_rect_t
+cell(tiku_rect_t row, int i, int count)
 {
-    return tiku_font_plain()->height - 3;              /* 12 at 12 px */
+    int stride = row.w + GAP;
+    int x = stride * i / count;
+    return (tiku_rect_t){row.x + x, row.y, stride * (i + 1) / count - x - GAP,
+                         row.h};
 }
 
-/**
- * @brief Row @p i of the laying-mode choices, in @p content's space.  The
- *        drawing and the click both read it.
+/** @brief Desktop space available between the menu bar, Deskbar and panel edge.
  */
 static tiku_rect_t
-mode_row(tiku_rect_t content, int i)
+work_area(const tiku_trk_desktop_prefs_window_t *c)
 {
-    tiku_rect_t r;
-
-    r.x = content.x + PAD;
-    r.y = content.y + mode_y() + i * row_h();
-    r.w = content.w - 2 * PAD;
-    r.h = row_h();
-    return r;
+    tiku_trk_rect_t area = tiku_trk_desktop_view_area(c->desktop_view);
+    int top = c->desktop_view ? c->desktop_view->top_inset : 0;
+    if (area.w <= 0 || area.h <= 0)
+        return (tiku_rect_t){0, top, c->screen_w, c->screen_h - top};
+    if (area.y < top) {
+        area.h -= top - area.y;
+        area.y = top;
+    }
+    if (area.h > c->screen_h - area.y)
+        area.h = c->screen_h - area.y;
+    return (tiku_rect_t){area.x, area.y, area.w, area.h};
 }
 
-/**
- * @brief The icon-size stepper's plus, at the row's right edge.
- *
- * The stepper is laid out from the right edge inward; the drawing and the
- * press both read these rectangles.
- */
-static tiku_rect_t
-plus_rect(tiku_rect_t content)
-{
-    tiku_rect_t r;
-
-    r.w = tiku_ui_step_w();
-    r.h = tiku_ui_button_h();
-    r.x = content.x + content.w - PAD - r.w;
-    r.y = content.y + icon_y();
-    return r;
-}
-
-/** @brief Room for the widest size the stepper shows, in the face in force.
- */
+/** @brief Keep the leading edge reachable when a frame exceeds the available
+ * span. */
 static int
-number_w(void)
+fit_origin(int position, int start, int space, int size)
 {
-    return tiku_text_width(tiku_font_plain(), "000 px") + 20;
+    if (position > start + space - size)
+        position = start + space - size;
+    return position < start ? start : position;
 }
 
-/** @brief The stepper's minus, left of the number it changes. */
+/** @brief Fit the controls to the work area and keep an open window's position
+ * when it fits. */
 static tiku_rect_t
-minus_rect(tiku_rect_t content)
+fitted_frame(tiku_trk_desktop_prefs_window_t *c, const tiku_rect_t *previous)
 {
-    tiku_rect_t r = plus_rect(content);
-
-    r.x -= number_w() + 8 + r.w;
-    return r;
+    tiku_rect_t area = work_area(c), frame;
+    desk_layout_t r = layout((tiku_rect_t){0, 0, TIKU_TRK_DESK_PREFS_W, 0});
+    frame.h = r.defaults.y + r.defaults.h + PAD + tiku_window_tab_h() +
+              TIKU_WINDOW_BORDER;
+    frame.w = area.w < TIKU_TRK_DESK_PREFS_W ? area.w : TIKU_TRK_DESK_PREFS_W;
+    frame.x = previous ? previous->x : (c->screen_w - frame.w) / 2;
+    frame.y = previous ? previous->y : area.y + (area.h - frame.h) / 3;
+    frame.x = fit_origin(frame.x, area.x, area.w, frame.w);
+    frame.y = fit_origin(frame.y, area.y, area.h, frame.h);
+    return frame;
 }
 
-/** @brief The Defaults button, first in the row of buttons. */
-static tiku_rect_t
-defaults_rect(tiku_rect_t content)
-{
-    tiku_rect_t r;
-
-    r.x = content.x + PAD;
-    r.y = content.y + button_y();
-    r.w = tiku_ui_button_w(tiku_str("button.defaults"), 112);
-    r.h = tiku_ui_button_h();
-    return r;
-}
-
-/** @brief The Revert button, beside Defaults. */
-static tiku_rect_t
-revert_rect(tiku_rect_t content)
-{
-    tiku_rect_t d = defaults_rect(content);
-    tiku_rect_t r = d;
-
-    r.x = d.x + d.w + 10;
-    r.w = tiku_ui_button_w(tiku_str("button.revert"), 100);
-    return r;
-}
-
-/** @brief The window's frame height: content, title tab and border. */
-static int
-window_height(void)
-{
-    return button_y() + tiku_ui_button_h() + PAD +
-           tiku_window_tab_h() + TIKU_WINDOW_BORDER;
-}
-
-/**
- * @brief Grow or shrink the window to what the contents need.
- *
- * Checked on every draw: the face can change while the window is open.
- * The top-left corner stays where it is.
+/** @brief Refit after the work area or face changes while the window is open.
  */
 static void
-refit(tiku_trk_desktop_prefs_window_t *controller)
+refit(tiku_trk_desktop_prefs_window_t *c)
 {
-    int want;
-
-    if (controller->window == NULL || !controller->window->open) {
-        return;
-    }
-    want = window_height();
-    if (controller->window->frame.h != want) {
-        controller->window->frame.h = want;
-        if (controller->dirty != NULL) {
-            *controller->dirty = 1;
-        }
+    tiku_rect_t old = c->window->frame;
+    tiku_rect_t frame = fitted_frame(c, &old);
+    if (old.x != frame.x || old.y != frame.y || old.w != frame.w ||
+        old.h != frame.h) {
+        c->window->frame = frame;
+        if (c->dirty)
+            *c->dirty = 1;
     }
 }
-
-/* The catalogue keys of the four laying modes' labels, looked up when a
- * row is drawn. */
-static const char *const kModeKeys[4] = {
-    "prefs.desktop.mode.corner", "prefs.desktop.mode.centred",
-    "prefs.desktop.mode.scaled", "prefs.desktop.mode.tiled"
-};
 
 /** @brief Whether the point lies within @p r. */
 static int
@@ -183,19 +149,7 @@ inside(tiku_rect_t r, int x, int y)
     return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
 }
 
-/** @brief The name a picture is listed under: the last part of its path. */
-static const char *
-leaf_of(const char *path)
-{
-    const char *slash = strrchr(path, '/');
-
-    return (slash != NULL) ? slash + 1 : path;
-}
-
-/**
- * @brief Save the record and apply it to the Desktop: the icon size, the
- *        picture, and Reduce motion when it changed.
- */
+/** @brief Submit the selected picture, placement and icon size. */
 static void
 apply(tiku_trk_desktop_prefs_window_t *controller)
 {
@@ -209,21 +163,6 @@ apply(tiku_trk_desktop_prefs_window_t *controller)
                                       controller->node);
         (void)tiku_store_flush(controller->store);
     }
-    /* Only a change to Reduce motion writes the settings file, which every
-     * running Tracker then reads again. */
-    if (controller->shared_prefs != NULL &&
-        (tiku_trk_prefs_get(controller->shared_prefs, "ReduceMotion") != 0) !=
-            (controller->model.value.reduce_motion != 0)) {
-        tiku_trk_prefs_set(controller->shared_prefs, "ReduceMotion",
-                           controller->model.value.reduce_motion != 0);
-        if (controller->shared_prefs_path[0] != '\0') {
-            (void)tiku_trk_prefs_submit(controller->shared_prefs,
-                                      controller->shared_prefs_path);
-            controller->model.value.reduce_motion =
-                tiku_trk_prefs_get(controller->shared_prefs, "ReduceMotion") !=
-                0;
-        }
-    }
     if (!controller->submit_save && desk != NULL && desk->view != NULL) {
         tiku_trk_poseview_set_icon_size(desk->view,
                                         controller->model.value.icon_size);
@@ -236,348 +175,523 @@ apply(tiku_trk_desktop_prefs_window_t *controller)
     }
 }
 
-/**
- * @brief Draw the picture list, the laying modes, the icon-size stepper,
- *        Reduce motion and the buttons, refitting the window to the face
- *        first.
- */
+/** @brief Request a desktop repaint after an edit or focus change. */
 static void
-draw(tiku_window_t *window, tiku_surface_t *surface,
-     tiku_rect_t content, void *context)
+redraw(tiku_trk_desktop_prefs_window_t *c)
 {
-    tiku_trk_desktop_prefs_window_t *controller = context;
-    const tiku_trk_deskprefs_values_t *v = &controller->model.value;
-    const tiku_font_t *font = tiku_font_plain();
-    const tiku_font_t *bold = tiku_font_bold();
-    char number[32];
-    int i;
-
-    (void)window;
-    refit(controller);
-    tiku_fill(surface, content, TIKU_C_PANEL);
-    tiku_text(surface, bold, content.x + PAD,
-                   content.y + bold->ascent + 10,
-                   tiku_str("prefs.desktop.picture"),
-                   TIKU_C_TEXT);
-
-    /* The list: what is there to choose, and which one is showing. */
-    {
-        tiku_rect_t list = { content.x + PAD, content.y + list_y(),
-                                  content.w - 2 * PAD,
-                                  LIST_ROWS * row_h() };
-
-        tiku_fill(surface, list, TIKU_C_DOC);
-        tiku_frame(surface, list,
-                        tiku_tint(TIKU_C_PANEL,
-                                       TIKU_DARKEN_2));
-        for (i = 0; i < LIST_ROWS; i++) {
-            tiku_rect_t row = { list.x + 1, list.y + 1 + i * row_h(),
-                                     list.w - 2, row_h() };
-            const char *label;
-            int chosen;
-
-            if (i == 0) {
-                label = tiku_str("prefs.desktop.no_picture");
-                chosen = !v->have_bg;
-            } else if (i - 1 < controller->pictures.count) {
-                label = leaf_of(controller->pictures.picture[i - 1]);
-                chosen = v->have_bg &&
-                         strcmp(controller->pictures.picture[i - 1],
-                                v->bg.path) == 0;
-            } else {
-                continue;
-            }
-            if (chosen) {
-                tiku_fill(surface, row, TIKU_C_SELECT);
-            }
-            tiku_text(surface, font, row.x + 8,
-                           row.y + (row_h() - font->height) / 2 + font->ascent,
-                           label, chosen ? TIKU_C_SELTEXT
-                                         : TIKU_C_TEXT);
-        }
-        if (controller->pictures.count == 0) {
-            tiku_text(surface, font, list.x + 8,
-                           list.y + row_h() + 15,
-                           tiku_str("prefs.desktop.drop_hint"),
-                           tiku_tint(TIKU_C_PANEL, 1.45f));
-        }
-    }
-
-    tiku_text(surface, bold, content.x + PAD,
-                   content.y + mode_y() - 12,
-                   tiku_str("prefs.desktop.how_laid"), TIKU_C_TEXT);
-    for (i = 0; i < 4; i++) {
-        tiku_rect_t row = mode_row(content, i);
-        int y = row.y;
-        tiku_rect_t box = { row.x + 2,
-                                 y + (row_h() - box_side()) / 2,
-                                 box_side(), box_side() };
-
-        tiku_fill(surface, box, TIKU_C_DOC);
-        tiku_frame(surface, box, TIKU_C_TEXT);
-        if ((int)v->bg.mode == i) {
-            tiku_fill(surface, tiku_inset(box, 3),
-                           TIKU_C_TEXT);
-        }
-        tiku_text(surface, font, row.x + 24,
-                       y + 4 + font->ascent, tiku_str(kModeKeys[i]),
-                       v->have_bg ? TIKU_C_TEXT
-                                  : tiku_tint(TIKU_C_PANEL,
-                                                   1.45f));
-    }
-
-    tiku_text(surface, bold, content.x + PAD,
-                   content.y + icon_y() +
-                       (tiku_ui_button_h() - bold->height) / 2 +
-                       bold->ascent,
-                   tiku_str("label.icon_size"), TIKU_C_TEXT);
-    {
-        tiku_rect_t minus = minus_rect(content);
-        tiku_rect_t plus = plus_rect(content);
-        tiku_rect_t shown = { minus.x + minus.w + 4, minus.y,
-                                   number_w(), minus.h };
-
-        tiku_ui_button(surface, minus, "-",
-                       tiku_press_held(&controller->press, 1)
-                           ? TIKU_S_PRESSED : 0u);
-        tiku_ui_button(surface, plus, "+",
-                       tiku_press_held(&controller->press, 2)
-                           ? TIKU_S_PRESSED : 0u);
-        snprintf(number, sizeof number, "%d px", v->icon_size);
-        (void)tiku_text_centered(surface, font, shown, number,
-                                      TIKU_C_TEXT);
-    }
-
-    tiku_ui_checkbox(surface, motion_rect(content),
-        tiku_str("prefs.desktop.reduce_motion"),
-        (v->reduce_motion ? TIKU_S_ON : 0u) |
-        (controller->shared_prefs ? 0u : TIKU_S_DISABLED));
-
-    if (controller->save_status) {
-        const char *status = controller->save_status(controller->save_context);
-        tiku_text_block_draw(
-            surface,
-            (tiku_rect_t){content.x + PAD,
-                          content.y + motion_y() + row_h() + 6,
-                          content.w - 2 * PAD, 2 * font->height},
-            TIKU_MEASURE_PLAIN, status ? status : "", TIKU_C_TEXT, 2);
-    }
-
-    tiku_ui_button(surface, defaults_rect(content),
-                        tiku_str("button.defaults"),
-                        (tiku_trk_deskprefs_defaultable(&controller->model)
-                            ? 0u : TIKU_S_DISABLED) |
-                        (tiku_press_held(&controller->press, 3)
-                            ? TIKU_S_PRESSED : 0u));
-    tiku_ui_button(surface, revert_rect(content),
-                        tiku_str("button.revert"),
-                        (tiku_trk_deskprefs_revertable(&controller->model)
-                            ? 0u : TIKU_S_DISABLED) |
-                        (tiku_press_held(&controller->press, 4)
-                            ? TIKU_S_PRESSED : 0u));
+    if (c->dirty)
+        *c->dirty = 1;
 }
 
-/**
- * @brief A press picks a picture or a laying mode or toggles Reduce
- *        motion; the stepper's arrows and the buttons act on a release
- *        over them.  Each change is applied at once.
- * @return 1 when taken.
- */
+/** @brief Find the stock thumbnail for a stored path, or return -1 for a custom
+ * file. */
 static int
-event(tiku_window_t *window, const tiku_event_t *event,
-      void *context)
+stock_index(const tiku_trk_desktop_prefs_window_t *c, const char *path)
 {
-    tiku_trk_desktop_prefs_window_t *controller = context;
-    tiku_rect_t content = tiku_window_content(window);
-    int x = event->x - content.x, y = event->y - content.y;
+    for (int i = 0; i < c->pictures.count; i++)
+        if (!strcmp(c->pictures.picture[i], path))
+            return i;
+    return -1;
+}
 
-    {
-        /* The stepper's arrows and the two buttons show pressed while
-         * held and act on a release over them; the list, the modes and
-         * the tick box act on the press. */
-        int under = inside(minus_rect(content), event->x, event->y) ? 1
-                  : inside(plus_rect(content), event->x, event->y) ? 2
-                  : (inside(defaults_rect(content), event->x, event->y) &&
-                     tiku_trk_deskprefs_defaultable(&controller->model)) ? 3
-                  : (inside(revert_rect(content), event->x, event->y) &&
-                     tiku_trk_deskprefs_revertable(&controller->model)) ? 4
-                  : 0;
+/** @brief Release the decoded thumbnails owned by the open window. */
+static void
+free_previews(tiku_trk_desktop_prefs_window_t *c)
+{
+    for (int i = 0; i <= STOCK_MAX; i++)
+        tiku_image_free(&c->previews[i]);
+}
 
-        if (event->type == TIKU_EVENT_POINTER_MOVE) {
-            if (tiku_press_track(&controller->press, under)) {
-                if (controller->dirty != NULL) { *controller->dirty = 1; }
-            }
-            return controller->press.id != 0;
-        }
-        if (event->type == TIKU_EVENT_POINTER_UP) {
-            int id = tiku_press_release(&controller->press, under);
+void
+tiku_trk_desktop_prefs_window_chosen(tiku_trk_desktop_prefs_window_t *c,
+                                     const char *path)
+{
+    if (!c->window || !c->window->open || !path)
+        return;
+    tiku_image_t thumb = {0};
+    if (strlen(path) >= sizeof c->model.value.bg.path ||
+        tiku_image_load_fit(path, THUMB_W, THUMB_H, &thumb) != TIKU_IMG_OK) {
+        c->notice_key = "prefs.desktop.invalid_picture";
+        redraw(c);
+        return;
+    }
+    tiku_image_free(&c->previews[STOCK_MAX]);
+    c->previews[STOCK_MAX] = thumb;
+    snprintf(c->custom_path, sizeof c->custom_path, "%s", path);
+    tiku_trk_deskprefs_set_picture(&c->model, path);
+    c->notice_key = NULL;
+    apply(c);
+}
 
-            if (controller->dirty != NULL) { *controller->dirty = 1; }
-            if (id == 1 || id == 2) {
-                if (tiku_trk_deskprefs_step_icon(&controller->model, id == 2)) {
-                    apply(controller);
-                }
-            } else if (id == 3) {
-                tiku_trk_deskprefs_defaults(&controller->model);
-                apply(controller);
-            } else if (id == 4) {
-                tiku_trk_deskprefs_revert(&controller->model);
-                apply(controller);
-            }
-            return 1;
-        }
-        if (event->type == TIKU_EVENT_POINTER_DOWN && under != 0) {
-            (void)tiku_press_arm(&controller->press, under);
-            if (controller->dirty != NULL) { *controller->dirty = 1; }
-            return 1;
+/** @brief Centre a rectangle of the requested dimensions in the tile. */
+static tiku_rect_t
+center(tiku_rect_t box, int w, int h)
+{
+    return (tiku_rect_t){box.x + (box.w - w) / 2, box.y + (box.h - h) / 2, w,
+                         h};
+}
+
+/** @brief Draw the selection border and the pressed face of a choice. */
+static void
+tile(tiku_surface_t *s, tiku_rect_t r, int selected, int held)
+{
+    tiku_fill(s, r, selected ? TIKU_C_SELECT : TIKU_C_PANEL);
+    tiku_frame(
+        s, r, selected ? TIKU_C_FOCUS : tiku_tint(TIKU_C_PANEL, TIKU_DARKEN_2));
+    tiku_fill(s, tiku_inset(r, 3), held ? TIKU_C_PANEL : TIKU_C_DOC);
+}
+
+/** @brief Mark the file-picker tile, including when it shows a custom
+ * thumbnail. */
+static void
+plus(tiku_surface_t *s, tiku_rect_t box)
+{
+    tiku_rect_t r = center(box, 13, 3);
+    tiku_fill(s, r, TIKU_C_TEXT);
+    tiku_fill(s, center(box, 3, 13), TIKU_C_TEXT);
+}
+
+/** @brief Centre a thumbnail at its original aspect ratio. */
+static void
+picture(tiku_surface_t *s, tiku_rect_t r, const tiku_image_t *im)
+{
+    if (!im->px || r.w <= 0 || r.h <= 0)
+        return;
+    int w = r.w, h = w * im->h / im->w;
+    if (h > r.h) {
+        h = r.h;
+        w = h * im->w / im->h;
+    }
+    tiku_paint_image(s, im, center(r, w, h), r);
+}
+
+/** @brief Draw the sample using the same placement calculation as the desktop.
+ */
+static void
+placement(tiku_surface_t *s, tiku_rect_t box, int mode,
+          const tiku_image_t *thumb)
+{
+    tiku_rect_t screen = center(box, box.w < 60 ? box.w - 10 : 50, 28);
+    tiku_fill(s, screen, TIKU_C_BACKDROP);
+    tiku_frame(s, screen, TIKU_C_TEXT);
+    screen = tiku_inset(screen, 2);
+    tiku_trk_bg_t bg = {.mode = (tiku_trk_bg_mode_t)mode};
+    int x, y, w, h;
+    for (int i = 0;
+         tiku_trk_bg_place(&bg, screen.w, screen.h, 17, 10, i, &x, &y, &w, &h);
+         i++) {
+        tiku_rect_t image = {screen.x + x, screen.y + y, w, h};
+        if (thumb->px)
+            tiku_paint_image(s, thumb, image, screen);
+        else {
+            if (image.w > screen.w - x)
+                image.w = screen.w - x;
+            if (image.h > screen.h - y)
+                image.h = screen.h - y;
+            tiku_fill(s, image, TIKU_C_SELECT);
+            tiku_frame(s, image, TIKU_C_TEXT);
         }
     }
-    if (event->type != TIKU_EVENT_POINTER_DOWN ||
-        !inside(content, event->x, event->y)) {
+}
+
+/** @brief Place the section heading just above its controls. */
+static void
+heading(tiku_surface_t *s, tiku_rect_t row, const char *label)
+{
+    tiku_text(s, tiku_font_bold(), row.x,
+              row.y - 4 - tiku_font_bold()->height + tiku_font_bold()->ascent,
+              label, TIKU_C_TEXT);
+}
+
+/** @brief Return the preset tile for a pixel size, or the ruler tile for a
+ * custom size. */
+static int
+preset(int size)
+{
+    for (int i = 0; i < 3; i++)
+        if (size == sizes[i])
+            return i;
+    return 3;
+}
+
+/** @brief Position the numeric field, keypad and action buttons. */
+static tiku_rect_t
+editor_rect(tiku_rect_t content, int id)
+{
+    int h = tiku_ui_button_h() > 32 ? tiku_ui_button_h() : 32;
+    int width = content.w < 270 ? content.w - 2 * PAD : 246;
+    tiku_rect_t row = {content.x + (content.w - width) / 2,
+                       content.y + PAD + tiku_font_bold()->height + 6, width,
+                       h};
+    if (!id)
+        return row;
+    if (id == CANCEL || id == ACCEPT) {
+        row.y += 5 * (h + 4) + 4;
+        return cell(row, id == ACCEPT, 2);
+    }
+    int k = id == ERASE ? 11 : id == DIGIT ? 10 : id - DIGIT - 1;
+    row.y += (k / 3 + 1) * (h + 4);
+    return cell(row, k % 3, 3);
+}
+
+/** @brief Whether the numeric field holds a size the desktop view accepts. */
+static int
+valid_size(const char *s)
+{
+    int n = atoi(s);
+    return n >= 16 && n <= 128;
+}
+
+/** @brief Draw the selected text and touch keypad for a custom icon size. */
+static void
+draw_editor(tiku_trk_desktop_prefs_window_t *c, tiku_surface_t *s,
+            tiku_rect_t content)
+{
+    tiku_rect_t field = editor_rect(content, 0);
+    int n = (int)strlen(c->digits);
+    heading(s, field, tiku_str("prefs.desktop.pixels"));
+    tiku_ui_textfield_sel(s, field, c->digits, n, c->replace_size ? 0 : n, n,
+                          TIKU_S_FOCUS);
+    for (int id = DIGIT; id <= CANCEL; id++) {
+        char digit[] = {(char)('0' + id - DIGIT), 0};
+        const char *label = id == ERASE    ? "<"
+                            : id == ACCEPT ? tiku_str("prefs.desktop.apply")
+                            : id == CANCEL ? tiku_str("button.cancel")
+                                           : digit;
+        unsigned state = tiku_press_held(&c->press, id) ? TIKU_S_PRESSED : 0;
+        if (id == ACCEPT && !valid_size(c->digits))
+            state |= TIKU_S_DISABLED;
+        tiku_ui_button(s, editor_rect(content, id), label, state);
+    }
+}
+
+/** @brief Paint the preference controls or the custom size editor. */
+static void
+draw(tiku_window_t *window, tiku_surface_t *s, tiku_rect_t content,
+     void *context)
+{
+    tiku_trk_desktop_prefs_window_t *c = context;
+    const tiku_trk_deskprefs_values_t *v = &c->model.value;
+    refit(c);
+    content = tiku_window_content(window);
+    desk_layout_t r = layout(content);
+    tiku_fill(s, content, TIKU_C_PANEL);
+    if (c->editing_size) {
+        draw_editor(c, s, content);
+        return;
+    }
+    heading(s, r.pictures, tiku_str("prefs.desktop.picture"));
+    heading(s, r.modes, tiku_str("prefs.desktop.justification"));
+    char size_label[80];
+    snprintf(size_label, sizeof size_label, "%s   %d px",
+             tiku_str("label.icon_size"), v->icon_size);
+    heading(s, r.sizes, size_label);
+    int n = c->pictures.count, selected = stock_index(c, v->bg.path);
+    for (int i = 0; i < n + 2; i++) {
+        int custom = i == n + 1;
+        int chosen =
+            i == 0 ? !v->have_bg
+                   : v->have_bg && (custom ? selected < 0 : selected == i - 1);
+        tiku_rect_t box = cell(r.pictures, i, n + 2);
+        tile(s, box, chosen,
+             tiku_press_held(&c->press, custom ? CUSTOM_TILE : NONE_TILE + i));
+        tiku_rect_t art = tiku_inset(box, 5);
+        if (!i)
+            tiku_fill(s, art, TIKU_C_BACKDROP);
+        else if (!custom)
+            picture(s, art, &c->previews[i - 1]);
+        else {
+            picture(s, art, &c->previews[STOCK_MAX]);
+            if (c->previews[STOCK_MAX].px) {
+                art = (tiku_rect_t){art.x + art.w - 18, art.y + art.h - 18, 18,
+                                    18};
+                tiku_fill(s, art, TIKU_C_DOC);
+            }
+            plus(s, art);
+        }
+    }
+    const tiku_image_t *sample = &c->previews[0];
+    if (v->have_bg) {
+        const tiku_image_t *active =
+            &c->previews[selected < 0 ? STOCK_MAX : selected];
+        if (active->px)
+            sample = active;
+    }
+    for (int i = 0; i < 4; i++) {
+        tiku_rect_t box = cell(r.modes, i, 4);
+        tile(s, box, (int)v->bg.mode == i,
+             tiku_press_held(&c->press, MODE_TILE + i));
+        placement(s, box, i, sample);
+        box = cell(r.sizes, i, 4);
+        tile(s, box, preset(v->icon_size) == i,
+             tiku_press_held(&c->press, SIZE_TILE + i));
+        if (i < 3) {
+            int side = 18 + 9 * i;
+            tiku_rect_t icon = center(box, side, side);
+            (void)tiku_icon_paint(s, "folder", icon.x, icon.y, side);
+        } else {
+            tiku_rect_t ruler = center(box, 34, 16);
+            tiku_fill(s, ruler, TIKU_C_PANEL);
+            tiku_frame(s, ruler, TIKU_C_TEXT);
+            for (int j = 1; j <= 7; j++)
+                tiku_vline(s, ruler.x + j * 4, ruler.y, j % 2 ? 5 : 9,
+                           TIKU_C_TEXT);
+        }
+    }
+    const char *status =
+        c->save_status ? c->save_status(c->save_context) : NULL;
+    if (!status || !*status)
+        status =
+            tiku_str(c->notice_key ? c->notice_key : "prefs.desktop.browse");
+    tiku_text_block_draw(s, r.status, TIKU_MEASURE_PLAIN, status, TIKU_C_TEXT,
+                         2);
+    tiku_ui_button(
+        s, r.defaults, tiku_str("button.defaults"),
+        (!tiku_trk_deskprefs_defaultable(&c->model) ? TIKU_S_DISABLED : 0) |
+            (tiku_press_held(&c->press, DEFAULTS) ? TIKU_S_PRESSED : 0));
+    tiku_ui_button(
+        s, r.revert, tiku_str("button.revert"),
+        (!tiku_trk_deskprefs_revertable(&c->model) ? TIKU_S_DISABLED : 0) |
+            (tiku_press_held(&c->press, REVERT) ? TIKU_S_PRESSED : 0));
+}
+
+/** @brief Return the control under the pointer, or zero for a gutter or
+ * disabled action. */
+static int
+hit(tiku_trk_desktop_prefs_window_t *c, tiku_rect_t content, int x, int y)
+{
+    if (c->editing_size) {
+        for (int id = DIGIT; id <= CANCEL; id++)
+            if (inside(editor_rect(content, id), x, y))
+                return id;
         return 0;
     }
-    if (event->button == 1u && controller->shared_prefs != NULL &&
-        inside(motion_rect(content), event->x, event->y)) {
-        controller->model.value.reduce_motion =
-            !controller->model.value.reduce_motion;
-        apply(controller);
-        return 1;
+    desk_layout_t r = layout(content);
+    int n = c->pictures.count;
+    for (int i = 0; i < n + 2; i++)
+        if (inside(cell(r.pictures, i, n + 2), x, y))
+            return i == n + 1 ? CUSTOM_TILE : NONE_TILE + i;
+    for (int i = 0; i < 4; i++) {
+        if (inside(cell(r.modes, i, 4), x, y))
+            return MODE_TILE + i;
+        if (inside(cell(r.sizes, i, 4), x, y))
+            return SIZE_TILE + i;
     }
-    if (y >= list_y() && y < list_y() + LIST_ROWS * row_h() &&
-        x >= PAD && x < content.w - PAD) {
-        int row = (y - list_y() - 1) / row_h();
-
-        if (row == 0) {
-            tiku_trk_deskprefs_clear_picture(&controller->model);
-            apply(controller);
-        } else if (row - 1 < controller->pictures.count) {
-            tiku_trk_deskprefs_set_picture(&controller->model,
-                controller->pictures.picture[row - 1]);
-            apply(controller);
-        }
-        return 1;
-    }
-    {
-        /* The mode rows as mode_row() lays them out, in content-relative
-         * coordinates, tested on x as well as y. */
-        tiku_rect_t zero = { 0, 0, TIKU_TRK_DESK_PREFS_W, 0 };
-        int i;
-
-        for (i = 0; i < 4; i++) {
-            tiku_rect_t row = mode_row(zero, i);
-
-            if (x >= row.x && x < row.x + row.w &&
-                y >= row.y && y < row.y + row.h) {
-                /* Only while a picture is chosen; without one the modes
-                 * are greyed. */
-                if (controller->model.value.have_bg) {
-                    tiku_trk_deskprefs_set_mode(&controller->model,
-                        (tiku_trk_bg_mode_t)i);
-                    apply(controller);
-                }
-                return 1;
-            }
-        }
-    }
+    if (inside(r.defaults, x, y) && tiku_trk_deskprefs_defaultable(&c->model))
+        return DEFAULTS;
+    if (inside(r.revert, x, y) && tiku_trk_deskprefs_revertable(&c->model))
+        return REVERT;
     return 0;
 }
 
-void
-tiku_trk_desktop_prefs_window_init(
-    tiku_trk_desktop_prefs_window_t *controller,
-    tiku_workspace_t *workspace, tiku_trk_desktop_view_t *desktop_view,
-    tiku_store_t *store, int screen_w, int screen_h, int *dirty)
+/** @brief Update the numeric field, cancel it or submit its validated size. */
+static void
+edit(tiku_trk_desktop_prefs_window_t *c, int id)
 {
-    memset(controller, 0, sizeof *controller);
-    controller->workspace = workspace;
-    controller->desktop_view = desktop_view;
-    controller->store = store;
-    controller->screen_w = screen_w;
-    controller->screen_h = screen_h;
-    controller->dirty = dirty;
-    (void)tiku_desktop_dir(controller->node, sizeof controller->node);
-    snprintf(controller->pictures_dir, sizeof controller->pictures_dir,
-             "%s/../wallpapers", controller->node);
-    tiku_trk_deskprefs_init(&controller->model);
-}
-
-void
-tiku_trk_desktop_prefs_window_bind_settings(
-    tiku_trk_desktop_prefs_window_t *controller,
-    tiku_trk_prefs_t *prefs, const char *path)
-{
-    controller->shared_prefs = prefs;
-    snprintf(controller->shared_prefs_path,
-             sizeof controller->shared_prefs_path, "%s",
-             (path != NULL) ? path : "");
-}
-
-void
-tiku_trk_desktop_prefs_window_close(
-    tiku_trk_desktop_prefs_window_t *controller)
-{
-    if (controller->window != NULL && controller->window->open) {
-        tiku_workspace_close(controller->workspace, controller->window);
+    size_t n = strlen(c->digits);
+    if (id == CANCEL)
+        c->editing_size = 0;
+    else if (id == ACCEPT) {
+        if (valid_size(c->digits)) {
+            c->model.value.icon_size = atoi(c->digits);
+            c->editing_size = 0;
+            apply(c);
+        }
+    } else {
+        if (c->replace_size) {
+            n = 0;
+            c->replace_size = 0;
+        }
+        if (id == ERASE) {
+            if (n)
+                n--;
+        } else if (n < sizeof c->digits - 1)
+            c->digits[n++] = (char)('0' + id - DIGIT);
+        c->digits[n] = 0;
     }
-    controller->window = NULL;
-    if (controller->dirty != NULL) {
-        *controller->dirty = 1;
-    }
+    redraw(c);
 }
 
-void
-tiku_trk_desktop_prefs_window_destroy(
-    tiku_trk_desktop_prefs_window_t *controller)
+/** @brief Apply the released tile or button and dispatch a double-click to the
+ * file panel. */
+static void
+activate(tiku_trk_desktop_prefs_window_t *c, int id, int64_t now)
 {
-    tiku_trk_desktop_prefs_window_close(controller);
-}
-
-void
-tiku_trk_desktop_prefs_window_open(
-    tiku_trk_desktop_prefs_window_t *controller)
-{
-    tiku_trk_folder_window_t *desk;
-    const char *dirs[2];
-    tiku_rect_t frame;
-
-    if (controller->window != NULL && controller->window->open) {
-        tiku_workspace_activate(controller->workspace,
-                                     controller->window);
+    c->notice_key = NULL;
+    if (c->editing_size) {
+        edit(c, id);
         return;
     }
-    /* Read afresh on every open: the Desktop's record may have changed
-     * elsewhere since, and a stale model would undo that change. */
-    desk = tiku_trk_desktop_view_folder(controller->desktop_view);
-    (void)tiku_trk_deskprefs_load(&controller->model, controller->store,
-        controller->node,
-        (desk != NULL && desk->view != NULL)
-            ? tiku_trk_poseview_icon_size(desk->view) : 0);
-    controller->model.value.reduce_motion =
-        tiku_trk_prefs_get(controller->shared_prefs, "ReduceMotion") != 0;
-    dirs[0] = controller->node;
-    dirs[1] = controller->pictures_dir;
-    (void)tiku_trk_deskprefs_pictures(&controller->pictures, dirs, 2);
-    tiku_trk_deskprefs_mark_opened(&controller->model);
+    if (id == CUSTOM_TILE) {
+        if (c->custom_click && now >= c->custom_click &&
+            now - c->custom_click <= 500000) {
+            c->custom_click = 0;
+            if (c->pick_file)
+                c->pick_file(c->pick_context);
+        } else {
+            c->custom_click = now;
+            if (*c->custom_path) {
+                tiku_trk_deskprefs_set_picture(&c->model, c->custom_path);
+                apply(c);
+            }
+        }
+        return;
+    }
+    c->custom_click = 0;
+    if (id == NONE_TILE)
+        tiku_trk_deskprefs_clear_picture(&c->model);
+    else if (id >= STOCK_TILE && id < CUSTOM_TILE)
+        tiku_trk_deskprefs_set_picture(&c->model,
+                                       c->pictures.picture[id - STOCK_TILE]);
+    else if (id >= MODE_TILE && id < SIZE_TILE)
+        tiku_trk_deskprefs_set_mode(&c->model,
+                                    (tiku_trk_bg_mode_t)(id - MODE_TILE));
+    else if (id >= SIZE_TILE && id < SIZE_TILE + 3)
+        c->model.value.icon_size = sizes[id - SIZE_TILE];
+    else if (id == SIZE_TILE + 3) {
+        c->editing_size = c->replace_size = 1;
+        snprintf(c->digits, sizeof c->digits, "%d", c->model.value.icon_size);
+        return;
+    } else if (id == DEFAULTS)
+        tiku_trk_deskprefs_defaults(&c->model);
+    else if (id == REVERT)
+        tiku_trk_deskprefs_revert(&c->model);
+    else
+        return;
+    apply(c);
+}
 
-    frame.w = TIKU_TRK_DESK_PREFS_W;
-    frame.h = window_height();
-    frame.x = (controller->screen_w - frame.w) / 2;
-    frame.y = (controller->screen_h - frame.h) / 3;
-    controller->window = tiku_workspace_open(controller->workspace,
-        tiku_str("title.desktop_prefs"), frame, draw, controller,
-        NULL);
-    if (controller->window != NULL) {
-        tiku_window_set_size_controls(controller->window, 0, 0);
-        tiku_window_set_handlers(controller->window, event, NULL, NULL);
+/** @brief Route pointer capture and the numeric editor’s keys to their
+ * controls. */
+static int
+event(tiku_window_t *window, const tiku_event_t *e, void *context)
+{
+    tiku_trk_desktop_prefs_window_t *c = context;
+    if (e->type == TIKU_EVENT_KEY_DOWN && c->editing_size) {
+        unsigned key = e->key;
+        if (key >= '0' && key <= '9')
+            edit(c, DIGIT + (int)(key - '0'));
+        else if (key == TIKU_KEY_BACKSPACE || key == TIKU_KEY_DELETE)
+            edit(c, ERASE);
+        else if (key == TIKU_KEY_RETURN)
+            edit(c, ACCEPT);
+        else if (key == TIKU_KEY_ESCAPE)
+            edit(c, CANCEL);
+        else
+            return 0;
+        return 1;
     }
-    if (controller->dirty != NULL) {
-        *controller->dirty = 1;
+    if (e->type == TIKU_EVENT_DEACTIVATED) {
+        memset(&c->press, 0, sizeof c->press);
+        c->custom_click = 0;
+        return 0;
     }
+    int id = hit(c, tiku_window_content(window), e->x, e->y);
+    if (e->type == TIKU_EVENT_POINTER_DOWN && e->button == 1 && id) {
+        tiku_window_t *under = NULL;
+        if (tiku_workspace_hit(c->workspace, e->x, e->y, &under) !=
+                TIKU_HIT_CONTENT ||
+            under != window)
+            return 0;
+        (void)tiku_press_arm(&c->press, id);
+    } else if (e->type == TIKU_EVENT_POINTER_UP && c->press.id) {
+        int action = tiku_press_release(&c->press, id);
+        if (action)
+            activate(c, action, e->time_us ? e->time_us : tiku_trk_now());
+    } else if (e->type == TIKU_EVENT_POINTER_MOVE && c->press.id) {
+        (void)tiku_press_track(&c->press, id);
+    } else
+        return 0;
+    redraw(c);
+    return 1;
+}
+
+/** @brief Release gallery resources and forget input state when the window
+ * leaves the workspace. */
+static void
+closed(tiku_window_t *w, void *context)
+{
+    tiku_trk_desktop_prefs_window_t *c = context;
+    (void)w;
+    free_previews(c);
+    c->window = NULL;
+    c->custom_click = 0;
+    c->editing_size = 0;
+    c->notice_key = NULL;
+    memset(&c->press, 0, sizeof c->press);
+    redraw(c);
+}
+
+void
+tiku_trk_desktop_prefs_window_init(tiku_trk_desktop_prefs_window_t *c,
+                                   tiku_workspace_t *workspace,
+                                   tiku_trk_desktop_view_t *view,
+                                   tiku_store_t *store, int screen_w,
+                                   int screen_h, int *dirty)
+{
+    memset(c, 0, sizeof *c);
+    c->workspace = workspace;
+    c->desktop_view = view;
+    c->store = store;
+    c->screen_w = screen_w;
+    c->screen_h = screen_h;
+    c->dirty = dirty;
+    (void)tiku_desktop_dir(c->node, sizeof c->node);
+    tiku_trk_deskprefs_init(&c->model);
+}
+
+void
+tiku_trk_desktop_prefs_window_close(tiku_trk_desktop_prefs_window_t *c)
+{
+    if (c->window && c->window->open)
+        tiku_workspace_close(c->workspace, c->window);
+}
+
+void
+tiku_trk_desktop_prefs_window_destroy(tiku_trk_desktop_prefs_window_t *c)
+{
+    tiku_trk_desktop_prefs_window_close(c);
+}
+
+void
+tiku_trk_desktop_prefs_window_open(tiku_trk_desktop_prefs_window_t *c)
+{
+    if (c->window && c->window->open) {
+        tiku_workspace_activate(c->workspace, c->window);
+        return;
+    }
+    tiku_trk_folder_window_t *desk =
+        tiku_trk_desktop_view_folder(c->desktop_view);
+    (void)tiku_trk_deskprefs_load(
+        &c->model, c->store, c->node,
+        desk && desk->view ? tiku_trk_poseview_icon_size(desk->view) : 0);
+    tiku_trk_deskprefs_mark_opened(&c->model);
+    c->window =
+        tiku_workspace_open(c->workspace, tiku_str("title.desktop_prefs"),
+                            fitted_frame(c, NULL), draw, c, NULL);
+    if (!c->window)
+        return;
+    tiku_window_set_size_controls(c->window, 0, 0);
+    tiku_window_set_handlers(c->window, event, NULL, closed);
+    const char *dir = c->pictures_dir;
+    (void)tiku_trk_deskprefs_pictures(&c->pictures, &dir, 1);
+    if (c->pictures.count > STOCK_MAX)
+        c->pictures.count = STOCK_MAX;
+    for (int i = 0; i < c->pictures.count; i++)
+        (void)tiku_image_load_fit(c->pictures.picture[i], THUMB_W, THUMB_H,
+                                  &c->previews[i]);
+    if (c->model.value.have_bg && stock_index(c, c->model.value.bg.path) < 0)
+        snprintf(c->custom_path, sizeof c->custom_path, "%s",
+                 c->model.value.bg.path);
+    if (*c->custom_path &&
+        tiku_image_load_fit(c->custom_path, THUMB_W, THUMB_H,
+                            &c->previews[STOCK_MAX]) != TIKU_IMG_OK)
+        c->custom_path[0] = 0;
+    redraw(c);
 }
 
 tiku_window_t *
-tiku_trk_desktop_prefs_window_handle(
-    tiku_trk_desktop_prefs_window_t *controller)
+tiku_trk_desktop_prefs_window_handle(tiku_trk_desktop_prefs_window_t *c)
 {
-    return controller->window;
+    return c->window;
 }

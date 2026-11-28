@@ -407,21 +407,14 @@ deskbar_pick_system(desktop_t *app, tiku_trk_db_pick_t *pick)
         }
         break;
     }
-    case TIKU_TRK_DB_TOGGLE_DARK: {
-        /* The switch is the DarkMode setting: step it, save it, and let
-         * sync_folder_preferences() apply it, so the switch, the
-         * preferences and the settings file agree. */
-        tiku_trk_prefs_t *prefs = prefs_model(app);
+    case TIKU_TRK_DB_TOGGLE_DARK:
+        if (app->theme_target < 0 && !alert_model(app)->open) {
+            int mode = tiku_trk_prefs_get(prefs_model(app), "DarkMode");
 
-        /* DarkMode has three values; each press steps to the next,
-         * wrapping round. */
-        tiku_trk_prefs_set(prefs, "DarkMode",
-                           (tiku_trk_prefs_get(prefs, "DarkMode") + 1) % 3);
-        (void)tiku_trk_prefs_submit(prefs, app->prefs_window.path);
-        sync_folder_preferences(app);
-        desktop_damage_all(app);
+            desktop_preview_theme(app, (mode + 1) % 3);
+            desktop_save_theme(app);
+        }
         break;
-    }
     case TIKU_TRK_DB_TOGGLE_REPLICANTS:
         /* The bar has already flipped it; the setting is saved with the
          * rest of the Deskbar's. */

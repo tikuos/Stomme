@@ -301,6 +301,9 @@ int tiku_trk_deskbar_hot_label(const tiku_trk_deskbar_t *db, char *out,
 /** @brief The tooltip being shown, or "" for none. */
 const char *tiku_trk_deskbar_tip(const tiku_trk_deskbar_t *db);
 
+/** @brief Screen bounds of the leaf popup and its submenu, empty while closed. */
+tiku_rect_t tiku_trk_deskbar_leaf_bounds(const tiku_trk_deskbar_t *db);
+
 /** @brief The open leaf menu's bottom edge on the screen, or -1. */
 int tiku_trk_deskbar_menu_bottom(const tiku_trk_deskbar_t *db);
 
@@ -724,6 +727,14 @@ void tiku_trk_deskbar_strip_title(const char *app, const char *title,
 /** @brief The bar's rectangle as last laid out: its sliver while hidden. */
 tiku_rect_t tiku_trk_deskbar_frame(const tiku_trk_deskbar_t *db);
 
+/** @brief Display space left by the current Deskbar and the global menu bar. */
+tiku_rect_t tiku_trk_deskbar_work_area(const tiku_trk_deskbar_t *db,
+                                      int width, int height);
+
+/** @brief Bound an adaptive panel's frame to the work area. */
+tiku_rect_t tiku_trk_deskbar_fit_panel(const tiku_trk_deskbar_t *db,
+                                      int width, int height, tiku_rect_t panel);
+
 /** @brief Draw the whole bar onto @p s, laying its frame out first. */
 void tiku_trk_deskbar_draw(tiku_trk_deskbar_t *db, tiku_surface_t *s);
 
@@ -887,6 +898,7 @@ enum {
     TIKU_TRK_DB_GROUP_DOCUMENTS,
     TIKU_TRK_DB_GROUP_GRAPHICS,
     TIKU_TRK_DB_GROUP_AUDIO,
+    TIKU_TRK_DB_GROUP_SETTINGS,
     TIKU_TRK_DB_GROUP_COUNT,
     /* APPS and PROGRAMMING, by the names the leaf menu shows them under. */
     TIKU_TRK_DB_GROUP_UTILITIES = TIKU_TRK_DB_GROUP_APPS,
@@ -898,8 +910,8 @@ enum {
  *        starting @p command when chosen, drawn with the art named by
  *        @p icon.
  *
- * Each group with programs is a row of the leaf menu, expanding to its
- * programs sorted by label.
+ * Settings adds its programs to the preferences submenu. Other groups
+ * with programs have a leaf row. Programs in each group sort by label.
  *
  * @return nonzero when the row was taken; 0 for a group out of range or a
  *         full table.
@@ -907,6 +919,9 @@ enum {
 int tiku_trk_deskbar_add_app_in(tiku_trk_deskbar_t *db, int group,
                                 const char *label, const char *command,
                                 const char *icon);
+
+/** @brief The button that opens the TikuOS menu, in screen coordinates. */
+tiku_rect_t tiku_trk_deskbar_leaf_button_rect(const tiku_trk_deskbar_t *db);
 
 /** @brief Where the theme switch sits, as last laid out. */
 tiku_rect_t tiku_trk_deskbar_switch_rect(const tiku_trk_deskbar_t *db);

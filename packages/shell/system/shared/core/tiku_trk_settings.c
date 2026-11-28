@@ -1009,6 +1009,11 @@ void tiku_trk_settings_close(tiku_trk_settings_t *owner)
     free(owner);
 }
 
+int tiku_trk_settings_save_busy(const tiku_trk_settings_t *owner)
+{
+    return owner && (owner->writer || (!owner->ready && owner->reader));
+}
+
 tiku_resource_error_t tiku_trk_settings_error(const tiku_trk_settings_t *owner)
 {
     return owner ? owner->error : TIKU_RESOURCE_INVALID;

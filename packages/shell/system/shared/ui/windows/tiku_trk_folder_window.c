@@ -329,6 +329,29 @@ draw_pose_icon(tiku_trk_folder_window_t *folder,
     }
 }
 
+void
+tiku_trk_folder_window_free_background(tiku_trk_folder_window_t *folder)
+{
+    free(folder->bg_rgb);
+    folder->bg_rgb = NULL;
+    tiku_image_free(&folder->bg_image);
+    folder->bg_shown[0] = '\0';
+}
+
+/** @brief Transfer an opaque image's allocation into the native RGB cache. */
+static void
+prepare_background(tiku_trk_folder_window_t *folder)
+{
+    tiku_image_t *image = &folder->bg_image;
+    size_t count = (size_t)image->w * image->h;
+
+    for (size_t i = 0; i < count; i++)
+        if ((image->px[i] >> 24) != 255u) return;
+    for (size_t i = 0; i < count; i++) image->px[i] &= 0xffffffu;
+    folder->bg_rgb = image->px;
+    image->px = NULL;
+}
+
 int
 tiku_trk_folder_window_draw_background(tiku_trk_folder_window_t *folder,
     tiku_surface_t *surface, tiku_rect_t content)
@@ -355,12 +378,12 @@ tiku_trk_folder_window_draw_background(tiku_trk_folder_window_t *folder,
         return 0;
     }
     if (strcmp(bg.path, folder->bg_shown) != 0) {
-        tiku_image_free(&folder->bg_image);
-        folder->bg_shown[0] = '\0';
+        tiku_trk_folder_window_free_background(folder);
         if (tiku_image_load(bg.path, &folder->bg_image) !=
             TIKU_IMG_OK) {
             return 0;
         }
+        prepare_background(folder);
         snprintf(folder->bg_shown, sizeof folder->bg_shown, "%s", bg.path);
     }
     folder->bg_applied = bg;
@@ -369,7 +392,12 @@ tiku_trk_folder_window_draw_background(tiku_trk_folder_window_t *folder,
                                   i, &dx, &dy, &dw, &dh); i++) {
         tiku_rect_t dst = { content.x + dx, content.y + dy, dw, dh };
 
-        tiku_paint_image(surface, &folder->bg_image, dst, content);
+        if (folder->bg_rgb) {
+            tiku_paint_rgb_image(surface, folder->bg_rgb, folder->bg_image.w,
+                                 folder->bg_image.h, dst, content);
+        } else {
+            tiku_paint_image(surface, &folder->bg_image, dst, content);
+        }
     }
     return 1;
 }
@@ -469,7 +497,10 @@ tiku_trk_folder_window_draw_icons(tiku_trk_folder_window_t *folder,
     for (i = first; i <= last; i++) {
         tiku_trk_pose_t *pose = tiku_trk_poseview_at(folder->view, i);
 
-        if (pose != NULL && pose->placed) {
+        if (pose != NULL && pose->placed &&
+            (surface->record || !surface->damage_active ||
+             rects_touch(surface->clip, pose_footprint(folder, pose,
+                                                       origin_x, origin_y)))) {
             draw_pose_icon(folder, surface, pose, origin_x, origin_y);
         }
     }

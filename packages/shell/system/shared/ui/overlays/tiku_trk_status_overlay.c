@@ -31,13 +31,19 @@ mark_dirty(tiku_trk_status_overlay_t *controller)
     }
 }
 
-/** @brief Where the alert sits: centred, a third of the way down. */
-static tiku_rect_t
-alert_frame(const tiku_trk_status_overlay_t *controller)
+tiku_rect_t
+tiku_trk_status_overlay_alert_frame(const tiku_trk_status_overlay_t *controller)
 {
     int w, h;
 
     tiku_alert_size(&w, &h);
+    if (controller->alert.tag == TIKU_TRK_ALERT_TAG_THEME_SWITCH) {
+        h = 72 + tiku_font_plain()->height + tiku_font_bold()->height;
+        if (w > controller->screen_w) w = controller->screen_w;
+        if (h > controller->screen_h) h = controller->screen_h;
+        return (tiku_rect_t){ (controller->screen_w - w) / 2,
+                              (controller->screen_h - h) / 2, w, h };
+    }
     return (tiku_rect_t){
         (controller->screen_w - w) / 2,
         (controller->screen_h - h) / 3, w, h
@@ -65,7 +71,7 @@ draw_alert(tiku_trk_status_overlay_t *controller)
         return;
     }
     tiku_alert_draw(&controller->alert, controller->surface,
-                    alert_frame(controller));
+                    tiku_trk_status_overlay_alert_frame(controller));
 }
 
 /** @brief The progress panel and its rows, when it is open. */
@@ -265,7 +271,7 @@ tiku_trk_status_overlay_pointer(tiku_trk_status_overlay_t *controller,
                                 int x, int y)
 {
     if (controller->alert.open) {
-        tiku_rect_t frame = alert_frame(controller);
+        tiku_rect_t frame = tiku_trk_status_overlay_alert_frame(controller);
 
         /* A press arms the button under it; the release over it answers
          * (tiku_trk_status_overlay_pointer_up()). */
@@ -306,7 +312,7 @@ tiku_trk_status_overlay_pointer_move(tiku_trk_status_overlay_t *controller,
     if (!controller->alert.open) {
         return 0;
     }
-    frame = alert_frame(controller);
+    frame = tiku_trk_status_overlay_alert_frame(controller);
     if (tiku_alert_track(&controller->alert, frame.w, frame.h,
                          x - frame.x, y - frame.y)) {
         mark_dirty(controller);
@@ -324,7 +330,7 @@ tiku_trk_status_overlay_pointer_up(tiku_trk_status_overlay_t *controller,
     if (!controller->alert.open) {
         return 0;
     }
-    frame = alert_frame(controller);
+    frame = tiku_trk_status_overlay_alert_frame(controller);
     picked = tiku_alert_release(&controller->alert, frame.w, frame.h,
                                 x - frame.x, y - frame.y);
     if (picked >= 0) {

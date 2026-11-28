@@ -101,6 +101,9 @@ typedef struct {
      * say. */
     int       (*say)(void *ctx, const char *noun, char *out, size_t max);
     void       *say_ctx;
+    /* Whether the focused, decorated window fits and its close box is hit.
+     * The diagnostic names the window and gives its bounds. */
+    int       (*window_fits)(void *ctx, char *out, size_t max);
     /* The focused window narrated from its display list, the lines the
      * conductor's "narrate" noun answers with.  Computed only when a step
      * asks: a narration is a full content draw. */

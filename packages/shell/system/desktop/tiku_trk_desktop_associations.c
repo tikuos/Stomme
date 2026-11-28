@@ -34,6 +34,7 @@ struct desktop_associations {
 typedef struct {
     tiku_rect_t types, apps, previous, next, app_previous, app_next;
     tiku_rect_t detail, status, cancel, save;
+    int rows; /**< visible list rows on each page */
 } assoc_layout_t;
 
 /** @brief The window's layout, scaled to the font; painting and input
@@ -43,8 +44,13 @@ static assoc_layout_t assoc_layout(tiku_rect_t c)
     assoc_layout_t l;
     int row = tiku_font_plain()->height + 12, bh = tiku_ui_button_h();
     int half = (c.w - 52) / 2;
-    l.types = (tiku_rect_t){c.x + 18, c.y + 76, half,
-                           ASSOC_PAGE * row + 8};
+    int overhead = 76 + 8 + 8 + 2 * bh + 10 + 3 * row + 8 + 12;
+    l.rows = ASSOC_PAGE;
+    if (c.h > 0 && c.h < overhead + l.rows * row) {
+        l.rows = (c.h - overhead) / row;
+        if (l.rows < 1) l.rows = 1;
+    }
+    l.types = (tiku_rect_t){c.x + 18, c.y + 76, half, l.rows * row + 8};
     l.apps = l.types; l.apps.x += half + 16;
     int y = l.types.y + l.types.h + 8;
     l.previous = (tiku_rect_t){l.types.x + half - 64, y, 28, bh};
@@ -86,21 +92,21 @@ static void assoc_candidates(struct desktop_associations *p)
 static void assoc_controls(struct desktop_associations *p, assoc_layout_t l)
 {
     tiku_dialog_begin(&p->dialog, ASSOC_SAVE, ASSOC_CANCEL);
-    for (int i = p->page; i < p->model.count && i < p->page + ASSOC_PAGE; i++)
+    for (int i = p->page; i < p->model.count && i < p->page + l.rows; i++)
         tiku_dialog_add(&p->dialog, i, assoc_row(l.types, i - p->page),
                         TIKU_DIALOG_TOGGLE, 1);
     for (int i = p->app_page; i <= p->count &&
-         i < p->app_page + ASSOC_PAGE && p->model.count; i++)
+         i < p->app_page + l.rows && p->model.count; i++)
         tiku_dialog_add(&p->dialog, ASSOC_APP + i,
             assoc_row(l.apps, i - p->app_page), TIKU_DIALOG_TOGGLE, 1);
     tiku_dialog_add(&p->dialog, ASSOC_PREV, l.previous,
                     TIKU_DIALOG_BUTTON, p->page > 0);
     tiku_dialog_add(&p->dialog, ASSOC_NEXT, l.next, TIKU_DIALOG_BUTTON,
-                    p->page + ASSOC_PAGE < p->model.count);
+                    p->page + l.rows < p->model.count);
     tiku_dialog_add(&p->dialog, ASSOC_APP_PREV, l.app_previous,
                     TIKU_DIALOG_BUTTON, p->app_page > 0);
     tiku_dialog_add(&p->dialog, ASSOC_APP_NEXT, l.app_next,
-                    TIKU_DIALOG_BUTTON, p->app_page + ASSOC_PAGE <= p->count);
+                    TIKU_DIALOG_BUTTON, p->app_page + l.rows <= p->count);
     tiku_dialog_add(&p->dialog, ASSOC_CANCEL, l.cancel, TIKU_DIALOG_BUTTON, 1);
     tiku_dialog_add(&p->dialog, ASSOC_SAVE, l.save, TIKU_DIALOG_BUTTON,
                     tiku_trk_associations_changed(&p->model));
@@ -179,7 +185,7 @@ static void assoc_draw(tiku_window_t *w, tiku_surface_t *s,
               "Opens with", TIKU_C_TEXT);
     tiku_ui_sunken(s, l.types, TIKU_C_DOC);
     tiku_ui_sunken(s, l.apps, TIKU_C_DOC);
-    for (int i = p->page; i < p->model.count && i < p->page + ASSOC_PAGE; i++) {
+    for (int i = p->page; i < p->model.count && i < p->page + l.rows; i++) {
         tiku_rect_t r = assoc_row(l.types, i - p->page);
         if (i == p->selected) tiku_fill(s, r, TIKU_C_SELECT);
         assoc_line(s, tiku_inset(r, 4), p->model.row[i].label,
@@ -188,7 +194,7 @@ static void assoc_draw(tiku_window_t *w, tiku_surface_t *s,
             tiku_frame(s, tiku_inset(r, 1), TIKU_C_FOCUS);
     }
     for (int i = p->app_page; i <= p->count &&
-         i < p->app_page + ASSOC_PAGE && p->model.count; i++) {
+         i < p->app_page + l.rows && p->model.count; i++) {
         tiku_rect_t r = assoc_row(l.apps, i - p->app_page);
         const char *chosen = p->model.row[p->selected].chosen;
         const char *name = i ? p->candidates[i - 1].app->name : "";
@@ -251,7 +257,8 @@ static void assoc_saved(void *context, tiku_resource_error_t error)
 static int assoc_event(tiku_window_t *w, const tiku_event_t *ev, void *ctx)
 {
     struct desktop_associations *p = ctx;
-    assoc_controls(p, assoc_layout(tiku_window_content(w)));
+    assoc_layout_t l = assoc_layout(tiku_window_content(w));
+    assoc_controls(p, l);
     int id = tiku_dialog_event(&p->dialog, ev).activated;
     if (ev->type == TIKU_EVENT_KEY_DOWN && (ev->modifiers & TIKU_MOD_CMD)) {
         if (ev->key == 's') id = ASSOC_SAVE;
@@ -271,10 +278,10 @@ static int assoc_event(tiku_window_t *w, const tiku_event_t *ev, void *ctx)
             i ? p->candidates[i - 1].app->name : "");
         p->status[0] = 0;
     }
-    if (id == ASSOC_PREV) p->page -= ASSOC_PAGE;
-    if (id == ASSOC_NEXT) p->page += ASSOC_PAGE;
-    if (id == ASSOC_APP_PREV) p->app_page -= ASSOC_PAGE;
-    if (id == ASSOC_APP_NEXT) p->app_page += ASSOC_PAGE;
+    if (id == ASSOC_PREV) p->page = p->page > l.rows ? p->page - l.rows : 0;
+    if (id == ASSOC_NEXT) p->page += l.rows;
+    if (id == ASSOC_APP_PREV) p->app_page = p->app_page > l.rows ? p->app_page - l.rows : 0;
+    if (id == ASSOC_APP_NEXT) p->app_page += l.rows;
     if (id == ASSOC_CANCEL) desktop_associations_close(p->app);
     if (id == ASSOC_SAVE && tiku_trk_associations_changed(&p->model)) {
         if (p->app->catalog_settings) {
@@ -338,6 +345,7 @@ void desktop_associations_open(desktop_t *app)
     r.h = l.save.y + l.save.h + 44;
     r.x = (app->surf->w - r.w) / 2;
     r.y = (app->surf->h - r.h) / 3;
+    r = tiku_trk_deskbar_fit_panel(app->deskbar, app->surf->w, app->surf->h, r);
     p->window = tiku_workspace_open(app->desk, "File Associations", r,
                                     assoc_draw, p, NULL);
     if (p->window) {

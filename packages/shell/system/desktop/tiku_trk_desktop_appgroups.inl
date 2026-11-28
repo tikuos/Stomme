@@ -19,6 +19,7 @@
  */
 static int installed_group(const char *category)
 {
+    if (!strcmp(category, "settings")) return TIKU_TRK_DB_GROUP_SETTINGS;
     if (!strcmp(category, "device-tools"))
         return TIKU_TRK_DB_GROUP_DEVICE_TOOLS;
     if (!strcmp(category, "programming") || !strcmp(category, "development"))

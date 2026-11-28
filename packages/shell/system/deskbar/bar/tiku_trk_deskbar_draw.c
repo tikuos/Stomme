@@ -106,10 +106,11 @@ db_leaf_menu_rect(const tiku_trk_deskbar_t *db, int rowh, int rows)
 }
 
 tiku_rect_t
-db_leaf_button_rect(const tiku_trk_deskbar_t *db)
+tiku_trk_deskbar_leaf_button_rect(const tiku_trk_deskbar_t *db)
 {
     tiku_rect_t r;
 
+    if (db == NULL) return (tiku_rect_t){ 0 };
     r.x = db->frame.x + 2;
     r.y = db->frame.y + 2;
     r.w = tiku_trk_deskbar_vertical(db->dock) ? db->frame.w - 4 : HLEAF_W;
@@ -121,7 +122,7 @@ db_leaf_button_rect(const tiku_trk_deskbar_t *db)
 static int
 leaf_button_hovered(const tiku_trk_deskbar_t *db)
 {
-    tiku_rect_t r = db_leaf_button_rect(db);
+    tiku_rect_t r = tiku_trk_deskbar_leaf_button_rect(db);
 
     return tiku_trk_deskbar_shown(db) && r.w > 0 && r.h > 0 &&
            db->pointer_x >= r.x && db->pointer_x < r.x + r.w &&
@@ -302,7 +303,7 @@ tiku_trk_deskbar_motion(tiku_trk_deskbar_t *db, int x, int y)
     db->pointer_y = y;
     if (leaf_button_hovered(db) != db->leaf_hover) {
         db->leaf_hover = !db->leaf_hover;
-        hover_touch(db, db_leaf_button_rect(db));
+        hover_touch(db, tiku_trk_deskbar_leaf_button_rect(db));
         changed = 1;
     }
     rowh = font->height + 6;
@@ -693,6 +694,17 @@ tiku_trk_deskbar_popup_at(const tiku_trk_deskbar_t *db, int x, int y,
             popup_has(db_calendar_rect(db), x, y, frame));
 }
 
+tiku_rect_t
+tiku_trk_deskbar_leaf_bounds(const tiku_trk_deskbar_t *db)
+{
+    if (db == NULL || !db->menu_open) return (tiku_rect_t){0};
+    int rowh = tiku_font_plain()->height + 6;
+    tiku_rect_t leaf = db_leaf_menu_rect(db, rowh, db->leaf_count);
+    if (db->sub_of >= 0 && db->sub_count > 0)
+        return tiku_rect_union(leaf, db_sub_menu_rect(db, leaf, rowh));
+    return leaf;
+}
+
 int
 tiku_trk_deskbar_menu_bottom(const tiku_trk_deskbar_t *db)
 {
@@ -795,6 +807,38 @@ sub_row(tiku_trk_deskbar_t *db, int command, const char *label,
     return si;
 }
 
+/** @brief Append a group's launch rows in label order, up to @p limit total rows. */
+static void
+add_group_rows(tiku_trk_deskbar_t *db, int group, int limit)
+{
+    int first = db->sub_count, i;
+
+    for (i = 0; i < db->app_count && db->sub_count < limit;
+         i++) {
+        tiku_trk_db_item_t *si;
+
+        if (db->app[i].group != group) {
+            continue;
+        }
+        si = sub_row(db, TIKU_TRK_DB_LAUNCH_APP, db->app[i].label,
+                     db->app[i].icon[0] != '\0' ? db->app[i].icon
+                                                 : "application");
+        if (si != NULL) {
+            snprintf(si->path, sizeof si->path, "%s", db->app[i].command);
+        }
+    }
+    /* Sorted by label, ignoring case, by moving whole rows so each
+     * keeps its icon and launch path; equal labels keep their order. */
+    for (i = first + 1; i < db->sub_count; i++) {
+        tiku_trk_db_item_t item = db->sub[i];
+        int j = i;
+        while (j > first && strcasecmp(db->sub[j-1].label, item.label) > 0) {
+            db->sub[j] = db->sub[j-1]; j--;
+        }
+        db->sub[j] = item;
+    }
+}
+
 /** @brief Fill the submenu for leaf row @p at, or close it. */
 void
 db_open_sub(tiku_trk_deskbar_t *db, int at)
@@ -828,14 +872,15 @@ db_open_sub(tiku_trk_deskbar_t *db, int at)
                 "");
 #if TIKU_SHELL_BOARD_SERVICES
 
-        sub_row(db, TIKU_TRK_DB_DEVICE_PREFERENCES, "Devices Preferences…",
+        sub_row(db, TIKU_TRK_DB_DEVICE_PREFERENCES, "Devices",
                 "microcontroller");
 #endif
 
-        sub_row(db, TIKU_TRK_DB_STARTUP_PREFERENCES, "Startup Preferences…",
+        sub_row(db, TIKU_TRK_DB_STARTUP_PREFERENCES, "Startup",
                 "");
-        sub_row(db, TIKU_TRK_DB_ASSOC_PREFERENCES, "File Associations…",
+        sub_row(db, TIKU_TRK_DB_ASSOC_PREFERENCES, "File Associations",
                 "folder_prefs");
+        add_group_rows(db, TIKU_TRK_DB_GROUP_SETTINGS, TIKU_TRK_DB_SUB_MAX - 1);
         /* The label names the action: the opposite of the current
          * state. */
         sub_row(db, TIKU_TRK_DB_TOGGLE_REPLICANTS,
@@ -844,35 +889,9 @@ db_open_sub(tiku_trk_deskbar_t *db, int at)
                              : "menu.show_replicants"),
                 "package");
         break;
-    case TIKU_TRK_DB_EXPAND_APPS: {
-        int i;
-
-        for (i = 0; i < db->app_count && db->sub_count < TIKU_TRK_DB_SUB_MAX;
-             i++) {
-            tiku_trk_db_item_t *si;
-
-            if (db->app[i].group != it->which) {
-                continue;
-            }
-            si = sub_row(db, TIKU_TRK_DB_LAUNCH_APP, db->app[i].label,
-                         db->app[i].icon[0] != '\0' ? db->app[i].icon
-                                                     : "application");
-            if (si != NULL) {
-                snprintf(si->path, sizeof si->path, "%s", db->app[i].command);
-            }
-        }
-        /* Sorted by label, ignoring case, by moving whole rows so each
-         * keeps its icon and launch path; equal labels keep their order. */
-        for (i = 1; i < db->sub_count; i++) {
-            tiku_trk_db_item_t item = db->sub[i];
-            int j = i;
-            while (j > 0 && strcasecmp(db->sub[j-1].label, item.label) > 0) {
-                db->sub[j] = db->sub[j-1]; j--;
-            }
-            db->sub[j] = item;
-        }
+    case TIKU_TRK_DB_EXPAND_APPS:
+        add_group_rows(db, it->which, TIKU_TRK_DB_SUB_MAX);
         break;
-    }
     case TIKU_TRK_DB_EXPAND_RECENT: {
         int i;
 
@@ -1640,7 +1659,7 @@ db_draw_leaf(tiku_trk_deskbar_t *db, tiku_surface_t *s, const tiku_font_t *fb,
     int down = db->menu_open;
     tiku_rgb_t face;
 
-    (*leaf) = db_leaf_button_rect(db);
+    (*leaf) = tiku_trk_deskbar_leaf_button_rect(db);
     /* The button moves when a hidden bar comes back or the bar changes
      * edge, so the hover is worked out again from the last pointer. */
     db->leaf_hover = leaf_button_hovered(db);

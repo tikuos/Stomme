@@ -92,15 +92,7 @@ tiku_trk_builtin_damage(tiku_window_t *window, tiku_rect_t rect)
         return;
     }
     tiku_workspace_cache_forget(app->desk, window);
-    /* Content alone changed, so the window's shadow needs no repaint: the
-     * rectangle joins the damage as it is, unless a full frame comes. */
-    if (app->dirty == 1) {
-        return;
-    }
-    app->damage = app->dirty == 2
-        ? tiku_rect_union(app->damage, (tiku_rect_t){ x0, y0, x1 - x0, y1 - y0 })
-        : (tiku_rect_t){ x0, y0, x1 - x0, y1 - y0 };
-    app->dirty = 2;
+    desktop_damage_rect(app, (tiku_rect_t){ x0, y0, x1 - x0, y1 - y0 });
 }
 
 /**

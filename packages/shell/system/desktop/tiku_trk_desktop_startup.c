@@ -236,6 +236,7 @@ typedef struct {
     tiku_rect_t group, restore, fallback, list;
     tiku_rect_t previous, next, clear, cancel, save;
     int heading, note;
+    int rows; /**< visible list rows on each page */
 } start_layout_t;
 
 /** @brief The window's layout, shared by drawing and input. */
@@ -252,7 +253,15 @@ static start_layout_t start_layout(tiku_rect_t c)
     l.fallback.y += row;
     l.heading = y + l.group.h + 24;
     l.list = (tiku_rect_t){c.x + 18, l.heading + 10,
-                         c.w - 36, START_PAGE * row + 8};
+                         c.w - 36, 0};
+    int overhead = l.list.y - c.y + 8 + 8 + 2 * button +
+        tiku_font_plain()->height + 28 + 12;
+    l.rows = START_PAGE;
+    if (c.h > 0 && c.h < overhead + l.rows * row) {
+        l.rows = (c.h - overhead) / row;
+        if (l.rows < 1) l.rows = 1;
+    }
+    l.list.h = l.rows * row + 8;
     y = l.list.y + l.list.h + 8;
     l.previous = (tiku_rect_t){c.x + c.w - 82, y, 28, button};
     l.next = (tiku_rect_t){c.x + c.w - 46, y, 28, button};
@@ -283,13 +292,13 @@ static void start_controls(struct desktop_startup *p, start_layout_t l)
     tiku_dialog_begin(&p->dialog, START_SAVE, START_CANCEL);
     tiku_dialog_add(&p->dialog, 0, l.restore, TIKU_DIALOG_TOGGLE, 1);
     tiku_dialog_add(&p->dialog, 1, l.fallback, TIKU_DIALOG_TOGGLE, 1);
-    for (int i = p->page; i < p->count && i < p->page + START_PAGE; i++)
+    for (int i = p->page; i < p->count && i < p->page + l.rows; i++)
         tiku_dialog_add(&p->dialog, i + 2, start_app_row(l, i - p->page),
                         TIKU_DIALOG_TOGGLE, 1);
     tiku_dialog_add(&p->dialog, START_PREVIOUS, l.previous,
                     TIKU_DIALOG_BUTTON, p->page > 0);
     tiku_dialog_add(&p->dialog, START_NEXT, l.next, TIKU_DIALOG_BUTTON,
-                    p->page + START_PAGE < p->count);
+                    p->page + l.rows < p->count);
     tiku_dialog_add(&p->dialog, START_CLEAR, l.clear, TIKU_DIALOG_BUTTON, 1);
     tiku_dialog_add(&p->dialog, START_CANCEL, l.cancel, TIKU_DIALOG_BUTTON, 1);
     tiku_dialog_add(&p->dialog, START_SAVE, l.save, TIKU_DIALOG_BUTTON, 1);
@@ -348,7 +357,7 @@ static void start_draw(tiku_window_t *w, tiku_surface_t *s,
     tiku_text(s, tiku_font_bold(), l.list.x, l.heading,
               "Open these applications", TIKU_C_TEXT);
     tiku_ui_sunken(s, l.list, TIKU_C_DOC);
-    for (i = p->page; i < p->count && i < p->page + START_PAGE; i++) {
+    for (i = p->page; i < p->count && i < p->page + l.rows; i++) {
         tiku_rect_t r = start_app_row(l, i - p->page);
         start_check(s, r, NULL, p->items[i].enabled,
                     tiku_dialog_focused(&p->dialog, i + 2));
@@ -367,16 +376,16 @@ static void start_draw(tiku_window_t *w, tiku_surface_t *s,
     for (i = 0; i < p->count; i++) enabled += p->items[i].enabled != 0;
     snprintf(count, sizeof count, "%d selected", enabled);
     tiku_text(s, f, l.list.x, l.next.y + f->ascent + 4, count, quiet);
-    if (p->count > START_PAGE) {
-        snprintf(count, sizeof count, "%d / %d", p->page / START_PAGE + 1,
-                 (p->count + START_PAGE - 1) / START_PAGE);
+    if (p->count > l.rows) {
+        snprintf(count, sizeof count, "%d / %d", p->page / l.rows + 1,
+                 (p->count + l.rows - 1) / l.rows);
         tiku_text(s, f, l.previous.x - tiku_text_width(f, count) - 12,
                   l.next.y + f->ascent + 4, count, quiet);
         tiku_ui_button(s, l.previous, "<", start_flags(p, START_PREVIOUS) |
                        (p->page ? 0 : TIKU_S_DISABLED));
         tiku_ui_button(s, l.next, ">",
             start_flags(p, START_NEXT) |
-            (p->page + START_PAGE < p->count ? 0 : TIKU_S_DISABLED));
+            (p->page + l.rows < p->count ? 0 : TIKU_S_DISABLED));
     }
     tiku_text_line_draw(s, (tiku_rect_t){c.x + 18, l.note - f->ascent,
         c.w - 36, f->height}, TIKU_MEASURE_PLAIN, p->status[0] ? p->status :
@@ -415,8 +424,8 @@ static int start_event(tiku_window_t *w, const tiku_event_t *ev, void *ctx)
         if (ev->key == 'w') id = START_CANCEL;
     }
     if (id >= 0 && id < p->count + 2) start_toggle(p, id);
-    if (id == START_PREVIOUS) p->page -= START_PAGE;
-    if (id == START_NEXT) p->page += START_PAGE;
+    if (id == START_PREVIOUS) p->page = p->page > l.rows ? p->page - l.rows : 0;
+    if (id == START_NEXT) p->page += l.rows;
     if (id == START_CLEAR) {
         p->restore = p->fallback = 0;
         for (int i = 0; i < p->count; i++) p->items[i].enabled = 0;
@@ -466,6 +475,7 @@ void desktop_startup_open(desktop_t *app)
     r.h = l.save.y + l.save.h + 44;
     r.x = (app->surf->w - r.w) / 2;
     r.y = (app->surf->h - r.h) / 3;
+    r = tiku_trk_deskbar_fit_panel(app->deskbar, app->surf->w, app->surf->h, r);
     p->window = tiku_workspace_open(app->desk, "Startup Preferences", r,
                                     start_draw, p, NULL);
     if (p->window != NULL) {

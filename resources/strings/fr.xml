@@ -35,7 +35,7 @@
   <string name="label.recent_applications">Applications récentes</string>
 
   <string name="title.deskbar_prefs">Préférences du Deskbar</string>
-  <string name="title.desktop_prefs">Préférences de Desktop</string>
+  <string name="title.desktop_prefs">Préférences du bureau</string>
   <string name="title.fonts">Polices</string>
 
   <string name="menu.about">À propos de ce système</string>
@@ -52,10 +52,11 @@
   <string name="menu.development">Développement</string>
   <string name="menu.device_tools">Outils pour appareils</string>
   <string name="menu.demos">Démonstrations</string>
-  <string name="menu.deskbar_prefs">Préférences du Deskbar…</string>
-  <string name="menu.tracker_prefs">Préférences de File Manager…</string>
-  <string name="menu.desktop_prefs">Préférences de Desktop…</string>
-  <string name="menu.fonts">Polices…</string>
+  <string name="menu.deskbar_prefs">Deskbar</string>
+  <string name="menu.tracker_prefs">Gestionnaire de fichiers</string>
+  <string name="menu.desktop_prefs">Bureau</string>
+  <string name="menu.fonts">Polices</string>
+  <string name="menu.sounds">Sons</string>
   <string name="menu.show_replicants">Afficher les replicants</string>
   <string name="menu.hide_replicants">Masquer les replicants</string>
   <string name="menu.shut_down">Arrêter…</string>
@@ -87,7 +88,11 @@
   <string name="prefs.desktop.picture">Image</string>
   <string name="prefs.desktop.no_picture">Aucune image</string>
   <string name="prefs.desktop.drop_hint">Déposez une image dans le bureau pour la proposer ici</string>
-  <string name="prefs.desktop.how_laid">Disposition</string>
+  <string name="prefs.desktop.justification">Disposition</string>
+  <string name="prefs.desktop.browse">Double-cliquez sur + pour choisir une image</string>
+  <string name="prefs.desktop.invalid_picture">Impossible d’ouvrir cette image.</string>
+  <string name="prefs.desktop.pixels">Taille des icônes en pixels (16–128)</string>
+  <string name="prefs.desktop.apply">Appliquer</string>
   <string name="prefs.desktop.mode.corner">Dans son coin</string>
   <string name="prefs.desktop.mode.centred">Centrée</string>
   <string name="prefs.desktop.mode.scaled">Ajustée</string>

@@ -17,6 +17,35 @@
 #include "tiku_trk_desktop_private.h"
 #include <limits.h>
 
+/** @brief Keep visible windows' close controls clear of the display edges. */
+void
+desktop_keep_window_tabs_visible(desktop_t *app)
+{
+    if (!app->surf || !app->desk) return;
+    tiku_rect_t area = tiku_trk_deskbar_work_area(app->deskbar,
+                                               app->surf->w, app->surf->h);
+    int tab_h = tiku_window_tab_h(), button = tiku_window_tab_button() + 6;
+    int right = area.x + area.w - button, bottom = area.y + area.h - tab_h;
+    if (right < area.x || bottom < area.y) return;
+
+    for (int i = 0; i < tiku_workspace_count(app->desk); i++) {
+        tiku_window_t *w = tiku_workspace_at(app->desk, i);
+        if (!w || !w->open || w->plain || w->minimized) continue;
+
+        int x = w->frame.x, y = w->frame.y;
+        if (x < area.x) x = area.x;
+        if (x > right) x = right;
+        if (y < area.y) y = area.y;
+        if (y > bottom) y = bottom;
+        if (x == w->frame.x && y == w->frame.y) continue;
+
+        w->frame.x = x;
+        w->frame.y = y;
+        tiku_workspace_cache_forget(app->desk, w);
+        desktop_damage_all(app);
+    }
+}
+
 /** @brief Send an embedded or remote application's window a resize event
  *         carrying its content size. */
 static void
@@ -220,13 +249,39 @@ tab_box_release(desktop_t *app, const tiku_event_t *ev, tiku_rect_t *damage)
     desktop_scope_begin(app, &scope);
     w->pressed = 0;
     app->box_press = NULL;
-    if (on && w->open) {
-        tab_box_act(app, w, hit, app->box_mods);
+    if (!on) {
+        *damage = desktop_scope_bound(app, &scope, NULL, w->frame, 0);
+        return 1;
     }
-    /* A box that acted closed, zoomed or shaded its window: all.  One let
-     * go off the box redraws only its own frame. */
-    *damage = on ? tiku_trk_damage_all()
-                 : desktop_scope_bound(app, &scope, NULL, w->frame, 0);
+    /* Closing the last local folder or Desktop preferences exposes its
+     * frame and changes the two bars. The controllers also serve callers
+     * which request their own full repaint through the dirty flag. */
+    int **request = NULL, local_dirty = 0, *saved = NULL;
+    tiku_rect_t frame = w->frame, bar = tiku_trk_deskbar_frame(app->deskbar);
+    if (hit == TIKU_HIT_CLOSE && scope.count == 1 && w->open &&
+        app->dirty != 1 && !(app->box_mods & (TIKU_MOD_CMD | TIKU_MOD_OPTION))) {
+        if (w == tiku_trk_desktop_prefs_window_handle(&app->desktop_prefs_window))
+            request = &app->desktop_prefs_window.dirty;
+        else if (folder_of(app, w))
+            request = &app->folder_lifecycle.dirty;
+    }
+    if (request) {
+        saved = *request;
+        *request = &local_dirty;
+    }
+    if (w->open) tab_box_act(app, w, hit, app->box_mods);
+    if (request) *request = saved;
+    *damage = tiku_trk_damage_all();
+    if (request && app->dirty != 1 && !w->open && !tiku_workspace_count(app->desk)) {
+        desktop_scope_t after;
+        desktop_scope_begin(app, &after);
+        if (after.menus == scope.menus && after.overlays == scope.overlays) {
+            desktop_publish_teams(app);
+            desktop_damage_later(app, tiku_rect_union(bar, tiku_trk_deskbar_frame(app->deskbar)));
+            desktop_damage_later(app, global_bar_rect(app));
+            *damage = frame;
+        }
+    }
     return 1;
 }
 
@@ -735,6 +790,11 @@ windows_key(void *self, const tiku_event_t *ev, tiku_rect_t *damage)
     *damage = tiku_trk_damage_none();
     if (ev->type != TIKU_EVENT_KEY_DOWN) {
         return 0;
+    }
+    if (w && w == app->desktop_prefs_window.window &&
+        app->desktop_prefs_window.editing_size && tiku_window_send(w, ev)) {
+        *damage = tiku_trk_damage_all();
+        return 1;
     }
     if (panel_key(app, key, key_char(ev))) {
         return 1;
