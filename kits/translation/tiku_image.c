@@ -566,6 +566,12 @@ done:
 tiku_image_err_t
 tiku_image_load(const char *path, tiku_image_t *out)
 {
+    return tiku_image_load_fit(path, 0, 0, out);
+}
+
+tiku_image_err_t
+tiku_image_load_fit(const char *path, int max_w, int max_h, tiku_image_t *out)
+{
     unsigned char *b = NULL;
     long n;
     tiku_image_err_t rc;
@@ -577,7 +583,7 @@ tiku_image_load(const char *path, tiku_image_t *out)
     if (n < 0) {
         return n == -2 ? TIKU_IMG_NO_MEMORY : TIKU_IMG_BAD;
     }
-    rc = tiku_image_decode(b, (size_t)n, out);
+    rc = tiku_image_decode_fit(b, (size_t)n, max_w, max_h, out);
     free(b);
     return rc;
 }

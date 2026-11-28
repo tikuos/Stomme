@@ -37,6 +37,20 @@ static tiku_surface_t *capture(void *context,const tiku_surface_t *s,tiku_rect_t
 /** @brief Count release of the test snapshot. */
 static void release(void *context,tiku_surface_t *s)
 { (void)context;if(s==&snapshot)++released; }
+/** @brief Lend pixels for the single window's client cache. */
+static tiku_surface_t *client_cache(void *context, int width, int height,
+                                    int scale, tiku_rgb_t ground)
+{
+    static tiku_rgb_t client_pixels[200 * 120];
+    static tiku_surface_t client;
+    (void)context;
+    (void)ground;
+    if (scale != 1 || width > 200 || height > 120) return NULL;
+    client = (tiku_surface_t){ .w = width, .h = height, .scale = scale, .px = client_pixels };
+    tiku_clip_reset(&client);
+    return &client;
+}
+
 /** @brief Exercise native window behavior without native heap entry points. */
 int main(void)
 {
@@ -97,7 +111,8 @@ int main(void)
     tiku_workspace_deinit(ws);CHECK(captured==1&&released==1);
     /* A callback that resets its own clip still draws only in its content,
      * so a frame that reuses the window's cache matches a full frame. */
-    ws=tiku_workspace_init(storage.bytes,sizeof storage.bytes,&s,NULL);
+    ops=(tiku_workspace_surfaces_t){.create=client_cache,.release=release};
+    ws=tiku_workspace_init(storage.bytes,sizeof storage.bytes,&s,&ops);
     a=tiku_workspace_open(ws,"Overhang",(tiku_rect_t){40,40,200,120},overhang,&red,NULL);
     tiku_rect_t content=tiku_window_content(a),below={content.x,content.y+content.h-4,content.w,12};
     tiku_workspace_cache_mode(ws,TIKU_CACHE_REFRESH);tiku_workspace_draw(ws);
@@ -106,6 +121,16 @@ int main(void)
     memcpy(reference,pixels,sizeof pixels);
     tiku_workspace_cache_mode(ws,TIKU_CACHE_REUSE);tiku_clip_damage(&s,&below);tiku_workspace_draw(ws);
     tiku_clip_damage(&s,NULL);CHECK(!memcmp(reference,pixels,sizeof pixels));
+    tiku_workspace_begin_track(ws,a,TIKU_HIT_TAB,60,50);
+    CHECK(tiku_workspace_track(ws,76,57));
+    tiku_workspace_draw(ws);
+    memcpy(reference,pixels,sizeof pixels);
+    uint64_t hits;
+    tiku_workspace_cache_stats(ws,NULL,&hits,NULL);
+    CHECK(hits >= 2);
+    tiku_workspace_cache_mode(ws,TIKU_CACHE_OFF);
+    tiku_workspace_draw(ws);
+    CHECK(!memcmp(reference,pixels,sizeof pixels));
     tiku_workspace_deinit(ws);
     ws=tiku_workspace_init(storage.bytes,sizeof storage.bytes,&s,NULL);
     for(int i=0;i<TIKU_WINDOW_MAX;++i)CHECK(tiku_workspace_open(ws,"Window",(tiku_rect_t){0,0,180,90},NULL,NULL,NULL));

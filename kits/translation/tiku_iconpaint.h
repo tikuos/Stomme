@@ -117,6 +117,11 @@ void tiku_paint_band(tiku_surface_t *s, tiku_rect_t r,
 void tiku_paint_image(tiku_surface_t *s, const tiku_image_t *im,
                           tiku_rect_t dst, tiku_rect_t clip);
 
+/** @brief Draw packed rows of opaque 0x00RRGGBB pixels with the placement,
+ *         clipping and theme of tiku_paint_image(). */
+void tiku_paint_rgb_image(tiku_surface_t *s, const tiku_rgb_t *pixels,
+                          int width, int height, tiku_rect_t dst, tiku_rect_t clip);
+
 /**
  * @brief Draw @p text with a contrast halo around it (PVL-071, IV-049).
  *

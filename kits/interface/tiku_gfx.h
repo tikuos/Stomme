@@ -368,6 +368,19 @@ void tiku_veil(tiku_surface_t *s, tiku_rect_t r, tiku_rgb_t c,
 void tiku_fill(tiku_surface_t *s, tiku_rect_t r,
                     tiku_rgb_t c);
 
+#if defined(TIKU_GFX_NATIVE_RASTER) && TIKU_GFX_NATIVE_RASTER
+/** @brief Optional native fill of a clipped rectangle in a 32-bit surface.
+ * Return nonzero after filling every requested pixel, or zero to repaint
+ * the rectangle in software. The provider releases the pixels before return.
+ */
+int tiku_gfx_native_fill(tiku_rgb_t *first, unsigned stride, unsigned width,
+                         unsigned height, tiku_rgb_t color);
+/** @brief Optional same-scale copy. Both spans remain owned by the caller
+ * through return. A zero result requests the software copy. */
+int tiku_gfx_native_blit(tiku_rgb_t *to, unsigned dst_stride, const tiku_rgb_t *from,
+                         unsigned src_stride, unsigned width, unsigned height);
+#endif
+
 /** @brief One-pixel outline just inside @p r. */
 void tiku_frame(tiku_surface_t *s, tiku_rect_t r,
                      tiku_rgb_t c);

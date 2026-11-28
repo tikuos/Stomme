@@ -744,6 +744,44 @@ static void cache_capture(tiku_workspace_t *ws, int slot, tiku_rect_t r,
     ws->cache[slot].valid = 1; ws->cache[slot].active = active;
 }
 
+/** @brief Whether this frame can copy the complete client from its cache. */
+static int
+cached_client(tiku_workspace_t *ws, tiku_window_t *w, tiku_rect_t r, int active)
+{
+    int slot = (int)(w - ws->windows);
+    const tiku_surface_t *p = ws->cache[slot].pixels;
+
+    return w->draw && !ws->surface->record && ws->cache_mode == TIKU_CACHE_REUSE &&
+           ws->cache[slot].valid && ws->cache[slot].active == active && p &&
+           p->w == r.w && p->h == r.h &&
+           p->scale == (ws->surface->scale > 0 ? ws->surface->scale : 1);
+}
+
+/** @brief Partition the part of the clip outside an opaque client into bands. */
+static int
+exposed_bands(tiku_rect_t clip, tiku_rect_t client, tiku_rect_t bands[4])
+{
+    int left = client.x > clip.x ? client.x : clip.x;
+    int top = client.y > clip.y ? client.y : clip.y;
+    int right = client.x + client.w < clip.x + clip.w ? client.x + client.w : clip.x + clip.w;
+    int bottom = client.y + client.h < clip.y + clip.h ? client.y + client.h : clip.y + clip.h;
+    int count = 0;
+
+    if (left >= right || top >= bottom) {
+        bands[0] = clip;
+        return 1;
+    }
+    if (top > clip.y)
+        bands[count++] = (tiku_rect_t){ clip.x, clip.y, clip.w, top - clip.y };
+    if (bottom < clip.y + clip.h)
+        bands[count++] = (tiku_rect_t){ clip.x, bottom, clip.w, clip.y + clip.h - bottom };
+    if (left > clip.x)
+        bands[count++] = (tiku_rect_t){ clip.x, top, left - clip.x, bottom - top };
+    if (right < clip.x + clip.w)
+        bands[count++] = (tiku_rect_t){ right, top, clip.x + clip.w - right, bottom - top };
+    return count;
+}
+
 /**
  * @brief Draw window @p w's content in @p r: from its cache under
  *        TIKU_CACHE_REUSE when the cache matches, otherwise through its
@@ -761,10 +799,7 @@ static void draw_content(tiku_workspace_t *ws, tiku_window_t *w,
     if (!w->draw || r.w <= 0 || r.h <= 0) return;
     tiku_clip_set(s, r);
     if (s->clip.w <= 0 || s->clip.h <= 0) { tiku_clip_reset(s); return; }
-    if (!s->record && ws->cache_mode == TIKU_CACHE_REUSE &&
-        ws->cache[slot].valid && ws->cache[slot].active == active && p &&
-        p->w == r.w && p->h == r.h &&
-        p->scale == (s->scale > 0 ? s->scale : 1)) {
+    if (cached_client(ws, w, r, active)) {
         tiku_blit(s, r.x, r.y, p); ws->cache_hits++;
     } else {
         int bounded = s->damage_active;
@@ -830,9 +865,19 @@ draw_window_at(tiku_workspace_t *workspace, tiku_window_t *window,
     /* The shadow is the body's; the tab stands in the band above it. */
     tiku_shadow(surface, body, TIKU_WINDOW_SHADOW_RADIUS, radius,
                 (active ? 0.45f : 0.30f) * lift);
-    tiku_fill_round(surface, body, radius,
-                    show_tab ? TIKU_CORNER_ALL & ~TIKU_CORNER_TL :
-                               TIKU_CORNER_ALL, TIKU_C_PANEL);
+    unsigned corners = show_tab ? TIKU_CORNER_ALL & ~TIKU_CORNER_TL : TIKU_CORNER_ALL;
+    if (cached_client(workspace, window, content, active)) {
+        tiku_rect_t clip = surface->clip, bands[4];
+        int count = exposed_bands(clip, content, bands);
+
+        for (int i = 0; i < count; i++) {
+            tiku_clip_set(surface, bands[i]);
+            tiku_fill_round(surface, body, radius, corners, TIKU_C_PANEL);
+        }
+        tiku_clip_set(surface, clip);
+    } else {
+        tiku_fill_round(surface, body, radius, corners, TIKU_C_PANEL);
+    }
     tiku_frame_round(surface, body, radius,
                      show_tab ? TIKU_CORNER_ALL & ~TIKU_CORNER_TL :
                                 TIKU_CORNER_ALL, dark);

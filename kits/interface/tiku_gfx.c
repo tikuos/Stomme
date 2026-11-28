@@ -478,6 +478,12 @@ tiku_blit(tiku_surface_t *dst, int x, int y,
         long dstride = tiku_surface_stride(dst);
         long sstride = tiku_surface_stride(src);
 
+#if defined(TIKU_GFX_NATIVE_RASTER) && TIKU_GFX_NATIVE_RASTER
+        if (tiku_gfx_native_blit(dst->px + (long)y0 * sc * dstride + (long)x0 * sc,
+                (unsigned)dstride, src->px + (long)(y0-y) * sc * sstride + (long)(x0-x) * sc,
+                (unsigned)sstride, (unsigned)(x1-x0) * sc, (unsigned)(y1-y0) * sc))
+            return;
+#endif
         for (row = y0; row < y1; row++) {
             for (sub = 0; sub < sc; sub++) {
                 memcpy(dst->px + ((long)row * sc + sub) * dstride +
@@ -1121,6 +1127,15 @@ tiku_fill(tiku_surface_t *s, tiku_rect_t r, tiku_rgb_t c)
         int sc = scale_of(s);
         long stride = tiku_surface_stride(s);
 
+#if defined(TIKU_GFX_NATIVE_RASTER) && TIKU_GFX_NATIVE_RASTER
+        if (x1 > x0 && y1 > y0 && tiku_gfx_native_fill(
+                s->px + (long)y0 * sc * stride + (long)x0 * sc,
+                (unsigned)stride, (unsigned)(x1-x0) * sc,
+                (unsigned)(y1-y0) * sc, c)) {
+            tiku_gfx_rec_leave(s, rec);
+            return;
+        }
+#endif
         for (y = (long)y0 * sc; y < (long)y1 * sc; y++) {
             tiku_rgb_t *row = s->px + (long)y * stride;
             for (x = (long)x0 * sc; x < (long)x1 * sc; x++) {

@@ -17,6 +17,17 @@ import check_pixels
 class RenderingTests(unittest.TestCase):
     """Compare real rendering and require faulted ownership paths to fail."""
 
+    def test_native_rectangles(self):
+        """Accepted and declined raster requests honor clip, stride and scale."""
+        with tempfile.TemporaryDirectory() as temp:
+            binary = Path(temp) / 'rectangles'
+            subprocess.run(['cc', '-std=c11', '-O2', '-ffunction-sections',
+                            '-DTIKU_PORTABLE_UI=1', '-DTIKU_GFX_NATIVE_RASTER=1',
+                            '-Ikits/interface', 'tests/portable/native_rectangles.c',
+                            'kits/interface/tiku_gfx.c', '-Wl,--gc-sections', '-o', str(binary)],
+                           cwd=ROOT, check=True)
+            subprocess.run([str(binary)], check=True)
+
     def test_rendering_and_mutations(self):
         """Reject early reuse, stale completion, lost cancellation and pixel corruption."""
         with tempfile.TemporaryDirectory() as temp:

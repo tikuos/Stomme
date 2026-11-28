@@ -435,47 +435,93 @@ tiku_paint_band(tiku_surface_t *s, tiku_rect_t r,
     }
 }
 
-void
-tiku_paint_image(tiku_surface_t *s, const tiku_image_t *im,
-                     tiku_rect_t dst, tiku_rect_t clip)
+/** @brief Restrict a surface interval to the part covered by a picture or clip. */
+static void
+image_span(int origin, int length, int *begin, int *end)
 {
-    int px, py;
+    int64_t limit = (int64_t)origin + length;
 
-    if (s == NULL || im == NULL || im->px == NULL || im->w <= 0 ||
-        im->h <= 0 || dst.w <= 0 || dst.h <= 0) {
+    if (origin > *begin) *begin = origin;
+    if (limit < *end) *end = (int)limit;
+}
+
+static void
+paint_pixels(tiku_surface_t *s, const uint32_t *pixels, int width, int height,
+             int rgb, tiku_rect_t dst, tiku_rect_t clip)
+{
+    if (s == NULL || pixels == NULL || width <= 0 || height <= 0 || dst.w <= 0 || dst.h <= 0) {
         return;
     }
-    if (s != NULL && s->record != NULL && s->record_depth == 0) {
-        tiku_dl_miss(s->record);        /* a picture has no command */
+    if (s->record != NULL && s->record_depth == 0) {
+        tiku_dl_miss(s->record);
     }
-    for (py = 0; py < dst.h; py++) {
-        int y = dst.y + py;
-        long sy = (long)py * im->h / dst.h;
+    if (clip.w <= 0 || clip.h <= 0) return;
+    int x0 = s->clip.x, y0 = s->clip.y;
+    int x1 = x0 + s->clip.w, y1 = y0 + s->clip.h;
+    image_span(dst.x, dst.w, &x0, &x1);
+    image_span(dst.y, dst.h, &y0, &y1);
+    image_span(clip.x, clip.w, &x0, &x1);
+    image_span(clip.y, clip.h, &y0, &y1);
+    if (x0 >= x1 || y0 >= y1) return;
 
-        if (y < clip.y || y >= clip.y + clip.h) {
+    int mono = tiku_theme_achromatic();
+    if (rgb && !mono && s->scale <= 1 && width == dst.w && height == dst.h) {
+        tiku_surface_t out = *s;
+        tiku_surface_t tile = { .px = (tiku_rgb_t *)pixels, .w = width, .h = height };
+
+        out.clip = (tiku_rect_t){ x0, y0, x1 - x0, y1 - y0 };
+        tiku_blit(&out, dst.x, dst.y, &tile);
+        return;
+    }
+    long stride = tiku_surface_stride(s);
+    int64_t start = ((int64_t)x0 - dst.x) * width;
+    int first = (int)(start / dst.w), phase = (int)(start % dst.w);
+    int step = width / dst.w, extra = width % dst.w;
+    for (int y = y0; y < y1; y++) {
+        size_t sy = (size_t)((((int64_t)y - dst.y) * height) / dst.h);
+        const uint32_t *src = pixels + sy * width;
+        int sx = first, remainder = phase;
+
+        if (s->scale <= 1 && !mono && width == dst.w) {
+            tiku_rgb_t *out = s->px + (long)y * stride + x0;
+            for (int x = x0; x < x1; x++) {
+                uint32_t p = src[sx++];
+                if (rgb || p >> 24) *out = p & 0xffffffu;
+                out++;
+            }
             continue;
         }
-        for (px = 0; px < dst.w; px++) {
-            int x = dst.x + px;
-            long sx = (long)px * im->w / dst.w;
-            uint32_t p;
-
-            if (x < clip.x || x >= clip.x + clip.w) {
-                continue;
+        for (int x = x0; x < x1; x++) {
+            uint32_t p = src[sx];
+            if (rgb || p >> 24) {
+                tiku_rgb_t c = p & 0xffffffu;
+                if (mono) c = tiku_grey(c);
+                if (s->scale <= 1) s->px[(long)y * stride + x] = c;
+                else tiku_pixel(s, x, y, c);
             }
-            p = im->px[sy * im->w + sx];
-            /* Transparent pixels are skipped: what is behind shows through
-             * a hole in the picture. */
-            if ((p >> 24) != 0u) {
-                tiku_rgb_t c = TIKU_RGB((p >> 16) & 0xffu,
-                                             (p >> 8) & 0xffu, p & 0xffu);
-
-                /* Greyed with everything else on an achromatic theme. */
-                tiku_pixel(s, x, y,
-                                tiku_theme_achromatic() ? tiku_grey(c) : c);
+            sx += step;
+            if (remainder >= dst.w - extra) {
+                sx++;
+                remainder -= dst.w - extra;
+            } else {
+                remainder += extra;
             }
         }
     }
+}
+
+void
+tiku_paint_image(tiku_surface_t *s, const tiku_image_t *im,
+                 tiku_rect_t dst, tiku_rect_t clip)
+{
+    if (im) paint_pixels(s, im->px, im->w, im->h, 0, dst, clip);
+}
+
+void
+tiku_paint_rgb_image(tiku_surface_t *s, const tiku_rgb_t *pixels,
+                     int width, int height, tiku_rect_t dst, tiku_rect_t clip)
+{
+    paint_pixels(s, pixels, width, height, 1, dst, clip);
 }
 
 void

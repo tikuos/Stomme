@@ -98,6 +98,10 @@ int tiku_image_data_png_size(const char *uri, size_t length, int *w, int *h);
  *  @return An image status; failure leaves @p out untouched. */
 tiku_image_err_t tiku_image_data_png(const char *uri, size_t length, tiku_image_t *out);
 
+/** @brief Read a regular image file at the dimensions chosen by tiku_image_decode_fit(). */
+tiku_image_err_t tiku_image_load_fit(const char *path, int max_w, int max_h,
+                                     tiku_image_t *out);
+
 /** @brief Free @p im's pixels and empty it; NULL is ignored. */
 void tiku_image_free(tiku_image_t *im);
 
